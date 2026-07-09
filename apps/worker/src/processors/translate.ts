@@ -28,11 +28,18 @@ export async function translateProcessor(job: Job<JobPayload>) {
     .limit(1);
   if (!original) throw new Error("Video chưa có phụ đề gốc để dịch");
 
-  const style = (video.translationStyle ?? "natural") as TranslationStyle;
+  const style = (typeof job.data.params.style === "string"
+    ? job.data.params.style
+    : (video.translationStyle ?? "natural")) as TranslationStyle;
+  const customPrompt =
+    typeof job.data.params.customPrompt === "string"
+      ? job.data.params.customPrompt
+      : null;
   const result = await translateSegments(
     {
       segments: original.segments as SubtitleSegment[],
       style,
+      customPrompt,
       glossary: video.glossary,
     },
     (pct) => void job.updateProgress(Math.min(95, pct)),

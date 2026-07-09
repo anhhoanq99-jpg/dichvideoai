@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, Loader2, Replace, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Download,
+  Loader2,
+  Replace,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react";
 import type { SubtitleSegment } from "@dichvideo/shared";
 import { useEditorState } from "@/hooks/use-editor-state";
+import { RetranslateModal } from "./retranslate-modal";
 import { SegmentTable } from "./segment-table";
 
 const SAVE_LABELS = {
@@ -17,6 +26,7 @@ const SAVE_LABELS = {
 interface EditorShellProps {
   videoId: string;
   trackId: string;
+  originalTrackId: string | null;
   trackVersion: number;
   original: SubtitleSegment[];
   translated: SubtitleSegment[];
@@ -25,6 +35,7 @@ interface EditorShellProps {
 export function EditorShell({
   videoId,
   trackId,
+  originalTrackId,
   trackVersion,
   original,
   translated,
@@ -37,6 +48,9 @@ export function EditorShell({
   const [find, setFind] = useState("");
   const [replace, setReplace] = useState("");
   const [replaceMsg, setReplaceMsg] = useState<string | null>(null);
+  const [showRetranslate, setShowRetranslate] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [overlay, setOverlay] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -69,15 +83,24 @@ export function EditorShell({
       {/* Left: video + tools */}
       <div className="flex w-2/5 min-w-72 flex-col gap-3">
         {previewUrl ? (
-          <video
-            ref={videoRef}
-            src={previewUrl}
-            controls
-            className="w-full rounded-lg bg-black"
-            onTimeUpdate={(e) =>
-              setCurrentMs(Math.round(e.currentTarget.currentTime * 1000))
-            }
-          />
+          <div className="relative overflow-hidden rounded-lg">
+            <video
+              ref={videoRef}
+              src={previewUrl}
+              controls
+              className="w-full bg-black"
+              onTimeUpdate={(e) =>
+                setCurrentMs(Math.round(e.currentTarget.currentTime * 1000))
+              }
+            />
+            {overlay && activeIndex >= 0 && segments[activeIndex]?.text && (
+              <div className="pointer-events-none absolute inset-x-4 bottom-12 text-center">
+                <span className="inline-block max-w-full rounded bg-black/70 px-2 py-0.5 text-sm font-medium leading-snug text-white">
+                  {segments[activeIndex].text}
+                </span>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex aspect-video items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-400 dark:bg-neutral-900">
             Đang tải video…
@@ -120,14 +143,24 @@ export function EditorShell({
           )}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
-          <input
-            type="checkbox"
-            checked={autoScroll}
-            onChange={(e) => setAutoScroll(e.target.checked)}
-          />
-          Tự cuộn theo video
-        </label>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+            <input
+              type="checkbox"
+              checked={autoScroll}
+              onChange={(e) => setAutoScroll(e.target.checked)}
+            />
+            Tự cuộn theo video
+          </label>
+          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+            <input
+              type="checkbox"
+              checked={overlay}
+              onChange={(e) => setOverlay(e.target.checked)}
+            />
+            Hiện phụ đề trên video
+          </label>
+        </div>
       </div>
 
       {/* Right: table + toolbar */}
@@ -150,20 +183,64 @@ export function EditorShell({
             >
               Lưu ngay
             </button>
-            <a
-              href={`/api/tracks/${trackId}/export?format=srt`}
-              className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            <button
+              type="button"
+              onClick={() => setShowRetranslate(true)}
+              className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700"
             >
-              <Download className="h-3 w-3" /> SRT
-            </a>
-            <a
-              href={`/api/tracks/${trackId}/export?format=vtt`}
-              className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            >
-              <Download className="h-3 w-3" /> VTT
-            </a>
+              <Sparkles className="h-3 w-3" /> Dịch lại AI
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExportOpen((v) => !v)}
+                className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              >
+                <Download className="h-3 w-3" /> Xuất file{" "}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {exportOpen && (
+                <div
+                  className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-200 bg-white py-1 text-xs shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
+                  onClick={() => setExportOpen(false)}
+                >
+                  {[
+                    { href: `/api/tracks/${trackId}/export?format=srt`, label: "Phụ đề dịch (.SRT)" },
+                    { href: `/api/tracks/${trackId}/export?format=vtt`, label: "Phụ đề dịch (.VTT)" },
+                    { href: `/api/tracks/${trackId}/export?format=txt`, label: "Văn bản dịch (.TXT)" },
+                    ...(originalTrackId
+                      ? [
+                          {
+                            href: `/api/tracks/${originalTrackId}/export?format=srt`,
+                            label: "Phụ đề gốc (.SRT)",
+                          },
+                          {
+                            href: `/api/tracks/${originalTrackId}/export?format=txt`,
+                            label: "Văn bản gốc (.TXT)",
+                          },
+                        ]
+                      : []),
+                  ].map((item) => (
+                    <a
+                      key={item.href + item.label}
+                      href={item.href}
+                      className="block px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        {showRetranslate && (
+          <RetranslateModal
+            videoId={videoId}
+            lineCount={segments.length}
+            onClose={() => setShowRetranslate(false)}
+          />
+        )}
         <div className="min-h-0 flex-1">
           <SegmentTable
             original={original}

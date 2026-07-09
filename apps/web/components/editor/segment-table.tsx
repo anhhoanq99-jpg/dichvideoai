@@ -12,6 +12,15 @@ function fmt(ms: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${milli}`;
 }
 
+/** chars/second — tốc độ đọc; phụ đề Việt thường thoải mái tới ~20 C/S */
+const CPS_WARN = 20;
+
+function cps(seg: SubtitleSegment): number | null {
+  const durS = (seg.endMs - seg.startMs) / 1000;
+  if (durS <= 0) return null;
+  return Math.round((seg.text.replace(/\s/g, "").length / durS) * 10) / 10;
+}
+
 interface SegmentTableProps {
   original: SubtitleSegment[];
   translated: SubtitleSegment[];
@@ -71,13 +80,38 @@ export function SegmentTable({
                 isActive && "bg-indigo-50/70 dark:bg-indigo-950/30",
               )}
             >
-              <button
-                type="button"
-                onClick={() => onRowClick(seg.startMs)}
-                className="font-mono text-xs text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400"
-              >
-                {fmt(seg.startMs)} → {fmt(seg.endMs)}
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRowClick(seg.startMs)}
+                  className="font-mono text-xs text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                >
+                  #{row.index + 1} · {fmt(seg.startMs)} → {fmt(seg.endMs)} ·{" "}
+                  {seg.endMs - seg.startMs}ms
+                </button>
+                {(() => {
+                  const v = cps(seg);
+                  if (v === null) return null;
+                  const slow = v <= CPS_WARN;
+                  return (
+                    <span
+                      title={
+                        slow
+                          ? "Tốc độ đọc ổn"
+                          : `Quá ${CPS_WARN} ký tự/giây — người xem khó đọc kịp, nên rút gọn câu`
+                      }
+                      className={cn(
+                        "shrink-0 font-mono text-[10px]",
+                        slow
+                          ? "text-neutral-400"
+                          : "font-semibold text-red-500",
+                      )}
+                    >
+                      {seg.text.replace(/\s/g, "").length} ký tự · {v} C/S
+                    </span>
+                  );
+                })()}
+              </div>
               <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
                 {originalByI.get(seg.i) ?? ""}
               </p>

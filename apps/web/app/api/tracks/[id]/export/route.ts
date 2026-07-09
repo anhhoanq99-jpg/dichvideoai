@@ -27,9 +27,15 @@ export async function GET(
     return NextResponse.json({ error: "Không tìm thấy" }, { status: 404 });
   }
 
-  const format = req.nextUrl.searchParams.get("format") === "vtt" ? "vtt" : "srt";
+  const raw = req.nextUrl.searchParams.get("format");
+  const format = raw === "vtt" || raw === "txt" ? raw : "srt";
   const segments = row.track.segments as SubtitleSegment[];
-  const content = format === "vtt" ? segmentsToVtt(segments) : segmentsToSrt(segments);
+  const content =
+    format === "vtt"
+      ? segmentsToVtt(segments)
+      : format === "txt"
+        ? segments.map((s) => s.text).join("\n") + "\n"
+        : segmentsToSrt(segments);
   const base = row.videoName.replace(/\.[^.]+$/, "");
   const filename = `${base}.${row.track.lang}.${format}`;
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, videos } from "@dichvideo/db";
-import { EXTRACT_METHODS } from "@dichvideo/shared";
+import { EXTRACT_METHODS, UPLOAD_STYLE_IDS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { completeMultipart } from "@/lib/r2";
@@ -19,7 +19,7 @@ const schema = z.object({
     .object({
       method: z.enum(EXTRACT_METHODS),
       sourceLang: z.string().max(10).optional(),
-      style: z.enum(["natural", "formal", "literal"]).default("natural"),
+      style: z.enum(UPLOAD_STYLE_IDS).default("natural"),
       glossary: z.string().max(10_000).optional(),
     })
     .optional(),

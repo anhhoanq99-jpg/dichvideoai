@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { UPLOAD_PART_SIZE } from "@dichvideo/shared";
+import { UPLOAD_PART_SIZE, type TranslationStyleId } from "@dichvideo/shared";
 
 export type UploadState =
   | { phase: "idle" }
@@ -43,7 +43,7 @@ async function putPartWithRetry(
 export interface PipelineSettings {
   method: "ocr" | "stt";
   sourceLang?: string;
-  style: "natural" | "formal" | "literal";
+  style: TranslationStyleId;
   glossary?: string;
 }
 

@@ -12,7 +12,12 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
+import {
+  TRANSLATION_STYLES,
+  UPLOAD_ALLOWED_TYPES,
+  UPLOAD_MAX_BYTES,
+  type TranslationStyleId,
+} from "@dichvideo/shared";
 import {
   useMultipartUpload,
   type PipelineSettings,
@@ -41,11 +46,7 @@ const LANG_OPTIONS = [
   { value: "th", label: "ไทย (Thái)" },
 ];
 
-const STYLE_OPTIONS = [
-  { value: "natural" as const, label: "Tự nhiên — văn nói (khuyên dùng)" },
-  { value: "formal" as const, label: "Trang trọng — lịch sự" },
-  { value: "literal" as const, label: "Bám sát — dịch sát từng câu" },
-];
+const STYLE_OPTIONS = TRANSLATION_STYLES.filter((s) => s.id !== "custom");
 
 type FileStatus = "waiting" | "uploading" | "done" | "error";
 
@@ -58,7 +59,7 @@ export default function UploadPage() {
   // thiết lập pipeline (áp cho tất cả video trong danh sách)
   const [method, setMethod] = useState<"ocr" | "stt">("ocr");
   const [sourceLang, setSourceLang] = useState("");
-  const [style, setStyle] = useState<"natural" | "formal" | "literal">("natural");
+  const [style, setStyle] = useState<TranslationStyleId>("natural");
   const [glossary, setGlossary] = useState("");
 
   const [files, setFiles] = useState<File[]>([]);
@@ -175,8 +176,8 @@ export default function UploadPage() {
               className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
             >
               {STYLE_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>

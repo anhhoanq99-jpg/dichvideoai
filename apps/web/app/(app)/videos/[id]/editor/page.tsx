@@ -43,6 +43,7 @@ export default async function EditorPage({
       <EditorShell
         videoId={video.id}
         trackId={translated.id}
+        originalTrackId={original?.id ?? null}
         trackVersion={translated.version}
         original={(original?.segments ?? []) as SubtitleSegment[]}
         translated={translated.segments as SubtitleSegment[]}
