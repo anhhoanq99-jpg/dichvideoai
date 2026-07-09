@@ -37,6 +37,7 @@ export const workerEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
   WORKER_HEALTH_PORT: z.coerce.number().default(8787),
+  FFMPEG_DIR: z.string().optional(),
 });
 
 export type WebEnv = z.infer<typeof webEnvSchema>;

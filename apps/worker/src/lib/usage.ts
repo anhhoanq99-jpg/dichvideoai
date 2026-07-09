@@ -1,0 +1,33 @@
+import { createDb, usageEvents } from "@dichvideo/db";
+
+export interface UsageRecord {
+  provider: "groq" | "gemini" | "azure-tts" | "r2";
+  metric: "tokens_in" | "tokens_out" | "audio_sec" | "chars" | "bytes";
+  quantity: number;
+  costUsdMicros: number;
+}
+
+/** Provider unit prices in USD micros. Verify against provider pricing pages before Phase 6 launch. */
+export const PRICING = {
+  /** Groq whisper-large-v3-turbo: $0.04/hour → per audio second */
+  groqWhisperPerAudioSec: 0.04e6 / 3600,
+  /** Gemini 2.5 Flash input per token ($0.30 / 1M) */
+  gemini25FlashInPerTok: 0.3e6 / 1_000_000,
+  /** Gemini 2.5 Flash output per token ($2.50 / 1M) */
+  gemini25FlashOutPerTok: 2.5e6 / 1_000_000,
+} as const;
+
+export async function recordUsage(jobId: string, records: UsageRecord[]) {
+  if (records.length === 0) return 0;
+  const db = createDb();
+  await db.insert(usageEvents).values(
+    records.map((r) => ({
+      jobId,
+      provider: r.provider,
+      metric: r.metric,
+      quantity: Math.round(r.quantity),
+      costUsdMicros: Math.round(r.costUsdMicros),
+    })),
+  );
+  return records.reduce((acc, r) => acc + Math.round(r.costUsdMicros), 0);
+}

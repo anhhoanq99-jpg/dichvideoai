@@ -4,7 +4,9 @@ packages:
 overrides:
   ioredis: ^5.11.1
 allowBuilds:
+  '@google/genai': true
   esbuild: true
   msgpackr-extract: true
+  protobufjs: true
   sharp: true
   unrs-resolver: true
