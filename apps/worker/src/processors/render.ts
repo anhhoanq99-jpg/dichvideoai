@@ -15,7 +15,11 @@ import {
   type SubtitleSegment,
 } from "@dichvideo/shared";
 import { runFfmpeg } from "../lib/ffmpeg-run";
-import { buildFiltergraph, outputResolution } from "../lib/filtergraph";
+import {
+  buildFiltergraph,
+  outputResolution,
+  subBoxToMargins,
+} from "../lib/filtergraph";
 import { cleanupJobDir, downloadFromR2, getR2, jobTempDir } from "../lib/r2";
 import { logger } from "../logger";
 
@@ -63,6 +67,16 @@ export async function renderProcessor(job: Job<JobPayload>) {
     .padStart(2, "0")
     .toUpperCase();
 
+  // user-drawn subtitle box → margins (position + wrap width); falls back to marginV
+  const boxMargins = params.subBox
+    ? subBoxToMargins(
+        params.subBox,
+        video.width,
+        video.height,
+        params.aspect,
+      )
+    : undefined;
+
   const style = {
     ...preset,
     font: RENDER_FONTS.includes(params.font as (typeof RENDER_FONTS)[number])
@@ -70,7 +84,10 @@ export async function renderProcessor(job: Job<JobPayload>) {
       : preset.font,
     size: clamp(params.fontSize ?? preset.size, 20, 120),
     bold: params.bold ?? preset.bold,
-    marginV: clamp(params.marginV ?? preset.marginV, 0, 400),
+    marginV: boxMargins
+      ? boxMargins.marginV
+      : clamp(params.marginV ?? preset.marginV, 0, 400),
+    ...(boxMargins ? { marginL: boxMargins.marginL, marginR: boxMargins.marginR } : {}),
     borderStyle: (boxed ? 3 : 1) as 1 | 3,
     ...(params.primaryColor && HEX_RE.test(params.primaryColor)
       ? { primary: params.primaryColor }

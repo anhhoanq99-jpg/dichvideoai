@@ -78,3 +78,21 @@ test("outputResolution matches aspect presets", () => {
   assert.deepEqual(outputResolution({ srcWidth: 1280, srcHeight: 720, aspect: "keep" }), { w: 1280, h: 720 });
   assert.deepEqual(outputResolution({ srcWidth: 1280, srcHeight: 720, aspect: "9:16" }), { w: 1080, h: 1920 });
 });
+
+test("subBoxToMargins: keep aspect — direct pixel margins", async () => {
+  const { subBoxToMargins } = await import("./filtergraph");
+  const m = subBoxToMargins({ x: 0.1, y: 0.72, w: 0.8, h: 0.18 }, 1920, 1080, "keep");
+  assert.equal(m.marginL, 192);
+  assert.equal(m.marginR, 192); // 1920 - (192 + 1536)
+  assert.equal(m.marginV, Math.round(1080 - 0.9 * 1080)); // 108
+});
+
+test("subBoxToMargins: 9:16 — box follows centered fit transform", async () => {
+  const { subBoxToMargins } = await import("./filtergraph");
+  // 1920x1080 source into 1080x1920: s = 1080/1920 = 0.5625 → fg 1080x607.5, oy ≈ 656
+  const m = subBoxToMargins({ x: 0, y: 0.8, w: 1, h: 0.2 }, 1920, 1080, "9:16");
+  assert.equal(m.marginL, 0);
+  assert.equal(m.marginR, 0);
+  // bottom of fg = oy + 607.5 ≈ 1264 → marginV = 1920 - 1264 ≈ 656
+  assert.ok(Math.abs(m.marginV - 656) <= 2, `marginV=${m.marginV}`);
+});

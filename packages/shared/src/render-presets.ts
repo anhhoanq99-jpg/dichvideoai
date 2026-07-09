@@ -12,6 +12,9 @@ export interface SubtitleStyle {
   borderStyle: 1 | 3;
   /** vertical margin from bottom, in PlayRes pixels */
   marginV: number;
+  /** horizontal margins (PlayRes px) — control wrap width + horizontal center */
+  marginL?: number;
+  marginR?: number;
 }
 
 export interface StylePreset extends SubtitleStyle {
@@ -121,4 +124,10 @@ export interface RenderParams extends StyleOverrides {
   coverMode: CoverMode;
   /** manual cover regions — blurred/boxed for the whole duration */
   regions?: CoverRegion[];
+  /**
+   * Normalized (0..1, source space) box where subtitles render: text centers
+   * horizontally inside it, bottom-anchored at its lower edge, wraps to its
+   * width. Overrides marginV when present.
+   */
+  subBox?: CoverRegion;
 }

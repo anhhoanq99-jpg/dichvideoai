@@ -28,6 +28,7 @@ const schema = z.object({
   aspect: z.enum(["keep", "16:9", "9:16", "1:1"]).default("keep"),
   coverMode: z.enum(COVER_MODES).default("none"),
   regions: z.array(regionSchema).max(MAX_COVER_REGIONS).optional(),
+  subBox: regionSchema.optional(),
   // style overrides
   font: z.enum(RENDER_FONTS as unknown as [string, ...string[]]).optional(),
   fontSize: z.number().int().min(20).max(120).optional(),

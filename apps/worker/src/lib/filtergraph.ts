@@ -55,6 +55,53 @@ export function outputResolution(input: {
 }
 
 /**
+ * Map a normalized source-space box to OUTPUT pixel space, following the same
+ * transform the aspect reframe applies (scale to fit, centered — matches
+ * `scale=force_original_aspect_ratio=decrease` + centered overlay).
+ */
+export function mapSourceBoxToOutput(
+  box: CoverRegion,
+  srcWidth: number,
+  srcHeight: number,
+  aspect: AspectId,
+): { x: number; y: number; w: number; h: number } {
+  if (aspect === "keep") {
+    return {
+      x: Math.round(box.x * srcWidth),
+      y: Math.round(box.y * srcHeight),
+      w: Math.round(box.w * srcWidth),
+      h: Math.round(box.h * srcHeight),
+    };
+  }
+  const out = ASPECT_DIMS[aspect];
+  const s = Math.min(out.w / srcWidth, out.h / srcHeight);
+  const ox = (out.w - srcWidth * s) / 2;
+  const oy = (out.h - srcHeight * s) / 2;
+  return {
+    x: Math.round(ox + box.x * srcWidth * s),
+    y: Math.round(oy + box.y * srcHeight * s),
+    w: Math.round(box.w * srcWidth * s),
+    h: Math.round(box.h * srcHeight * s),
+  };
+}
+
+/** subBox → ASS style margins (an2 bottom-center inside the box). */
+export function subBoxToMargins(
+  box: CoverRegion,
+  srcWidth: number,
+  srcHeight: number,
+  aspect: AspectId,
+): { marginL: number; marginR: number; marginV: number } {
+  const out = outputResolution({ srcWidth, srcHeight, aspect });
+  const px = mapSourceBoxToOutput(box, srcWidth, srcHeight, aspect);
+  return {
+    marginL: Math.max(0, px.x),
+    marginR: Math.max(0, out.w - (px.x + px.w)),
+    marginV: Math.max(0, out.h - (px.y + px.h)),
+  };
+}
+
+/**
  * Compose the full -filter_complex graph:
  *   covers (source coordinate space) → aspect reframe → ass burn
  * Returns the graph string; final labeled output is [v].

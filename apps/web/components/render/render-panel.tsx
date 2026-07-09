@@ -12,7 +12,10 @@ import {
 } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 import { RegionSelector } from "./region-selector";
+import { SubtitlePositionBox } from "./subtitle-position-box";
 import { cn } from "@/lib/utils";
+
+const DEFAULT_SUB_BOX: CoverRegion = { x: 0.1, y: 0.72, w: 0.8, h: 0.18 };
 
 const COVER_OPTIONS: { value: CoverMode; label: string; hint: string }[] = [
   { value: "blur", label: "Làm mờ", hint: "Blur các vùng đã khoanh" },
@@ -43,6 +46,8 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [boxColor, setBoxColor] = useState("#000000");
   const [boxOpacity, setBoxOpacity] = useState(100);
   const [marginV, setMarginV] = useState(40);
+  const [customPosition, setCustomPosition] = useState(false);
+  const [subBox, setSubBox] = useState<CoverRegion>(DEFAULT_SUB_BOX);
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +97,7 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
         aspect,
         coverMode,
         ...(coverMode !== "none" && regions.length > 0 ? { regions } : {}),
+        ...(customPosition ? { subBox } : {}),
         ...(customize
           ? {
               font,
@@ -197,6 +203,33 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
               onChange={setRegions}
             />
           )}
+
+          {/* Vị trí phụ đề */}
+          <div>
+            <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={customPosition}
+                onChange={(e) => setCustomPosition(e.target.checked)}
+              />
+              Tự chọn vị trí phụ đề trên video (kéo &amp; co dãn)
+            </label>
+            {customPosition && previewUrl && (
+              <div className="mt-2">
+                <SubtitlePositionBox
+                  previewUrl={previewUrl}
+                  box={subBox}
+                  onChange={setSubBox}
+                  fontSize={fontSize}
+                  bold={bold}
+                  primaryColor={primaryColor}
+                  boxed={boxed}
+                  boxColor={boxColor}
+                  boxOpacity={boxOpacity}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Kiểu phụ đề */}
           <div className="flex flex-wrap items-center gap-4">
@@ -338,19 +371,21 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
                   </label>
                 </>
               )}
-              <label className="text-sm">
-                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-                  Vị trí (cách đáy): {marginV}px
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={400}
-                  value={marginV}
-                  onChange={(e) => setMarginV(Number(e.target.value))}
-                  className="mt-2 w-full"
-                />
-              </label>
+              {!customPosition && (
+                <label className="text-sm">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                    Vị trí (cách đáy): {marginV}px
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={400}
+                    value={marginV}
+                    onChange={(e) => setMarginV(Number(e.target.value))}
+                    className="mt-2 w-full"
+                  />
+                </label>
+              )}
             </div>
           )}
 
