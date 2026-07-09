@@ -7,6 +7,7 @@ import { getSession } from "@/lib/session";
 import { getOwnVideo } from "@/lib/video-access";
 import { VideoStatusBadge } from "@/components/videos/video-status-badge";
 import { ExtractPanel } from "@/components/videos/extract-panel";
+import { TranslatePanel } from "@/components/videos/translate-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function VideoDetailPage({
     .from(subtitleTracks)
     .where(eq(subtitleTracks.videoId, video.id));
   const original = tracks.find((t) => t.kind === "original");
+  const translated = tracks.find((t) => t.kind === "translated");
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -49,6 +51,13 @@ export default async function VideoDetailPage({
         videoId={video.id}
         videoStatus={video.status}
         hasOriginalTrack={Boolean(original)}
+      />
+
+      <TranslatePanel
+        videoId={video.id}
+        hasOriginalTrack={Boolean(original)}
+        hasTranslatedTrack={Boolean(translated)}
+        initialGlossary={video.glossary}
       />
 
       {original && (

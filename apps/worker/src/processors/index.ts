@@ -3,6 +3,7 @@ import type { JobPayload, JobType } from "@dichvideo/shared";
 import { logger } from "../logger";
 import { probeProcessor } from "./probe";
 import { ocrProcessor, sttProcessor } from "./extract";
+import { translateProcessor } from "./translate";
 
 type Processor = (job: Job<JobPayload>) => Promise<unknown>;
 
@@ -19,7 +20,7 @@ export const processors: Record<JobType, Processor> = {
   probe: probeProcessor,
   stt: sttProcessor,
   ocr: ocrProcessor,
-  translate: noop("translate"),
+  translate: translateProcessor,
   render: noop("render"),
   dub: noop("dub"),
 };

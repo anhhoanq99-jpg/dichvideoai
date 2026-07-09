@@ -61,6 +61,10 @@ export const videos = pgTable(
     height: integer("height"),
     sizeBytes: bigint("size_bytes", { mode: "number" }),
     sourceLang: text("source_lang"),
+    /** User glossary: one "term=translation" per line, injected into translate prompt */
+    glossary: text("glossary"),
+    /** natural | formal | literal */
+    translationStyle: text("translation_style"),
     /** Audit trail — legal requirement (brainstorm #2) */
     uploadIp: text("upload_ip"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

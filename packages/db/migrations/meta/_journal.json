@@ -8,6 +8,13 @@
       "when": 1783586221528,
       "tag": "0000_lovely_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783595683999,
+      "tag": "0001_fluffy_rhino",
+      "breakpoints": true
     }
   ]
 }
