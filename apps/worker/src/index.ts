@@ -16,6 +16,7 @@ import {
   type JobPayload,
   type JobType,
 } from "@dichvideo/shared";
+import { chargeJobStart, refundJobOnFinalFailure } from "./lib/billing";
 import { logger } from "./logger";
 import { processors } from "./processors";
 
@@ -38,6 +39,9 @@ const worker = new Worker<JobPayload>(
       .update(jobs)
       .set({ status: "active", startedAt: new Date() })
       .where(eq(jobs.id, job.data.jobId));
+
+    // trừ credit trước khi chạy — thiếu credit thì job fail với thông báo rõ
+    await chargeJobStart(db, job.data, type);
 
     return processor(job);
   },
@@ -62,6 +66,14 @@ worker.on("failed", async (job, err) => {
     .set({ status: "failed", error: err.message, finishedAt: new Date() })
     .where(eq(jobs.id, job.data.jobId));
   logger.error({ jobId: job.data.jobId, type: job.name, err: err.message }, "job failed");
+
+  // hết lượt retry → hoàn credit đã trừ
+  const attempts = job.opts.attempts ?? 1;
+  if (job.attemptsMade >= attempts) {
+    await refundJobOnFinalFailure(db, job.data.jobId, job.data.userId).catch((e) =>
+      logger.error({ jobId: job.data.jobId, err: String(e) }, "refund failed"),
+    );
+  }
 });
 
 worker.on("error", (err) => {
