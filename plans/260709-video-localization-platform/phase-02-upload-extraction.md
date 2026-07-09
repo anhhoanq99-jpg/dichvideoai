@@ -10,7 +10,7 @@
 - **Date:** 2026-07-09
 - **Description:** Browser → R2 presigned multipart upload; ffprobe metadata job; STT extraction (Groq Whisper → segments); Gemini video OCR **spike** + swappable extraction service interface; extraction UI.
 - **Priority:** Critical
-- **Implementation status:** Not started
+- **Implementation status:** Code complete 2026-07-09 (commit 6a2e536). Typecheck + build + lint pass. FFmpeg installed on dev machine (winget, FFMPEG_DIR in .env). BLOCKED on user-provided keys: R2 (account+bucket+token), GROQ_API_KEY, GEMINI_API_KEY. Spike NOT yet run (needs GEMINI_API_KEY + sample hardsub videos) — OCR path unverified until gate passes.
 - **Review status:** Not reviewed
 
 ## Key Insights

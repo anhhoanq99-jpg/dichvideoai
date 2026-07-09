@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AudioLines, Loader2, ScanText } from "lucide-react";
 import { useJobPoll } from "@/hooks/use-job-poll";
@@ -33,9 +33,11 @@ export function ExtractPanel({
   const job = useJobPoll(jobId);
   const router = useRouter();
 
-  if (job?.status === "done") {
-    router.refresh();
-  }
+  useEffect(() => {
+    if (job?.status === "done") {
+      router.refresh();
+    }
+  }, [job?.status, router]);
 
   const running = job?.status === "queued" || job?.status === "active";
   const canStart =

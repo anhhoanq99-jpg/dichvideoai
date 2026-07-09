@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, Loader2, X } from "lucide-react";
 import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
@@ -30,9 +30,11 @@ export default function UploadPage() {
     [upload],
   );
 
-  if (state.phase === "done") {
-    router.push(`/videos/${state.videoId}`);
-  }
+  useEffect(() => {
+    if (state.phase === "done") {
+      router.push(`/videos/${state.videoId}`);
+    }
+  }, [state, router]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
