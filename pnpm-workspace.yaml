@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+overrides:
+  ioredis: ^5.11.1
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  sharp: true
+  unrs-resolver: true

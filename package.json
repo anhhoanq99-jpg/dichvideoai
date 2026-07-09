@@ -1,0 +1,18 @@
+{
+  "name": "web-dichvideo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter web --filter worker dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "db:generate": "pnpm --filter @dichvideo/db generate",
+    "db:migrate": "pnpm --filter @dichvideo/db migrate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.10.0"
+}
