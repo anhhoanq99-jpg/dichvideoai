@@ -53,7 +53,24 @@ export async function renderProcessor(job: Job<JobPayload>) {
     ...preset,
     size: clamp(params.fontSize ?? preset.size, 20, 120),
     marginV: clamp(params.marginV ?? preset.marginV, 0, 400),
+    ...(params.primaryColor && HEX_RE.test(params.primaryColor)
+      ? { primary: params.primaryColor }
+      : {}),
+    ...(params.boxColor && HEX_RE.test(params.boxColor)
+      ? { back: params.boxColor }
+      : {}),
   };
+
+  const segments = track.segments as SubtitleSegment[];
+  const hasBoxes = segments.some((s) => s.box);
+  if (params.coverMode === "auto" && !hasBoxes) {
+    throw new Error(
+      "Track này không có vị trí chữ (chỉ OCR mới có) — hãy dùng chế độ che thủ công",
+    );
+  }
+  if (params.placement === "replace" && params.aspect !== "keep") {
+    throw new Error("Chèn phụ đề vào vị trí gốc chỉ hỗ trợ khung hình gốc");
+  }
 
   const dir = await jobTempDir(job.data.jobId);
   try {
@@ -69,7 +86,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
     const assPath = path.join(dir, "subs.ass");
     await writeFile(
       assPath,
-      buildAss(track.segments as SubtitleSegment[], style, playRes),
+      buildAss(segments, style, playRes, { placement: params.placement ?? "bottom" }),
       "utf8",
     );
 
@@ -78,6 +95,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
       srcHeight: video.height,
       coverMode: params.coverMode,
       region: params.region,
+      segments: params.coverMode === "auto" ? segments : undefined,
       aspect: params.aspect,
       assPath,
       fontsDir: FONTS_DIR,
@@ -130,6 +148,8 @@ export async function renderProcessor(job: Job<JobPayload>) {
     await cleanupJobDir(job.data.jobId);
   }
 }
+
+const HEX_RE = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));

@@ -10,6 +10,14 @@ const segmentSchema = z.object({
   startMs: z.number().int().min(0),
   endMs: z.number().int().min(0),
   text: z.string().max(2000),
+  box: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      w: z.number().min(0).max(1),
+      h: z.number().min(0).max(1),
+    })
+    .optional(),
 });
 
 const patchSchema = z.object({

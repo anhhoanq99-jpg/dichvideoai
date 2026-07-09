@@ -2,34 +2,39 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Download, Loader2 } from "lucide-react";
+import { Clapperboard, Download, Loader2, Sparkles } from "lucide-react";
 import {
   ASPECT_PRESETS,
   STYLE_PRESETS,
   type CoverMode,
   type CoverRegion,
+  type Placement,
 } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 import { RegionSelector } from "./region-selector";
 import { cn } from "@/lib/utils";
 
-const COVER_OPTIONS: { value: CoverMode; label: string; hint: string }[] = [
-  { value: "none", label: "Không che", hint: "Video gốc không có phụ đề cứng" },
-  { value: "blur", label: "Làm mờ", hint: "Blur vùng phụ đề gốc" },
-  { value: "box", label: "Hộp tối", hint: "Che bằng nền tối đồng màu" },
-];
-
 interface RenderPanelProps {
   videoId: string;
   translatedTrackId: string | null;
+  /** OCR tracks carry per-line boxes → enables auto-cover + replace placement */
+  hasBoxes: boolean;
 }
 
-export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
+export function RenderPanel({
+  videoId,
+  translatedTrackId,
+  hasBoxes,
+}: RenderPanelProps) {
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
   const [aspect, setAspect] = useState<string>("keep");
-  const [coverMode, setCoverMode] = useState<CoverMode>("none");
+  const [coverMode, setCoverMode] = useState<CoverMode>(hasBoxes ? "auto" : "none");
+  const [placement, setPlacement] = useState<Placement>("bottom");
+  const [primaryColor, setPrimaryColor] = useState("#FFFFFF");
+  const [boxColor, setBoxColor] = useState("#000000");
+  const [useCustomColors, setUseCustomColors] = useState(false);
   const [region, setRegion] = useState<CoverRegion | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +56,28 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
 
   if (!translatedTrackId) return null;
 
+  const coverOptions: {
+    value: CoverMode;
+    label: string;
+    hint: string;
+    disabled?: boolean;
+  }[] = [
+    {
+      value: "auto",
+      label: "Tự động (AI)",
+      hint: hasBoxes
+        ? "Che đúng chỗ, đúng lúc mọi vùng chữ — kể cả nhiều chỗ cùng lúc"
+        : "Cần trích xuất bằng OCR để có vị trí chữ",
+      disabled: !hasBoxes,
+    },
+    { value: "blur", label: "Làm mờ thủ công", hint: "Tự khoanh một vùng cố định" },
+    { value: "box", label: "Hộp tối thủ công", hint: "Che vùng cố định bằng nền tối" },
+    { value: "none", label: "Không che", hint: "Video gốc không có chữ cứng" },
+  ];
+
   const running = job !== null && (job.status === "queued" || job.status === "active");
   const doneKey = (job?.result as { r2Key?: string } | null)?.r2Key;
+  const replaceForced = placement === "replace";
 
   async function start() {
     setError(null);
@@ -62,9 +87,11 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
       body: JSON.stringify({
         trackId: translatedTrackId,
         styleId,
-        aspect,
+        aspect: replaceForced ? "keep" : aspect,
         coverMode,
-        ...(coverMode !== "none" && region ? { region } : {}),
+        placement,
+        ...(useCustomColors ? { primaryColor, boxColor: `${boxColor}E6` } : {}),
+        ...((coverMode === "blur" || coverMode === "box") && region ? { region } : {}),
       }),
     });
     const data = await res.json();
@@ -119,18 +146,70 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
 
       {open && !running && (
         <div className="mt-4 space-y-4">
+          {/* Vị trí phụ đề Việt */}
           <div>
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              Che phụ đề gốc
+              Vị trí phụ đề tiếng Việt
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {COVER_OPTIONS.map((o) => (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setPlacement("bottom")}
+                className={cn(
+                  "rounded-lg border p-2 text-left text-sm transition-colors",
+                  placement === "bottom"
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
+                    : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
+                )}
+              >
+                <span className="block font-medium">Dưới đáy video</span>
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                  Kiểu phụ đề truyền thống
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={!hasBoxes}
+                onClick={() => setPlacement("replace")}
+                className={cn(
+                  "rounded-lg border p-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  placement === "replace"
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
+                    : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
+                )}
+              >
+                <span className="flex items-center gap-1 font-medium">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                  Thay vào chỗ chữ gốc
+                </span>
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                  {hasBoxes
+                    ? "Ô nền đậm đè lên chữ gốc, chữ Việt nằm đúng vị trí cũ"
+                    : "Cần trích xuất bằng OCR"}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Che chữ gốc */}
+          <div>
+            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              Che chữ nước ngoài gốc
+              {replaceForced && (
+                <span className="ml-1 text-neutral-400">
+                  (ô nền của phụ đề đã che phần lớn — chọn thêm nếu muốn chắc chắn)
+                </span>
+              )}
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {coverOptions.map((o) => (
                 <button
                   key={o.value}
                   type="button"
+                  disabled={o.disabled}
                   onClick={() => setCoverMode(o.value)}
                   className={cn(
-                    "rounded-lg border p-2 text-left text-sm transition-colors",
+                    "rounded-lg border p-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                     coverMode === o.value
                       ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
                       : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
@@ -145,7 +224,7 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
             </div>
           </div>
 
-          {coverMode !== "none" && previewUrl && (
+          {(coverMode === "blur" || coverMode === "box") && previewUrl && (
             <RegionSelector
               previewUrl={previewUrl}
               region={region}
@@ -153,7 +232,8 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
             />
           )}
 
-          <div className="flex flex-wrap gap-4">
+          {/* Kiểu chữ + màu + khung hình */}
+          <div className="flex flex-wrap items-center gap-4">
             <label className="text-sm">
               <span className="mr-2 text-neutral-500 dark:text-neutral-400">
                 Kiểu phụ đề:
@@ -175,9 +255,10 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
                 Khung hình:
               </span>
               <select
-                value={aspect}
+                value={replaceForced ? "keep" : aspect}
+                disabled={replaceForced}
                 onChange={(e) => setAspect(e.target.value)}
-                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800"
               >
                 {ASPECT_PRESETS.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -186,12 +267,42 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
                 ))}
               </select>
             </label>
+            <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={useCustomColors}
+                onChange={(e) => setUseCustomColors(e.target.checked)}
+              />
+              Tùy chỉnh màu
+            </label>
+            {useCustomColors && (
+              <>
+                <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+                  Chữ
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+                    className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+                  Ô nền
+                  <input
+                    type="color"
+                    value={boxColor}
+                    onChange={(e) => setBoxColor(e.target.value.toUpperCase())}
+                    className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           <button
             type="button"
             onClick={() => void start()}
-            disabled={coverMode !== "none" && !region}
+            disabled={(coverMode === "blur" || coverMode === "box") && !region}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Bắt đầu render

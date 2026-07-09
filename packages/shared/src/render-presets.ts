@@ -61,8 +61,12 @@ export const ASPECT_PRESETS = [
 
 export type AspectId = (typeof ASPECT_PRESETS)[number]["id"];
 
-export const COVER_MODES = ["none", "blur", "box"] as const;
+export const COVER_MODES = ["none", "blur", "box", "auto"] as const;
 export type CoverMode = (typeof COVER_MODES)[number];
+
+export const PLACEMENTS = ["bottom", "replace"] as const;
+/** bottom = fixed bottom-center subs; replace = position each VN line over the original text box */
+export type Placement = (typeof PLACEMENTS)[number];
 
 /** Normalized (0..1) rectangle in SOURCE video coordinate space. */
 export interface CoverRegion {
@@ -78,7 +82,13 @@ export interface RenderParams {
   /** clamped overrides */
   fontSize?: number;
   marginV?: number;
+  /** #RRGGBB override for text color */
+  primaryColor?: string;
+  /** #RRGGBB or #RRGGBBAA override for box background (boxed/replace styles) */
+  boxColor?: string;
   aspect: AspectId;
   coverMode: CoverMode;
   region?: CoverRegion;
+  /** replace requires aspect="keep" and an OCR track with boxes */
+  placement?: Placement;
 }

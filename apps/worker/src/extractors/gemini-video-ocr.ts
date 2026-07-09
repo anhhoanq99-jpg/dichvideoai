@@ -15,10 +15,32 @@ const RESPONSE_SCHEMA = {
       start: { type: "string", description: "mm:ss or hh:mm:ss when the line first appears" },
       end: { type: "string", description: "mm:ss or hh:mm:ss when the line disappears" },
       text: { type: "string", description: "exact subtitle text on screen" },
+      box: {
+        type: "object",
+        description:
+          "bounding box of this text line in the frame, integer coordinates on a 0-1000 scale where (0,0) is top-left of the frame",
+        properties: {
+          x: { type: "integer", description: "left edge, 0-1000" },
+          y: { type: "integer", description: "top edge, 0-1000" },
+          w: { type: "integer", description: "width, 0-1000" },
+          h: { type: "integer", description: "height, 0-1000" },
+        },
+        required: ["x", "y", "w", "h"],
+      },
     },
-    required: ["start", "end", "text"],
+    required: ["start", "end", "text", "box"],
   },
 } as const;
+
+function normBox(raw?: { x: number; y: number; w: number; h: number }) {
+  if (!raw) return undefined;
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n / 1000));
+  const x = clamp01(raw.x);
+  const y = clamp01(raw.y);
+  const w = Math.min(1 - x, Math.max(0.01, raw.w / 1000));
+  const h = Math.min(1 - y, Math.max(0.01, raw.h / 1000));
+  return { x, y, w, h };
+}
 
 function timecodeToMs(tc: string): number {
   const parts = tc.split(":").map((p) => Number.parseFloat(p));
@@ -69,10 +91,13 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
       model: this.model,
       contents: [
         createPartFromUri(file.uri!, file.mimeType!),
-        `Extract every burned-in (hardcoded) subtitle line shown in this video.${langHint} ` +
-          "Return ONLY the on-screen subtitle captions, not scene descriptions, signs, watermarks or channel names. " +
-          "For each distinct subtitle line, give the timestamp where it appears (start) and disappears (end), " +
-          "and its exact text. Preserve original language and punctuation.",
+        `Extract every burned-in (hardcoded) text line shown in this video.${langHint} ` +
+          "Include subtitle captions AND any other overlaid foreign text (titles, labels) that a viewer would want translated — " +
+          "but NOT watermarks, channel names or logos. " +
+          "For each distinct text line, give: the timestamp where it appears (start) and disappears (end), " +
+          "its exact text, and its bounding box on a 0-1000 coordinate scale (x=left, y=top, w=width, h=height). " +
+          "If the same line appears in multiple places at once, output one entry per location. " +
+          "Preserve original language and punctuation.",
       ],
       config: {
         responseMimeType: "application/json",
@@ -86,6 +111,7 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
       start: string;
       end: string;
       text: string;
+      box?: { x: number; y: number; w: number; h: number };
     }[];
     const segments = normalizeSegments(
       raw
@@ -93,6 +119,7 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
           startMs: timecodeToMs(r.start),
           endMs: timecodeToMs(r.end),
           text: r.text,
+          box: normBox(r.box),
         }))
         .filter((r) => !Number.isNaN(r.startMs) && !Number.isNaN(r.endMs)),
     );

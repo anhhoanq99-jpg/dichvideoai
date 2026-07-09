@@ -22,6 +22,12 @@ export interface SubtitleSegment {
   startMs: number;
   endMs: number;
   text: string;
+  /**
+   * Normalized (0..1) bounding box of the ORIGINAL on-screen text in the
+   * source frame. Present only for OCR-extracted tracks — enables auto-cover
+   * and replace-placement rendering.
+   */
+  box?: { x: number; y: number; w: number; h: number };
 }
 
 // ---- Upload constraints (MVP caps — Phase 2) ----

@@ -74,6 +74,50 @@ test("9:16 reframe: cover happens BEFORE scaling, ass last", () => {
   assert.match(g, /\[framed\]ass=/);
 });
 
+test("auto cover: clusters same-spot lines, separate spots stay separate", async () => {
+  const { clusterCoverRegions } = await import("./filtergraph");
+  const bottomSub = { x: 0.2, y: 0.85, w: 0.6, h: 0.08 };
+  const topTitle = { x: 0.3, y: 0.05, w: 0.4, h: 0.06 };
+  const clusters = clusterCoverRegions([
+    { i: 0, startMs: 0, endMs: 2000, text: "a", box: bottomSub },
+    { i: 1, startMs: 2100, endMs: 4000, text: "b", box: bottomSub },
+    { i: 2, startMs: 1000, endMs: 3000, text: "title", box: topTitle },
+    { i: 3, startMs: 10_000, endMs: 12_000, text: "c", box: bottomSub },
+  ]);
+  assert.equal(clusters.length, 2);
+  const bottom = clusters.find((c) => c.box.y > 0.5)!;
+  // adjacent windows merged (gap 0.1s + padding), distant window separate
+  assert.equal(bottom.windows.length, 2);
+});
+
+test("auto cover graph: time-enabled overlays chained before ass", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "auto",
+    segments: [
+      { i: 0, startMs: 1000, endMs: 3000, text: "a", box: { x: 0.2, y: 0.85, w: 0.6, h: 0.08 } },
+      { i: 1, startMs: 500, endMs: 2000, text: "t", box: { x: 0.3, y: 0.05, w: 0.4, h: 0.06 } },
+    ],
+    aspect: "keep",
+  });
+  assert.match(g, /overlay=\d+:\d+:enable='between\(t,[\d.]+,[\d.]+\)'/);
+  assert.equal((g.match(/boxblur/g) ?? []).length, 2);
+  assert.ok(g.indexOf("enable=") < g.indexOf("ass="), "covers precede ass");
+});
+
+test("auto cover caps cluster count", async () => {
+  const { clusterCoverRegions } = await import("./filtergraph");
+  const many = Array.from({ length: 60 }, (_, k) => ({
+    i: k,
+    startMs: k * 1000,
+    endMs: k * 1000 + 900,
+    text: String(k),
+    box: { x: (k % 10) * 0.1, y: Math.floor(k / 10) * 0.15, w: 0.05, h: 0.05 },
+  }));
+  const clusters = clusterCoverRegions(many);
+  assert.ok(clusters.length <= 24);
+});
+
 test("outputResolution matches aspect presets", () => {
   assert.deepEqual(outputResolution({ srcWidth: 1280, srcHeight: 720, aspect: "keep" }), { w: 1280, h: 720 });
   assert.deepEqual(outputResolution({ srcWidth: 1280, srcHeight: 720, aspect: "9:16" }), { w: 1080, h: 1920 });

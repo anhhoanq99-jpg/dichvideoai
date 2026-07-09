@@ -8,13 +8,18 @@ import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
 import { getOwnVideo } from "@/lib/video-access";
 
+const HEX = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+
 const schema = z.object({
   trackId: z.string().uuid(),
   styleId: z.enum(STYLE_PRESETS.map((p) => p.id) as [string, ...string[]]),
   fontSize: z.number().int().min(20).max(120).optional(),
   marginV: z.number().int().min(0).max(400).optional(),
+  primaryColor: z.string().regex(HEX).optional(),
+  boxColor: z.string().regex(HEX).optional(),
   aspect: z.enum(["keep", "16:9", "9:16", "1:1"]).default("keep"),
   coverMode: z.enum(COVER_MODES).default("none"),
+  placement: z.enum(["bottom", "replace"]).default("bottom"),
   region: z
     .object({
       x: z.number().min(0).max(1),
@@ -46,9 +51,18 @@ export async function POST(
   if (!body.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
-  if (body.data.coverMode !== "none" && !body.data.region) {
+  if (
+    (body.data.coverMode === "blur" || body.data.coverMode === "box") &&
+    !body.data.region
+  ) {
     return NextResponse.json(
       { error: "Chọn vùng phụ đề gốc cần che trước" },
+      { status: 400 },
+    );
+  }
+  if (body.data.placement === "replace" && body.data.aspect !== "keep") {
+    return NextResponse.json(
+      { error: "Chèn phụ đề vào vị trí gốc chỉ hỗ trợ khung hình gốc" },
       { status: 400 },
     );
   }
