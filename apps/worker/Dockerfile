@@ -17,6 +17,9 @@ RUN pnpm install --frozen-lockfile --filter worker...
 
 COPY packages ./packages
 COPY apps/worker ./apps/worker
+# Vietnamese-complete fonts for libass sub burning (OFL-licensed, bundled in repo)
+# Sanity check: ass filter must be compiled in
+RUN ffmpeg -hide_banner -filters 2>/dev/null | grep -q " ass " || (echo "ffmpeg missing libass" && exit 1)
 
 EXPOSE 8787
 CMD ["pnpm", "--filter", "worker", "start"]

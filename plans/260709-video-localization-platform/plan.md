@@ -20,7 +20,7 @@ Commercial SaaS for VN market: user uploads video → extract subtitles (STT aud
 |---|-------|------|--------|----------|
 | 1 | Foundation (monorepo, DB, auth, queue, UI shell) | [phase-01-foundation.md](./phase-01-foundation.md) | Done — smoke test passed on Neon+Upstash (option B, no Docker); pending: user verifies Google login in browser | 95% |
 | 2 | Upload & extraction (R2, STT, OCR spike) | [phase-02-upload-extraction.md](./phase-02-upload-extraction.md) | Done — user verified E2E (upload→probe→STT→segments UI, 2026-07-09); Gemini OCR spike pending sample videos | 90% |
-| 3 | Translation & subtitle editor | [phase-03-translation-editor.md](./phase-03-translation-editor.md) | Not started | 0% |
+| 3 | Translation & subtitle editor | [phase-03-translation-editor.md](./phase-03-translation-editor.md) | Code complete (0b4a018) — awaiting user E2E test (translate real video, editor QA) | 85% |
 | 4 | Render (cover + burn subs, FFmpeg) | [phase-04-render.md](./phase-04-render.md) | Not started | 0% |
 | 5 | Dubbing (TTS, timing fit, mix, mux) | [phase-05-dubbing.md](./phase-05-dubbing.md) | Not started | 0% |
 | 6 | Monetization & launch (credits, SePay, ToS, deploy) | [phase-06-monetization-launch.md](./phase-06-monetization-launch.md) | Not started | 0% |

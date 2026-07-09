@@ -6,7 +6,12 @@ export type TranslationStyle = "natural" | "formal" | "literal";
 
 const STYLE_INSTRUCTIONS: Record<TranslationStyle, string> = {
   natural:
-    "Dịch tự nhiên, mượt mà như lời thoại phim Việt, giữ sắc thái cảm xúc của nhân vật.",
+    "Dịch như người Việt NÓI CHUYỆN thật ngoài đời, không phải văn viết. Yêu cầu:\n" +
+    "- Dịch theo Ý, tuyệt đối không dịch từng từ theo cấu trúc câu gốc (tránh kiểu 'Google dịch' lủng củng).\n" +
+    "- Dùng từ ngữ đời thường, trợ từ tự nhiên (à, nhé, đấy, thôi, mà, cơ, hả...) đúng chỗ.\n" +
+    "- Đảo lại trật tự câu cho đúng cách người Việt diễn đạt; câu ngắn gọn như lời thoại phim lồng tiếng.\n" +
+    "- Giữ đúng cảm xúc: giận thì gắt, đùa thì tếu, buồn thì trầm — chọn từ theo sắc thái nhân vật.\n" +
+    "- Thành ngữ/tục ngữ gốc → thay bằng thành ngữ Việt tương đương, không dịch nghĩa đen.",
   formal: "Dịch trang trọng, lịch sự, phù hợp nội dung tài liệu/tin tức.",
   literal: "Dịch sát nghĩa nhất có thể, ưu tiên độ chính xác hơn độ mượt.",
 };

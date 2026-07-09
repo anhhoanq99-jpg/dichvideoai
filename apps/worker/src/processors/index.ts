@@ -4,6 +4,7 @@ import { logger } from "../logger";
 import { probeProcessor } from "./probe";
 import { ocrProcessor, sttProcessor } from "./extract";
 import { translateProcessor } from "./translate";
+import { renderProcessor } from "./render";
 
 type Processor = (job: Job<JobPayload>) => Promise<unknown>;
 
@@ -21,6 +22,6 @@ export const processors: Record<JobType, Processor> = {
   stt: sttProcessor,
   ocr: ocrProcessor,
   translate: translateProcessor,
-  render: noop("render"),
+  render: renderProcessor,
   dub: noop("dub"),
 };
