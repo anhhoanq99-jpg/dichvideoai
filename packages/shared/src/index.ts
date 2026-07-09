@@ -6,4 +6,5 @@ export * from "./subtitle-io";
 export * from "./render-presets";
 export * from "./translate-styles";
 export * from "./dub-presets";
+export * from "./edge-voices";
 export * from "./ass-builder";

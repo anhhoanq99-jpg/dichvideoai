@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Loader2, Mic } from "lucide-react";
-import { DUB_VOICES, type DubVoiceId } from "@dichvideo/shared";
+import { DUB_VOICES, EDGE_VOICES } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 
 interface DubPanelProps {
@@ -11,10 +11,31 @@ interface DubPanelProps {
   translatedTrackId: string | null;
 }
 
-/** Lồng tiếng Việt AI: chọn giọng, tốc độ, trộn âm lượng — chạy nền qua worker. */
+/** Tên quốc gia tiếng Việt từ mã locale ("ja-JP" → "Nhật Bản"). */
+function localeLabel(locale: string): string {
+  const region = locale.split("-").find((p) => /^[A-Z]{2}$/.test(p));
+  try {
+    const name = region
+      ? new Intl.DisplayNames(["vi"], { type: "region" }).of(region)
+      : null;
+    return name ?? locale;
+  } catch {
+    return locale;
+  }
+}
+
+const LOCALES = [...new Set(EDGE_VOICES.map((v) => v.locale))]
+  .map((l) => ({ id: l, label: localeLabel(l) }))
+  .sort((a, b) =>
+    a.id === "vi-VN" ? -1 : b.id === "vi-VN" ? 1 : a.label.localeCompare(b.label, "vi"),
+  );
+
+/** Lồng tiếng AI: 322 giọng đủ mọi quốc gia, lọc theo nước + giới tính. */
 export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
   const [open, setOpen] = useState(false);
-  const [voice, setVoice] = useState<DubVoiceId>(DUB_VOICES[0].id);
+  const [locale, setLocale] = useState("vi-VN");
+  const [gender, setGender] = useState<"all" | "F" | "M">("all");
+  const [voice, setVoice] = useState<string>(DUB_VOICES[0].id);
   const [speed, setSpeed] = useState(1);
   const [aiVolume, setAiVolume] = useState(100);
   const [bgVolume, setBgVolume] = useState(20);
@@ -26,6 +47,21 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
   useEffect(() => {
     if (job?.status === "done") router.refresh();
   }, [job?.status, router]);
+
+  const voiceOptions = useMemo(
+    () =>
+      EDGE_VOICES.filter(
+        (v) => v.locale === locale && (gender === "all" || v.gender === gender),
+      ),
+    [locale, gender],
+  );
+
+  // đổi bộ lọc → tự chọn giọng đầu tiên còn khớp
+  useEffect(() => {
+    if (voiceOptions.length > 0 && !voiceOptions.some((v) => v.id === voice)) {
+      setVoice(voiceOptions[0].id);
+    }
+  }, [voiceOptions, voice]);
 
   if (!translatedTrackId) return null;
 
@@ -100,16 +136,46 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Giọng đọc
+                Quốc gia / ngôn ngữ ({LOCALES.length})
+              </span>
+              <select
+                value={locale}
+                onChange={(e) => setLocale(e.target.value)}
+                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+              >
+                {LOCALES.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label} ({l.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                Giới tính
+              </span>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value as typeof gender)}
+                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+              >
+                <option value="all">Tất cả</option>
+                <option value="F">Nữ</option>
+                <option value="M">Nam</option>
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                Giọng đọc ({voiceOptions.length} giọng)
               </span>
               <select
                 value={voice}
-                onChange={(e) => setVoice(e.target.value as DubVoiceId)}
+                onChange={(e) => setVoice(e.target.value)}
                 className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               >
-                {DUB_VOICES.map((v) => (
+                {voiceOptions.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name}
+                    {v.name} — {v.gender === "F" ? "Nữ" : "Nam"}
                   </option>
                 ))}
               </select>

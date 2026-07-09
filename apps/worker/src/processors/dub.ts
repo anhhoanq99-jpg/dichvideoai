@@ -8,7 +8,8 @@ import type { Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
-  DUB_VOICE_IDS,
+  DUB_VOICES,
+  EDGE_VOICE_IDS,
   type DubParams,
   type JobPayload,
   type SubtitleSegment,
@@ -80,7 +81,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
     );
   if (!track) throw new Error("Không tìm thấy track phụ đề để lồng tiếng");
 
-  const voice = DUB_VOICE_IDS.includes(params.voice) ? params.voice : DUB_VOICE_IDS[0];
+  const voice = EDGE_VOICE_IDS.has(params.voice) ? params.voice : DUB_VOICES[0].id;
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
   const bgVol = clamp(params.bgVolume ?? 20, 0, 100) / 100;
@@ -121,10 +122,13 @@ export async function dubProcessor(job: Job<JobPayload>) {
       const slot = slotMs(segments, k, videoDurMs);
       const chain = atempoChain(rawMs / slot);
       const out = path.join(dir, `fit-${k}.wav`);
+      // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
+      const expMs = Math.min(chain ? slot : rawMs, slot);
+      const fades = `afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, (expMs - 25) / 1000).toFixed(3)}:d=0.025`;
       await execFileAsync(ffBin("ffmpeg"), [
         "-y",
         "-i", clips[k],
-        ...(chain ? ["-af", chain] : []),
+        "-af", chain ? `${chain},${fades}` : fades,
         "-ar", "24000",
         "-ac", "1",
         "-c:a", "pcm_s16le",
