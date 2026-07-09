@@ -73,8 +73,11 @@ export default async function CreditsPage() {
               </code>
             </li>
             <li>
-              Tỷ lệ: <b>{VND_PER_CREDIT.toLocaleString("vi-VN")}đ = 1 credit</b> (50.000đ =
-              1.000 credits)
+              Tỷ lệ: <b>1.000đ = {(1000 / VND_PER_CREDIT).toLocaleString("vi-VN")} credits</b>{" "}
+              — nạp nhiều tặng thêm:
+              <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                200.000đ +10% · 500.000đ +20% · 1 triệu +40% · 2 triệu +60% · 5 triệu +80%
+              </span>
             </li>
             <li>Credits tự cộng trong ~1 phút sau khi tiền vào tài khoản.</li>
           </ol>

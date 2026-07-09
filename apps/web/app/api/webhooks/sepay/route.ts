@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { applyCreditDelta, creditLedger, schema } from "@dichvideo/db";
-import { VND_PER_CREDIT } from "@dichvideo/shared";
+import { VND_PER_CREDIT, topupBonusPercent } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 
 /**
@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, skipped: "user not found" });
   }
 
-  const credits = Math.floor(tx.transferAmount / VND_PER_CREDIT);
+  // nạp nhiều tặng thêm: +10% từ 200k … +80% từ 5 triệu
+  const base = Math.floor(tx.transferAmount / VND_PER_CREDIT);
+  const credits = Math.floor(base * (1 + topupBonusPercent(tx.transferAmount) / 100));
   if (credits <= 0) return NextResponse.json({ success: true, skipped: "amount too small" });
 
   await applyCreditDelta(db, {

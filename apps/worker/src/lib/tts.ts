@@ -33,6 +33,28 @@ export async function synthesizeClip(input: {
   return audioFilePath;
 }
 
+// Gemini TTS free tier chỉ cho 3 request/phút — chủ động giãn nhịp giữa các câu.
+// Nâng key lên paid tier thì đặt GEMINI_TTS_RPM cao hơn (vd 60) là hết chờ.
+const GEMINI_TTS_RPM = Number(process.env.GEMINI_TTS_RPM ?? 3);
+const GEMINI_INTERVAL_MS = Math.ceil(60_000 / Math.max(1, GEMINI_TTS_RPM));
+let geminiNextSlotAt = 0;
+
+async function geminiThrottle(): Promise<void> {
+  const now = Date.now();
+  const wait = geminiNextSlotAt - now;
+  geminiNextSlotAt = Math.max(now, geminiNextSlotAt) + GEMINI_INTERVAL_MS;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
+/** Lỗi 429 → số ms cần chờ theo RetryInfo của Google (null nếu không phải 429). */
+export function rateLimitDelayMs(err: unknown): number | null {
+  const s = err instanceof Error ? err.message : String(err);
+  if (!/429|RESOURCE_EXHAUSTED/i.test(s)) return null;
+  const m = /retry in ([\d.]+)\s*s/i.exec(s) ?? /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(s);
+  const sec = m ? Number.parseFloat(m[1]) : 60;
+  return Math.ceil((Number.isFinite(sec) ? sec : 60) * 1000) + 1500;
+}
+
 /** Sinh 1 clip bằng giọng cao cấp Gemini TTS → wav 24kHz + usage để trừ chi phí. */
 export async function synthesizeGeminiClip(input: {
   text: string;
@@ -45,6 +67,7 @@ export async function synthesizeGeminiClip(input: {
   if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình");
   const ai = new GoogleGenAI({ apiKey });
 
+  await geminiThrottle();
   const res = await ai.models.generateContent({
     model: process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts",
     contents: input.text,
@@ -82,11 +105,12 @@ export async function synthesizeGeminiClip(input: {
   };
 }
 
-const MAX_TTS_RETRIES = 3;
+const MAX_TTS_RETRIES = 6;
 
 /**
  * Sinh clip theo id giọng bất kỳ: "gemini:Xxx" → Gemini TTS (trả phí),
- * còn lại → Edge TTS (miễn phí). Có retry quanh lỗi mạng.
+ * còn lại → Edge TTS (miễn phí). Retry quanh lỗi mạng; gặp 429 thì chờ
+ * đúng thời gian Google yêu cầu rồi thử lại.
  */
 export async function synthesizeClipWithRetry(input: {
   text: string;
@@ -110,7 +134,8 @@ export async function synthesizeClipWithRetry(input: {
       return { file: await synthesizeClip(input), usage: [] };
     } catch (err) {
       lastErr = err;
-      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      const rateLimited = rateLimitDelayMs(err);
+      await new Promise((r) => setTimeout(r, rateLimited ?? 1500 * (attempt + 1)));
     }
   }
   throw new Error(
