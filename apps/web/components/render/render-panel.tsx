@@ -12,10 +12,10 @@ import {
 } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 import { RegionSelector } from "./region-selector";
-import { SubtitlePositionBox } from "./subtitle-position-box";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_SUB_BOX: CoverRegion = { x: 0.1, y: 0.72, w: 0.8, h: 0.18 };
+/** dải đáy video — vị trí phụ đề gốc thường gặp */
+const DEFAULT_BAND: CoverRegion = { x: 0.02, y: 0.78, w: 0.96, h: 0.16 };
 
 const COVER_OPTIONS: { value: CoverMode; label: string; hint: string }[] = [
   { value: "blur", label: "Làm mờ", hint: "Blur các vùng đã khoanh" },
@@ -34,7 +34,8 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
   const [aspect, setAspect] = useState<string>("keep");
   const [coverMode, setCoverMode] = useState<CoverMode>("blur");
-  const [regions, setRegions] = useState<CoverRegion[]>([]);
+  const [regions, setRegions] = useState<CoverRegion[]>([DEFAULT_BAND]);
+  const [placeOver, setPlaceOver] = useState(true);
   // style overrides
   const [customize, setCustomize] = useState(false);
   const [font, setFont] = useState<string>(STYLE_PRESETS[0].font);
@@ -46,8 +47,6 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [boxColor, setBoxColor] = useState("#000000");
   const [boxOpacity, setBoxOpacity] = useState(100);
   const [marginV, setMarginV] = useState(40);
-  const [customPosition, setCustomPosition] = useState(false);
-  const [subBox, setSubBox] = useState<CoverRegion>(DEFAULT_SUB_BOX);
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +71,12 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const running = job !== null && (job.status === "queued" || job.status === "active");
   const doneKey = (job?.result as { r2Key?: string } | null)?.r2Key;
 
+  function pickCover(mode: CoverMode) {
+    setCoverMode(mode);
+    // luôn có sẵn dải đáy để render được ngay, không bắt user khoanh tay
+    if (mode !== "none" && regions.length === 0) setRegions([DEFAULT_BAND]);
+  }
+
   function applyPreset(id: string) {
     setStyleId(id);
     const p = STYLE_PRESETS.find((x) => x.id === id)!;
@@ -88,6 +93,11 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
 
   async function start() {
     setError(null);
+    // phụ đề Việt đè vào vùng che thấp nhất (thay chỗ chữ gốc) — tự động, không cần kéo tay
+    const bottom =
+      coverMode !== "none" && placeOver && regions.length > 0
+        ? regions.reduce((a, b) => (a.y + a.h >= b.y + b.h ? a : b))
+        : null;
     const res = await fetch(`/api/videos/${videoId}/render`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -97,7 +107,7 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
         aspect,
         coverMode,
         ...(coverMode !== "none" && regions.length > 0 ? { regions } : {}),
-        ...(customPosition ? { subBox } : {}),
+        ...(bottom ? { subBox: { x: 0.05, y: bottom.y, w: 0.9, h: bottom.h } } : {}),
         ...(customize
           ? {
               font,
@@ -175,7 +185,7 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
                 <button
                   key={o.value}
                   type="button"
-                  onClick={() => setCoverMode(o.value)}
+                  onClick={() => pickCover(o.value)}
                   className={cn(
                     "rounded-lg border p-2 text-left text-sm transition-colors",
                     coverMode === o.value
@@ -191,8 +201,8 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
               ))}
             </div>
             <p className="mt-1 text-xs text-neutral-400">
-              Mẹo: kiểu phụ đề &quot;Ô kín (che chữ gốc)&quot; bên dưới cũng che được chữ ở vị trí
-              phụ đề — chỉ cần khoanh thêm các vùng chữ khác.
+              Đã khoanh sẵn dải đáy video (chỗ phụ đề gốc thường nằm). Nếu chữ gốc ở chỗ
+              khác, xóa vùng và kéo chuột khoanh lại — được nhiều vùng.
             </p>
           </div>
 
@@ -204,32 +214,16 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
             />
           )}
 
-          {/* Vị trí phụ đề */}
-          <div>
+          {coverMode !== "none" && (
             <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
               <input
                 type="checkbox"
-                checked={customPosition}
-                onChange={(e) => setCustomPosition(e.target.checked)}
+                checked={placeOver}
+                onChange={(e) => setPlaceOver(e.target.checked)}
               />
-              Tự chọn vị trí phụ đề trên video (kéo &amp; co dãn)
+              Đặt phụ đề Việt đè vào vùng che (thay đúng chỗ chữ gốc)
             </label>
-            {customPosition && previewUrl && (
-              <div className="mt-2">
-                <SubtitlePositionBox
-                  previewUrl={previewUrl}
-                  box={subBox}
-                  onChange={setSubBox}
-                  fontSize={fontSize}
-                  bold={bold}
-                  primaryColor={primaryColor}
-                  boxed={boxed}
-                  boxColor={boxColor}
-                  boxOpacity={boxOpacity}
-                />
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Kiểu phụ đề */}
           <div className="flex flex-wrap items-center gap-4">
@@ -371,7 +365,7 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
                   </label>
                 </>
               )}
-              {!customPosition && (
+              {!(placeOver && coverMode !== "none") && (
                 <label className="text-sm">
                   <span className="block text-xs text-neutral-500 dark:text-neutral-400">
                     Vị trí (cách đáy): {marginV}px
