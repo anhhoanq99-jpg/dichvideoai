@@ -34,9 +34,11 @@ export function SiteFooter() {
           Dịch Video AI
         </p>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-neutral-400">
-          <a href="#tinh-nang" className="hover:text-white">Tính năng</a>
-          <a href="#bang-gia" className="hover:text-white">Bảng giá</a>
-          <a href="#faq" className="hover:text-white">Hỏi đáp</a>
+          <a href="/#tinh-nang" className="hover:text-white">Tính năng</a>
+          <a href="/#bang-gia" className="hover:text-white">Bảng giá</a>
+          <a href="/#faq" className="hover:text-white">Hỏi đáp</a>
+          <Link href="/dieu-khoan" className="hover:text-white">Điều khoản</Link>
+          <Link href="/bao-mat" className="hover:text-white">Bảo mật</Link>
           <Link href="/login" className="hover:text-white">Đăng nhập</Link>
         </nav>
         <p className="text-xs text-neutral-500">
