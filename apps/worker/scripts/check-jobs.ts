@@ -7,7 +7,7 @@ const db = createDb();
 const rows = await db
   .select()
   .from(jobs)
-  .where(eq(jobs.type, "render"))
+  .where(eq(jobs.type, process.env.JOB_TYPE ?? "render"))
   .orderBy(desc(jobs.createdAt))
   .limit(3);
 for (const r of rows) {

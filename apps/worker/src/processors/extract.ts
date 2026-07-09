@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { Job } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import type { JobPayload } from "@dichvideo/shared";
 import { GeminiVideoOcrExtractor } from "../extractors/gemini-video-ocr";
@@ -46,6 +46,15 @@ async function runExtraction(job: Job<JobPayload>, extractor: SubtitleExtractor)
 
     const costUsdMicros = await recordUsage(job.data.jobId, result.usage);
 
+    // re-extract = overwrite: một video chỉ giữ một track gốc, tránh track cũ/hỏng lẫn vào bước dịch
+    await db
+      .delete(subtitleTracks)
+      .where(
+        and(
+          eq(subtitleTracks.videoId, video.id),
+          eq(subtitleTracks.kind, "original"),
+        ),
+      );
     await db.insert(subtitleTracks).values({
       videoId: video.id,
       kind: "original",

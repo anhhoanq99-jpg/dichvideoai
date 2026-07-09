@@ -1,5 +1,5 @@
 import type { Job } from "bullmq";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import type { JobPayload, SubtitleSegment } from "@dichvideo/shared";
 import { translateSegments, type TranslationStyle } from "../lib/translate";
@@ -14,6 +14,7 @@ export async function translateProcessor(job: Job<JobPayload>) {
     .where(eq(videos.id, job.data.videoId));
   if (!video) throw new Error(`Video ${job.data.videoId} không tồn tại`);
 
+  // luôn dịch track gốc mới nhất (video có thể được trích xuất lại nhiều lần)
   const [original] = await db
     .select()
     .from(subtitleTracks)
@@ -22,7 +23,9 @@ export async function translateProcessor(job: Job<JobPayload>) {
         eq(subtitleTracks.videoId, video.id),
         eq(subtitleTracks.kind, "original"),
       ),
-    );
+    )
+    .orderBy(desc(subtitleTracks.createdAt))
+    .limit(1);
   if (!original) throw new Error("Video chưa có phụ đề gốc để dịch");
 
   const style = (video.translationStyle ?? "natural") as TranslationStyle;
