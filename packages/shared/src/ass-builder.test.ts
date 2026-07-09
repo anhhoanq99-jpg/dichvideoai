@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { buildAss, escapeAssText, hexToAss } from "./ass-builder";
 import { STYLE_PRESETS } from "./render-presets";
 
+const SEGS = [{ i: 0, startMs: 1000, endMs: 3500, text: "Ăn quả nhớ kẻ trồng cây" }];
+
 test("hexToAss converts RGB and alpha correctly", () => {
   assert.equal(hexToAss("#FFFFFF"), "&H00FFFFFF");
   assert.equal(hexToAss("#FFE94A"), "&H004AE9FF"); // BGR order
@@ -15,14 +17,21 @@ test("escapeAssText neutralizes override tags and newlines", () => {
 });
 
 test("buildAss produces valid structure with Vietnamese text", () => {
-  const ass = buildAss(
-    [{ i: 0, startMs: 1000, endMs: 3500, text: "Ăn quả nhớ kẻ trồng cây" }],
-    STYLE_PRESETS[0],
-    { w: 1920, h: 1080 },
-  );
+  const ass = buildAss(SEGS, STYLE_PRESETS[0], { w: 1920, h: 1080 });
   assert.match(ass, /PlayResX: 1920/);
   assert.match(ass, /Style: Default,Be Vietnam Pro,48,&H00FFFFFF/);
   assert.match(ass, /Dialogue: 0,0:00:01\.00,0:00:03\.50,Default,,0,0,0,,Ăn quả nhớ kẻ trồng cây/);
+});
+
+test("buildAss bold flag and boxed borderStyle", () => {
+  const boldBox = buildAss(
+    SEGS,
+    { ...STYLE_PRESETS[0], bold: true, borderStyle: 3, back: "#101010FF" },
+    { w: 1920, h: 1080 },
+  );
+  // Bold = -1, BorderStyle 3 in the style line
+  assert.match(boldBox, /,-1,0,0,0,100,100,0,0,3,/);
+  assert.match(boldBox, /&H00101010/);
 });
 
 test("buildAss skips empty and inverted segments", () => {

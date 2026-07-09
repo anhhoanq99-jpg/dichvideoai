@@ -2,40 +2,48 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Download, Loader2, Sparkles } from "lucide-react";
+import { Clapperboard, Download, Loader2 } from "lucide-react";
 import {
   ASPECT_PRESETS,
+  RENDER_FONTS,
   STYLE_PRESETS,
   type CoverMode,
   type CoverRegion,
-  type Placement,
 } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 import { RegionSelector } from "./region-selector";
 import { cn } from "@/lib/utils";
 
+const COVER_OPTIONS: { value: CoverMode; label: string; hint: string }[] = [
+  { value: "blur", label: "Làm mờ", hint: "Blur các vùng đã khoanh" },
+  { value: "box", label: "Hộp tối", hint: "Che các vùng bằng nền tối" },
+  { value: "none", label: "Không che", hint: "Video gốc không có chữ cứng" },
+];
+
 interface RenderPanelProps {
   videoId: string;
   translatedTrackId: string | null;
-  /** OCR tracks carry per-line boxes → enables auto-cover + replace placement */
-  hasBoxes: boolean;
 }
 
-export function RenderPanel({
-  videoId,
-  translatedTrackId,
-  hasBoxes,
-}: RenderPanelProps) {
+export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
   const [aspect, setAspect] = useState<string>("keep");
-  const [coverMode, setCoverMode] = useState<CoverMode>(hasBoxes ? "auto" : "none");
-  const [placement, setPlacement] = useState<Placement>("bottom");
+  const [coverMode, setCoverMode] = useState<CoverMode>("blur");
+  const [regions, setRegions] = useState<CoverRegion[]>([]);
+  // style overrides
+  const [customize, setCustomize] = useState(false);
+  const [font, setFont] = useState<string>(STYLE_PRESETS[0].font);
+  const [fontSize, setFontSize] = useState(48);
+  const [bold, setBold] = useState(false);
   const [primaryColor, setPrimaryColor] = useState("#FFFFFF");
+  const [outlineColor, setOutlineColor] = useState("#000000");
+  const [boxed, setBoxed] = useState(false);
   const [boxColor, setBoxColor] = useState("#000000");
-  const [useCustomColors, setUseCustomColors] = useState(false);
-  const [region, setRegion] = useState<CoverRegion | null>(null);
+  const [boxOpacity, setBoxOpacity] = useState(100);
+  const [marginV, setMarginV] = useState(40);
+
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const job = useJobStream(jobId);
@@ -56,28 +64,22 @@ export function RenderPanel({
 
   if (!translatedTrackId) return null;
 
-  const coverOptions: {
-    value: CoverMode;
-    label: string;
-    hint: string;
-    disabled?: boolean;
-  }[] = [
-    {
-      value: "auto",
-      label: "Tự động (AI)",
-      hint: hasBoxes
-        ? "Che đúng chỗ, đúng lúc mọi vùng chữ — kể cả nhiều chỗ cùng lúc"
-        : "Cần trích xuất bằng OCR để có vị trí chữ",
-      disabled: !hasBoxes,
-    },
-    { value: "blur", label: "Làm mờ thủ công", hint: "Tự khoanh một vùng cố định" },
-    { value: "box", label: "Hộp tối thủ công", hint: "Che vùng cố định bằng nền tối" },
-    { value: "none", label: "Không che", hint: "Video gốc không có chữ cứng" },
-  ];
-
   const running = job !== null && (job.status === "queued" || job.status === "active");
   const doneKey = (job?.result as { r2Key?: string } | null)?.r2Key;
-  const replaceForced = placement === "replace";
+
+  function applyPreset(id: string) {
+    setStyleId(id);
+    const p = STYLE_PRESETS.find((x) => x.id === id)!;
+    setFont(p.font);
+    setFontSize(p.size);
+    setBold(p.bold);
+    setPrimaryColor(p.primary);
+    setOutlineColor(p.outline);
+    setBoxed(p.borderStyle === 3);
+    setBoxColor(p.back ?? "#000000");
+    setBoxOpacity(p.id === "solid-box" ? 100 : 67);
+    setMarginV(p.marginV);
+  }
 
   async function start() {
     setError(null);
@@ -87,11 +89,22 @@ export function RenderPanel({
       body: JSON.stringify({
         trackId: translatedTrackId,
         styleId,
-        aspect: replaceForced ? "keep" : aspect,
+        aspect,
         coverMode,
-        placement,
-        ...(useCustomColors ? { primaryColor, boxColor: `${boxColor}E6` } : {}),
-        ...((coverMode === "blur" || coverMode === "box") && region ? { region } : {}),
+        ...(coverMode !== "none" && regions.length > 0 ? { regions } : {}),
+        ...(customize
+          ? {
+              font,
+              fontSize,
+              bold,
+              primaryColor,
+              outlineColor,
+              boxed,
+              boxColor,
+              boxOpacity,
+              marginV,
+            }
+          : {}),
       }),
     });
     const data = await res.json();
@@ -146,70 +159,19 @@ export function RenderPanel({
 
       {open && !running && (
         <div className="mt-4 space-y-4">
-          {/* Vị trí phụ đề Việt */}
-          <div>
-            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              Vị trí phụ đề tiếng Việt
-            </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setPlacement("bottom")}
-                className={cn(
-                  "rounded-lg border p-2 text-left text-sm transition-colors",
-                  placement === "bottom"
-                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
-                    : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
-                )}
-              >
-                <span className="block font-medium">Dưới đáy video</span>
-                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-                  Kiểu phụ đề truyền thống
-                </span>
-              </button>
-              <button
-                type="button"
-                disabled={!hasBoxes}
-                onClick={() => setPlacement("replace")}
-                className={cn(
-                  "rounded-lg border p-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                  placement === "replace"
-                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
-                    : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
-                )}
-              >
-                <span className="flex items-center gap-1 font-medium">
-                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                  Thay vào chỗ chữ gốc
-                </span>
-                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-                  {hasBoxes
-                    ? "Ô nền đậm đè lên chữ gốc, chữ Việt nằm đúng vị trí cũ"
-                    : "Cần trích xuất bằng OCR"}
-                </span>
-              </button>
-            </div>
-          </div>
-
           {/* Che chữ gốc */}
           <div>
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
               Che chữ nước ngoài gốc
-              {replaceForced && (
-                <span className="ml-1 text-neutral-400">
-                  (ô nền của phụ đề đã che phần lớn — chọn thêm nếu muốn chắc chắn)
-                </span>
-              )}
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {coverOptions.map((o) => (
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {COVER_OPTIONS.map((o) => (
                 <button
                   key={o.value}
                   type="button"
-                  disabled={o.disabled}
                   onClick={() => setCoverMode(o.value)}
                   className={cn(
-                    "rounded-lg border p-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "rounded-lg border p-2 text-left text-sm transition-colors",
                     coverMode === o.value
                       ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
                       : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
@@ -222,17 +184,21 @@ export function RenderPanel({
                 </button>
               ))}
             </div>
+            <p className="mt-1 text-xs text-neutral-400">
+              Mẹo: kiểu phụ đề &quot;Ô kín (che chữ gốc)&quot; bên dưới cũng che được chữ ở vị trí
+              phụ đề — chỉ cần khoanh thêm các vùng chữ khác.
+            </p>
           </div>
 
-          {(coverMode === "blur" || coverMode === "box") && previewUrl && (
+          {coverMode !== "none" && previewUrl && (
             <RegionSelector
               previewUrl={previewUrl}
-              region={region}
-              onChange={setRegion}
+              regions={regions}
+              onChange={setRegions}
             />
           )}
 
-          {/* Kiểu chữ + màu + khung hình */}
+          {/* Kiểu phụ đề */}
           <div className="flex flex-wrap items-center gap-4">
             <label className="text-sm">
               <span className="mr-2 text-neutral-500 dark:text-neutral-400">
@@ -240,7 +206,7 @@ export function RenderPanel({
               </span>
               <select
                 value={styleId}
-                onChange={(e) => setStyleId(e.target.value)}
+                onChange={(e) => applyPreset(e.target.value)}
                 className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               >
                 {STYLE_PRESETS.map((p) => (
@@ -255,10 +221,9 @@ export function RenderPanel({
                 Khung hình:
               </span>
               <select
-                value={replaceForced ? "keep" : aspect}
-                disabled={replaceForced}
+                value={aspect}
                 onChange={(e) => setAspect(e.target.value)}
-                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800"
+                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               >
                 {ASPECT_PRESETS.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -270,39 +235,129 @@ export function RenderPanel({
             <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
               <input
                 type="checkbox"
-                checked={useCustomColors}
-                onChange={(e) => setUseCustomColors(e.target.checked)}
+                checked={customize}
+                onChange={(e) => {
+                  setCustomize(e.target.checked);
+                  if (e.target.checked) applyPreset(styleId);
+                }}
               />
-              Tùy chỉnh màu
+              Tùy chỉnh chi tiết
             </label>
-            {useCustomColors && (
-              <>
-                <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
-                  Chữ
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
-                    className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
-                  />
-                </label>
-                <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
-                  Ô nền
-                  <input
-                    type="color"
-                    value={boxColor}
-                    onChange={(e) => setBoxColor(e.target.value.toUpperCase())}
-                    className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
-                  />
-                </label>
-              </>
-            )}
           </div>
+
+          {customize && (
+            <div className="grid gap-4 rounded-lg border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-700">
+              <label className="text-sm">
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                  Font chữ
+                </span>
+                <select
+                  value={font}
+                  onChange={(e) => setFont(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                >
+                  {RENDER_FONTS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                  Cỡ chữ: {fontSize}
+                </span>
+                <input
+                  type="range"
+                  min={20}
+                  max={120}
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
+                  className="mt-2 w-full"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={bold}
+                  onChange={(e) => setBold(e.target.checked)}
+                />
+                Chữ đậm
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Màu chữ</span>
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+                  className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Màu viền</span>
+                <input
+                  type="color"
+                  value={outlineColor}
+                  onChange={(e) => setOutlineColor(e.target.value.toUpperCase())}
+                  className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={boxed}
+                  onChange={(e) => setBoxed(e.target.checked)}
+                />
+                Ô nền sau chữ
+              </label>
+              {boxed && (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Màu ô nền
+                    </span>
+                    <input
+                      type="color"
+                      value={boxColor}
+                      onChange={(e) => setBoxColor(e.target.value.toUpperCase())}
+                      className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                      Độ phủ ô nền: {boxOpacity}% {boxOpacity === 100 ? "(che kín chữ gốc)" : ""}
+                    </span>
+                    <input
+                      type="range"
+                      min={20}
+                      max={100}
+                      value={boxOpacity}
+                      onChange={(e) => setBoxOpacity(Number(e.target.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                </>
+              )}
+              <label className="text-sm">
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                  Vị trí (cách đáy): {marginV}px
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={400}
+                  value={marginV}
+                  onChange={(e) => setMarginV(Number(e.target.value))}
+                  className="mt-2 w-full"
+                />
+              </label>
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => void start()}
-            disabled={(coverMode === "blur" || coverMode === "box") && !region}
+            disabled={coverMode !== "none" && regions.length === 0}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Bắt đầu render

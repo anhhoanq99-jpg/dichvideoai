@@ -34,51 +34,18 @@ export interface PlayRes {
   h: number;
 }
 
-export interface BuildAssOptions {
-  /**
-   * "bottom" (default): fixed bottom-center subs.
-   * "replace": anchor each line at the bottom-center of its original text box
-   * (segment.box) with an opaque background box — the VN text covers the
-   * original foreign text. Lines without a box fall back to bottom placement.
-   */
-  placement?: "bottom" | "replace";
-}
-
-/** Median original-text-box height (px) → consistent auto font size for replace mode. */
-function medianBoxFontSize(
-  segments: SubtitleSegment[],
-  playResH: number,
-  fallback: number,
-): number {
-  const heights = segments
-    .filter((s) => s.box)
-    .map((s) => s.box!.h * playResH)
-    .sort((a, b) => a - b);
-  if (heights.length === 0) return fallback;
-  const median = heights[Math.floor(heights.length / 2)];
-  return Math.min(120, Math.max(20, Math.round(median * 0.72)));
-}
-
 /**
  * Build a complete .ass document for libass burning.
- * Bottom placement: alignment 2 (bottom-center), position via marginV.
- * Replace placement: per-line `\pos` over the original text box.
+ * Alignment 2 (bottom-center); vertical position via marginV.
  */
 export function buildAss(
   segments: SubtitleSegment[],
   style: SubtitleStyle,
   playRes: PlayRes,
-  options: BuildAssOptions = {},
 ): string {
-  const replace = options.placement === "replace";
   const primary = hexToAss(style.primary);
   const outline = hexToAss(style.outline);
-  // replace mode needs a near-opaque box to actually cover the original text
-  const back = hexToAss(style.back ?? (replace ? "#000000E6" : "#000000AA"));
-  const borderStyle = replace ? 3 : style.borderStyle;
-  const size = replace
-    ? medianBoxFontSize(segments, playRes.h, style.size)
-    : style.size;
+  const back = hexToAss(style.back ?? "#000000AA");
 
   const header = [
     "[Script Info]",
@@ -90,7 +57,7 @@ export function buildAss(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Default,${style.font},${size},${primary},${primary},${outline},${back},0,0,0,0,100,100,0,0,${borderStyle},${borderStyle === 3 ? 4 : 2},0,2,60,60,${style.marginV},1`,
+    `Style: Default,${style.font},${style.size},${primary},${primary},${outline},${back},${style.bold ? -1 : 0},0,0,0,100,100,0,0,${style.borderStyle},${style.borderStyle === 3 ? 5 : 2},0,2,60,60,${style.marginV},1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -98,15 +65,10 @@ export function buildAss(
 
   const events = segments
     .filter((s) => s.text.trim().length > 0 && s.endMs > s.startMs)
-    .map((s) => {
-      // anchor at bottom-center of the original box so text sits where the
-      // foreign text was (an2 = bottom-center anchor for \pos)
-      const posTag =
-        replace && s.box
-          ? `{\\an2\\pos(${Math.round((s.box.x + s.box.w / 2) * playRes.w)},${Math.round((s.box.y + s.box.h) * playRes.h)})}`
-          : "";
-      return `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${posTag}${escapeAssText(s.text)}`;
-    })
+    .map(
+      (s) =>
+        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${escapeAssText(s.text)}`,
+    )
     .join("\n");
 
   return `${header}\n${events}\n`;

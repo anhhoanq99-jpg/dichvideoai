@@ -2,32 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, subtitleTracks } from "@dichvideo/db";
-import { COVER_MODES, STYLE_PRESETS } from "@dichvideo/shared";
+import {
+  COVER_MODES,
+  MAX_COVER_REGIONS,
+  RENDER_FONTS,
+  STYLE_PRESETS,
+} from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
 import { getOwnVideo } from "@/lib/video-access";
 
-const HEX = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+const regionSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().min(0.01).max(1),
+  h: z.number().min(0.01).max(1),
+});
 
 const schema = z.object({
   trackId: z.string().uuid(),
   styleId: z.enum(STYLE_PRESETS.map((p) => p.id) as [string, ...string[]]),
-  fontSize: z.number().int().min(20).max(120).optional(),
-  marginV: z.number().int().min(0).max(400).optional(),
-  primaryColor: z.string().regex(HEX).optional(),
-  boxColor: z.string().regex(HEX).optional(),
   aspect: z.enum(["keep", "16:9", "9:16", "1:1"]).default("keep"),
   coverMode: z.enum(COVER_MODES).default("none"),
-  placement: z.enum(["bottom", "replace"]).default("bottom"),
-  region: z
-    .object({
-      x: z.number().min(0).max(1),
-      y: z.number().min(0).max(1),
-      w: z.number().min(0.01).max(1),
-      h: z.number().min(0.01).max(1),
-    })
-    .optional(),
+  regions: z.array(regionSchema).max(MAX_COVER_REGIONS).optional(),
+  // style overrides
+  font: z.enum(RENDER_FONTS as unknown as [string, ...string[]]).optional(),
+  fontSize: z.number().int().min(20).max(120).optional(),
+  bold: z.boolean().optional(),
+  primaryColor: z.string().regex(HEX).optional(),
+  outlineColor: z.string().regex(HEX).optional(),
+  boxed: z.boolean().optional(),
+  boxColor: z.string().regex(HEX).optional(),
+  boxOpacity: z.number().int().min(0).max(100).optional(),
+  marginV: z.number().int().min(0).max(400).optional(),
 });
 
 export async function POST(
@@ -51,18 +61,9 @@ export async function POST(
   if (!body.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
-  if (
-    (body.data.coverMode === "blur" || body.data.coverMode === "box") &&
-    !body.data.region
-  ) {
+  if (body.data.coverMode !== "none" && !body.data.regions?.length) {
     return NextResponse.json(
-      { error: "Chọn vùng phụ đề gốc cần che trước" },
-      { status: 400 },
-    );
-  }
-  if (body.data.placement === "replace" && body.data.aspect !== "keep") {
-    return NextResponse.json(
-      { error: "Chèn phụ đề vào vị trí gốc chỉ hỗ trợ khung hình gốc" },
+      { error: "Khoanh ít nhất một vùng cần che trước" },
       { status: 400 },
     );
   }

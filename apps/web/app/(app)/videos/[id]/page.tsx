@@ -78,9 +78,6 @@ export default async function VideoDetailPage({
       <RenderPanel
         videoId={video.id}
         translatedTrackId={translated?.id ?? null}
-        hasBoxes={Boolean(
-          (translated?.segments as SubtitleSegment[] | undefined)?.some((s) => s.box),
-        )}
       />
 
       {renderOutputs.length > 0 && (

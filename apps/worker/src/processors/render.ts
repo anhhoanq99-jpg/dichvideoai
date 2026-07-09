@@ -7,6 +7,7 @@ import { createReadStream } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
+  RENDER_FONTS,
   STYLE_PRESETS,
   buildAss,
   type JobPayload,
@@ -49,28 +50,38 @@ export async function renderProcessor(job: Job<JobPayload>) {
 
   const preset = STYLE_PRESETS.find((p) => p.id === params.styleId);
   if (!preset) throw new Error(`Style không hợp lệ: ${params.styleId}`);
+
+  const boxed = params.boxed ?? preset.borderStyle === 3;
+  // combine box color + opacity into #RRGGBBAA
+  const boxHex =
+    params.boxColor && HEX_RE.test(params.boxColor)
+      ? params.boxColor
+      : (preset.back ?? "#000000");
+  const opacity = clamp(params.boxOpacity ?? (preset.id === "solid-box" ? 100 : 67), 0, 100);
+  const alpha = Math.round((opacity / 100) * 255)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+
   const style = {
     ...preset,
+    font: RENDER_FONTS.includes(params.font as (typeof RENDER_FONTS)[number])
+      ? (params.font as string)
+      : preset.font,
     size: clamp(params.fontSize ?? preset.size, 20, 120),
+    bold: params.bold ?? preset.bold,
     marginV: clamp(params.marginV ?? preset.marginV, 0, 400),
+    borderStyle: (boxed ? 3 : 1) as 1 | 3,
     ...(params.primaryColor && HEX_RE.test(params.primaryColor)
       ? { primary: params.primaryColor }
       : {}),
-    ...(params.boxColor && HEX_RE.test(params.boxColor)
-      ? { back: params.boxColor }
+    ...(params.outlineColor && HEX_RE.test(params.outlineColor)
+      ? { outline: params.outlineColor }
       : {}),
+    back: `${boxHex}${alpha}`,
   };
 
   const segments = track.segments as SubtitleSegment[];
-  const hasBoxes = segments.some((s) => s.box);
-  if (params.coverMode === "auto" && !hasBoxes) {
-    throw new Error(
-      "Track này không có vị trí chữ (chỉ OCR mới có) — hãy dùng chế độ che thủ công",
-    );
-  }
-  if (params.placement === "replace" && params.aspect !== "keep") {
-    throw new Error("Chèn phụ đề vào vị trí gốc chỉ hỗ trợ khung hình gốc");
-  }
 
   const dir = await jobTempDir(job.data.jobId);
   try {
@@ -84,18 +95,13 @@ export async function renderProcessor(job: Job<JobPayload>) {
       aspect: params.aspect,
     });
     const assPath = path.join(dir, "subs.ass");
-    await writeFile(
-      assPath,
-      buildAss(segments, style, playRes, { placement: params.placement ?? "bottom" }),
-      "utf8",
-    );
+    await writeFile(assPath, buildAss(segments, style, playRes), "utf8");
 
     const graph = buildFiltergraph({
       srcWidth: video.width,
       srcHeight: video.height,
       coverMode: params.coverMode,
-      region: params.region,
-      segments: params.coverMode === "auto" ? segments : undefined,
+      regions: params.regions,
       aspect: params.aspect,
       assPath,
       fontsDir: FONTS_DIR,
