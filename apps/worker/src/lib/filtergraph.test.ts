@@ -5,6 +5,7 @@ import {
   escapeFilterPath,
   outputResolution,
   regionToPixels,
+  sanitizeDrawText,
 } from "./filtergraph";
 
 const BASE = {
@@ -85,6 +86,32 @@ test("subBoxToMargins: keep aspect — direct pixel margins", async () => {
   assert.equal(m.marginL, 192);
   assert.equal(m.marginR, 192); // 1920 - (192 + 1536)
   assert.equal(m.marginV, Math.round(1080 - 0.9 * 1080)); // 108
+});
+
+test("sanitizeDrawText neutralizes quote/backslash/expansion", () => {
+  assert.equal(sanitizeDrawText("Kênh 'ABC' \\ %{pts}"), "Kênh ’ABC’ / %%{pts}");
+});
+
+test("logo: drawtext is the last step, after ass burn", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "none",
+    aspect: "keep",
+    logo: {
+      text: "Kênh Của Tôi",
+      position: "tr",
+      fontSize: 28,
+      color: "#FFFFFF",
+      opacity: 80,
+      fontFile: "C:\\repo\\fonts\\BeVietnamPro-Bold.ttf",
+    },
+  });
+  const assIdx = g.indexOf("ass=");
+  const dtIdx = g.indexOf("drawtext=");
+  assert.ok(assIdx >= 0 && dtIdx > assIdx, "drawtext must come after ass");
+  assert.match(g, /fontcolor=0xFFFFFF@0\.8/);
+  assert.match(g, /x=w-tw-24:y=24/);
+  assert.match(g, /\[v\]$/);
 });
 
 test("subBoxToMargins: 9:16 — box follows centered fit transform", async () => {

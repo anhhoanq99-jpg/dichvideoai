@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Download, Loader2 } from "lucide-react";
+import { Clapperboard, Download, Loader2, Save } from "lucide-react";
 import {
   ASPECT_PRESETS,
+  LOGO_POSITIONS,
   RENDER_FONTS,
   STYLE_PRESETS,
   type CoverMode,
   type CoverRegion,
+  type LogoPosition,
 } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 import { RegionSelector } from "./region-selector";
@@ -27,6 +29,32 @@ interface RenderPanelProps {
   videoId: string;
   translatedTrackId: string | null;
 }
+
+/** Cài đặt render lưu theo tên trong trình duyệt. */
+interface SavedPreset {
+  styleId: string;
+  aspect: string;
+  coverMode: CoverMode;
+  placeOver: boolean;
+  customize: boolean;
+  font: string;
+  fontSize: number;
+  bold: boolean;
+  primaryColor: string;
+  outlineColor: string;
+  boxed: boolean;
+  boxColor: string;
+  boxOpacity: number;
+  marginV: number;
+  logoOn: boolean;
+  logoText: string;
+  logoPosition: LogoPosition;
+  logoSize: number;
+  logoColor: string;
+  logoOpacity: number;
+}
+
+const PRESETS_KEY = "dichvideo:render-presets";
 
 export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [open, setOpen] = useState(false);
@@ -47,11 +75,30 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
   const [boxColor, setBoxColor] = useState("#000000");
   const [boxOpacity, setBoxOpacity] = useState(100);
   const [marginV, setMarginV] = useState(40);
+  // logo/watermark của user
+  const [logoOn, setLogoOn] = useState(false);
+  const [logoText, setLogoText] = useState("");
+  const [logoPosition, setLogoPosition] = useState<LogoPosition>("tr");
+  const [logoSize, setLogoSize] = useState(28);
+  const [logoColor, setLogoColor] = useState("#FFFFFF");
+  const [logoOpacity, setLogoOpacity] = useState(80);
+  // cài đặt đã lưu (localStorage)
+  const [presetName, setPresetName] = useState("");
+  const [savedPresets, setSavedPresets] = useState<Record<string, SavedPreset>>({});
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const job = useJobStream(jobId);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PRESETS_KEY);
+      if (raw) setSavedPresets(JSON.parse(raw));
+    } catch {
+      // preset hỏng → bỏ qua
+    }
+  }, []);
 
   useEffect(() => {
     if (open && !previewUrl) {
@@ -70,6 +117,48 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
 
   const running = job !== null && (job.status === "queued" || job.status === "active");
   const doneKey = (job?.result as { r2Key?: string } | null)?.r2Key;
+
+  function savePreset() {
+    const name = presetName.trim();
+    if (!name) return;
+    const next: Record<string, SavedPreset> = {
+      ...savedPresets,
+      [name]: {
+        styleId, aspect, coverMode, placeOver, customize,
+        font, fontSize, bold, primaryColor, outlineColor,
+        boxed, boxColor, boxOpacity, marginV,
+        logoOn, logoText, logoPosition, logoSize, logoColor, logoOpacity,
+      },
+    };
+    setSavedPresets(next);
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(next));
+    setPresetName("");
+  }
+
+  function applySavedPreset(name: string) {
+    const p = savedPresets[name];
+    if (!p) return;
+    setStyleId(p.styleId);
+    setAspect(p.aspect);
+    setCoverMode(p.coverMode);
+    setPlaceOver(p.placeOver);
+    setCustomize(p.customize);
+    setFont(p.font);
+    setFontSize(p.fontSize);
+    setBold(p.bold);
+    setPrimaryColor(p.primaryColor);
+    setOutlineColor(p.outlineColor);
+    setBoxed(p.boxed);
+    setBoxColor(p.boxColor);
+    setBoxOpacity(p.boxOpacity);
+    setMarginV(p.marginV);
+    setLogoOn(p.logoOn);
+    setLogoText(p.logoText);
+    setLogoPosition(p.logoPosition);
+    setLogoSize(p.logoSize);
+    setLogoColor(p.logoColor);
+    setLogoOpacity(p.logoOpacity);
+  }
 
   function pickCover(mode: CoverMode) {
     setCoverMode(mode);
@@ -108,6 +197,17 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
         coverMode,
         ...(coverMode !== "none" && regions.length > 0 ? { regions } : {}),
         ...(bottom ? { subBox: { x: 0.05, y: bottom.y, w: 0.9, h: bottom.h } } : {}),
+        ...(logoOn && logoText.trim()
+          ? {
+              logo: {
+                text: logoText.trim(),
+                position: logoPosition,
+                fontSize: logoSize,
+                color: logoColor,
+                opacity: logoOpacity,
+              },
+            }
+          : {}),
         ...(customize
           ? {
               font,
@@ -382,6 +482,121 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
               )}
             </div>
           )}
+
+          {/* Logo / watermark của kênh */}
+          <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
+            <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={logoOn}
+                onChange={(e) => setLogoOn(e.target.checked)}
+              />
+              Chèn logo / tên kênh của bạn vào video
+            </label>
+            {logoOn && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="text-sm sm:col-span-2 lg:col-span-1">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                    Nội dung chữ
+                  </span>
+                  <input
+                    value={logoText}
+                    onChange={(e) => setLogoText(e.target.value.slice(0, 60))}
+                    placeholder="Tên kênh của bạn"
+                    className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                    Vị trí
+                  </span>
+                  <select
+                    value={logoPosition}
+                    onChange={(e) => setLogoPosition(e.target.value as LogoPosition)}
+                    className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                  >
+                    {LOGO_POSITIONS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                    Cỡ chữ: {logoSize}px
+                  </span>
+                  <input
+                    type="range"
+                    min={12}
+                    max={96}
+                    value={logoSize}
+                    onChange={(e) => setLogoSize(Number(e.target.value))}
+                    className="mt-2 w-full"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Màu chữ
+                  </span>
+                  <input
+                    type="color"
+                    value={logoColor}
+                    onChange={(e) => setLogoColor(e.target.value.toUpperCase())}
+                    className="h-7 w-9 cursor-pointer rounded border border-neutral-300 dark:border-neutral-700"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                    Độ hiện: {logoOpacity}%
+                  </span>
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    value={logoOpacity}
+                    onChange={(e) => setLogoOpacity(Number(e.target.value))}
+                    className="mt-2 w-full"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Cài đặt đã lưu */}
+          <div className="flex flex-wrap items-center gap-2">
+            {Object.keys(savedPresets).length > 0 && (
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) applySavedPreset(e.target.value);
+                  e.target.value = "";
+                }}
+                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+              >
+                <option value="">— Cài đặt đã lưu —</option>
+                {Object.keys(savedPresets).map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="Tên cài đặt…"
+              className="w-36 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+            />
+            <button
+              type="button"
+              onClick={savePreset}
+              disabled={!presetName.trim()}
+              className="flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            >
+              <Save className="h-3.5 w-3.5" /> Lưu cài đặt
+            </button>
+          </div>
 
           <button
             type="button"

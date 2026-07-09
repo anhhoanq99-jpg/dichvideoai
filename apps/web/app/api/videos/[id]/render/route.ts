@@ -29,6 +29,15 @@ const schema = z.object({
   coverMode: z.enum(COVER_MODES).default("none"),
   regions: z.array(regionSchema).max(MAX_COVER_REGIONS).optional(),
   subBox: regionSchema.optional(),
+  logo: z
+    .object({
+      text: z.string().min(1).max(60),
+      position: z.enum(["tl", "tr", "bl", "br"]),
+      fontSize: z.number().int().min(12).max(96),
+      color: z.string().regex(HEX),
+      opacity: z.number().int().min(0).max(100),
+    })
+    .optional(),
   // style overrides
   font: z.enum(RENDER_FONTS as unknown as [string, ...string[]]).optional(),
   fontSize: z.number().int().min(20).max(120).optional(),

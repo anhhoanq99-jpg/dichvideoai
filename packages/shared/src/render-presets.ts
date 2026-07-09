@@ -117,6 +117,26 @@ export interface StyleOverrides {
   marginV?: number;
 }
 
+export const LOGO_POSITIONS = [
+  { id: "tl", name: "Góc trên — trái" },
+  { id: "tr", name: "Góc trên — phải" },
+  { id: "bl", name: "Góc dưới — trái" },
+  { id: "br", name: "Góc dưới — phải" },
+] as const;
+export type LogoPosition = (typeof LOGO_POSITIONS)[number]["id"];
+
+/** Watermark chữ CỦA NGƯỜI DÙNG chèn thêm vào video (tên kênh...). */
+export interface LogoParams {
+  text: string;
+  position: LogoPosition;
+  /** px theo chiều cao video xuất */
+  fontSize: number;
+  /** #RRGGBB */
+  color: string;
+  /** 0..100 */
+  opacity: number;
+}
+
 export interface RenderParams extends StyleOverrides {
   trackId: string;
   styleId: string;
@@ -130,4 +150,6 @@ export interface RenderParams extends StyleOverrides {
    * width. Overrides marginV when present.
    */
   subBox?: CoverRegion;
+  /** watermark chữ của người dùng chèn lên video */
+  logo?: LogoParams;
 }

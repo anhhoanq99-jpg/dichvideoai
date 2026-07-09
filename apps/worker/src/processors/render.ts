@@ -114,6 +114,17 @@ export async function renderProcessor(job: Job<JobPayload>) {
     const assPath = path.join(dir, "subs.ass");
     await writeFile(assPath, buildAss(segments, style, playRes), "utf8");
 
+    const logo =
+      params.logo?.text?.trim() && HEX_RE.test(params.logo.color)
+        ? {
+            ...params.logo,
+            text: params.logo.text.trim().slice(0, 60),
+            fontSize: clamp(params.logo.fontSize, 12, 96),
+            opacity: clamp(params.logo.opacity, 0, 100),
+            fontFile: path.join(FONTS_DIR, "BeVietnamPro-Bold.ttf"),
+          }
+        : undefined;
+
     const graph = buildFiltergraph({
       srcWidth: video.width,
       srcHeight: video.height,
@@ -122,6 +133,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
       aspect: params.aspect,
       assPath,
       fontsDir: FONTS_DIR,
+      logo,
     });
 
     const outPath = path.join(dir, "out.mp4");

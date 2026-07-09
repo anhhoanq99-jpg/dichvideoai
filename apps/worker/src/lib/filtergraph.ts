@@ -1,4 +1,9 @@
-import type { AspectId, CoverMode, CoverRegion } from "@dichvideo/shared";
+import type {
+  AspectId,
+  CoverMode,
+  CoverRegion,
+  LogoParams,
+} from "@dichvideo/shared";
 
 export interface FiltergraphInput {
   srcWidth: number;
@@ -11,12 +16,35 @@ export interface FiltergraphInput {
   assPath: string;
   /** absolute path to bundled fonts dir */
   fontsDir: string;
+  /** user watermark text drawn on top of everything */
+  logo?: LogoParams & { fontFile: string };
 }
 
 /** Escape a path for use inside an ffmpeg filter argument (Windows colons/backslashes). */
 export function escapeFilterPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:");
 }
+
+/**
+ * Sanitize user text for drawtext inside a quoted filter arg: swap characters
+ * that would break quoting/expansion instead of escaping (đơn giản và an toàn).
+ */
+export function sanitizeDrawText(t: string): string {
+  return t
+    .replace(/\\/g, "/")
+    .replace(/'/g, "’")
+    .replace(/%\{/g, "%%{")
+    .replace(/\r?\n/g, " ")
+    .trim();
+}
+
+const LOGO_MARGIN = 24;
+const LOGO_XY: Record<string, string> = {
+  tl: `x=${LOGO_MARGIN}:y=${LOGO_MARGIN}`,
+  tr: `x=w-tw-${LOGO_MARGIN}:y=${LOGO_MARGIN}`,
+  bl: `x=${LOGO_MARGIN}:y=h-th-${LOGO_MARGIN}`,
+  br: `x=w-tw-${LOGO_MARGIN}:y=h-th-${LOGO_MARGIN}`,
+};
 
 /** Denormalize region → even-numbered pixel rect clamped to frame. */
 export function regionToPixels(
@@ -142,9 +170,20 @@ export function buildFiltergraph(input: FiltergraphInput): string {
   }
 
   // 3. burn Vietnamese subs
+  const subOut = input.logo ? "[sub]" : "[v]";
   steps.push(
-    `${current}ass=filename='${escapeFilterPath(input.assPath)}':fontsdir='${escapeFilterPath(input.fontsDir)}'[v]`,
+    `${current}ass=filename='${escapeFilterPath(input.assPath)}':fontsdir='${escapeFilterPath(input.fontsDir)}'${subOut}`,
   );
+
+  // 4. user watermark on top
+  if (input.logo) {
+    const text = sanitizeDrawText(input.logo.text);
+    const alpha = Math.min(Math.max(input.logo.opacity, 0), 100) / 100;
+    const color = `0x${input.logo.color.replace("#", "")}@${alpha}`;
+    steps.push(
+      `[sub]drawtext=fontfile='${escapeFilterPath(input.logo.fontFile)}':text='${text}':fontsize=${input.logo.fontSize}:fontcolor=${color}:borderw=2:bordercolor=0x000000@${Math.min(alpha, 0.5)}:${LOGO_XY[input.logo.position]}[v]`,
+    );
+  }
 
   return steps.join(";");
 }
