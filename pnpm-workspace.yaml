@@ -6,6 +6,7 @@ overrides:
 allowBuilds:
   '@google/genai': true
   esbuild: true
+  msedge-tts: true
   msgpackr-extract: true
   protobufjs: true
   sharp: true

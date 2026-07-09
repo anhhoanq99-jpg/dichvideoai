@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { Download } from "lucide-react";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { jobs, subtitleTracks } from "@dichvideo/db";
 import type { SubtitleSegment } from "@dichvideo/shared";
 import { db } from "@/lib/db";
@@ -10,6 +10,7 @@ import { VideoStatusBadge } from "@/components/videos/video-status-badge";
 import { ExtractPanel } from "@/components/videos/extract-panel";
 import { TranslatePanel } from "@/components/videos/translate-panel";
 import { RenderPanel } from "@/components/render/render-panel";
+import { DubPanel } from "@/components/dub/dub-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +34,17 @@ export default async function VideoDetailPage({
   const translated = tracks.find((t) => t.kind === "translated");
 
   const renderOutputs = await db
-    .select({ id: jobs.id, result: jobs.result, finishedAt: jobs.finishedAt })
+    .select({
+      id: jobs.id,
+      type: jobs.type,
+      result: jobs.result,
+      finishedAt: jobs.finishedAt,
+    })
     .from(jobs)
     .where(
       and(
         eq(jobs.videoId, video.id),
-        eq(jobs.type, "render"),
+        inArray(jobs.type, ["render", "dub"]),
         eq(jobs.status, "done"),
       ),
     )
@@ -80,10 +86,15 @@ export default async function VideoDetailPage({
         translatedTrackId={translated?.id ?? null}
       />
 
+      <DubPanel
+        videoId={video.id}
+        translatedTrackId={translated?.id ?? null}
+      />
+
       {renderOutputs.length > 0 && (
         <section className="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-            <h2 className="text-sm font-semibold">Video đã render</h2>
+            <h2 className="text-sm font-semibold">Video đã xuất</h2>
             <p className="text-xs text-neutral-400">Tự xóa sau 7 ngày — hãy tải về máy.</p>
           </div>
           <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -92,6 +103,15 @@ export default async function VideoDetailPage({
               return (
                 <li key={o.id} className="flex items-center justify-between px-4 py-2 text-sm">
                   <span className="text-neutral-500 dark:text-neutral-400">
+                    <span
+                      className={
+                        o.type === "dub"
+                          ? "mr-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                          : "mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                      }
+                    >
+                      {o.type === "dub" ? "Lồng tiếng" : "Phụ đề"}
+                    </span>
                     {o.finishedAt?.toLocaleString("vi-VN") ?? ""}
                     {size ? ` · ${Math.round(size / 1e6)} MB` : ""}
                   </span>
