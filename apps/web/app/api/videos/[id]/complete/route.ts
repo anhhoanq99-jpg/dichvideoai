@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, videos } from "@dichvideo/db";
+import { EXTRACT_METHODS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { completeMultipart } from "@/lib/r2";
@@ -13,6 +14,15 @@ const schema = z.object({
   parts: z
     .array(z.object({ partNumber: z.number().int().min(1), etag: z.string().min(1) }))
     .min(1),
+  // pipeline một chạm: probe xong tự trích xuất rồi tự dịch
+  pipeline: z
+    .object({
+      method: z.enum(EXTRACT_METHODS),
+      sourceLang: z.string().max(10).optional(),
+      style: z.enum(["natural", "formal", "literal"]).default("natural"),
+      glossary: z.string().max(10_000).optional(),
+    })
+    .optional(),
 });
 
 export async function POST(
@@ -35,21 +45,37 @@ export async function POST(
   }
 
   await completeMultipart(video.r2Key, body.data.uploadId, body.data.parts);
+  const p = body.data.pipeline;
   await db
     .update(videos)
-    .set({ status: "processing" })
+    .set({
+      status: "processing",
+      ...(p
+        ? {
+            sourceLang: p.sourceLang ?? null,
+            translationStyle: p.style,
+            glossary: p.glossary ?? null,
+          }
+        : {}),
+    })
     .where(eq(videos.id, video.id));
 
+  const probeParams = p ? { chain: { method: p.method } } : {};
   const [job] = await db
     .insert(jobs)
-    .values({ videoId: video.id, userId: session.user.id, type: "probe", params: {} })
+    .values({
+      videoId: video.id,
+      userId: session.user.id,
+      type: "probe",
+      params: probeParams,
+    })
     .returning();
 
   await enqueuePipelineJob("probe", {
     jobId: job.id,
     videoId: video.id,
     userId: session.user.id,
-    params: {},
+    params: probeParams,
   });
 
   return NextResponse.json({ ok: true, probeJobId: job.id });

@@ -40,6 +40,13 @@ async function putPartWithRetry(
   throw lastErr;
 }
 
+export interface PipelineSettings {
+  method: "ocr" | "stt";
+  sourceLang?: string;
+  style: "natural" | "formal" | "literal";
+  glossary?: string;
+}
+
 export function useMultipartUpload() {
   const [state, setState] = useState<UploadState>({ phase: "idle" });
   const abortRef = useRef<AbortController | null>(null);
@@ -58,7 +65,8 @@ export function useMultipartUpload() {
     setState({ phase: "idle" });
   }, []);
 
-  const upload = useCallback(async (file: File) => {
+  /** Resolves with videoId on success, null on error/cancel. */
+  const upload = useCallback(async (file: File, pipeline?: PipelineSettings) => {
     const abort = new AbortController();
     abortRef.current = abort;
     setState({ phase: "uploading", pct: 0 });
@@ -122,7 +130,11 @@ export function useMultipartUpload() {
       const doneRes = await fetch(`/api/videos/${info.videoId}/complete`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uploadId: info.uploadId, parts }),
+        body: JSON.stringify({
+          uploadId: info.uploadId,
+          parts,
+          ...(pipeline ? { pipeline } : {}),
+        }),
         signal: abort.signal,
       });
       if (!doneRes.ok) {
@@ -132,12 +144,14 @@ export function useMultipartUpload() {
 
       setState({ phase: "done", videoId: info.videoId });
       uploadInfoRef.current = null;
+      return info.videoId;
     } catch (err) {
-      if (abort.signal.aborted) return; // user cancelled — state handled in cancel()
+      if (abort.signal.aborted) return null; // user cancelled — state handled in cancel()
       setState({
         phase: "error",
         message: err instanceof Error ? err.message : "Lỗi không xác định",
       });
+      return null;
     }
   }, []);
 

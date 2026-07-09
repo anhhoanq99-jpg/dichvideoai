@@ -6,6 +6,7 @@ import type { JobPayload } from "@dichvideo/shared";
 import { GeminiVideoOcrExtractor } from "../extractors/gemini-video-ocr";
 import { GroqWhisperExtractor } from "../extractors/groq-whisper";
 import type { SubtitleExtractor } from "../extractors/types";
+import { chainJob } from "../lib/chain";
 import { cleanupJobDir, downloadFromR2, jobTempDir } from "../lib/r2";
 import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
@@ -76,6 +77,18 @@ async function runExtraction(job: Job<JobPayload>, extractor: SubtitleExtractor)
       },
       "extraction done",
     );
+
+    // pipeline một chạm: trích xong tự dịch (style/glossary đã lưu trên video)
+    if (job.data.params.thenTranslate === true) {
+      const nextId = await chainJob({
+        videoId: video.id,
+        userId: job.data.userId,
+        type: "translate",
+        params: { style: video.translationStyle ?? "natural" },
+      });
+      logger.info({ videoId: video.id, nextId }, "chained translate");
+    }
+
     return { segmentCount: result.segments.length };
   } finally {
     await cleanupJobDir(job.data.jobId);
