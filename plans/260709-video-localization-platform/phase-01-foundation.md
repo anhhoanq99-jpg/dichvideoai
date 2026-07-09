@@ -10,7 +10,7 @@
 - **Date:** 2026-07-09
 - **Description:** Restructure to pnpm monorepo; Postgres + Drizzle schema (incl. credits ledger + cost tracking day 1); better-auth Google login; Redis + BullMQ scaffold; validated env config; dark/light dashboard shell in Vietnamese.
 - **Priority:** Critical (everything depends on it)
-- **Implementation status:** Not started
+- **Implementation status:** DONE 2026-07-09. Dev infra = option B cloud (Neon Postgres ap-southeast-1 + Upstash Redis TLS) instead of local Docker (WSL2 unavailable on dev machine). Migration applied (9 tables). Smoke test PASSED: ledger grant → BullMQ enqueue → worker → job `done` → ledger invariant holds (`apps/worker/src/dev/smoke.ts`). Google OAuth creds configured in .env; browser login pending user verification.
 - **Review status:** Not reviewed
 
 ## Key Insights
