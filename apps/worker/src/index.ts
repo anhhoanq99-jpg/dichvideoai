@@ -89,3 +89,12 @@ async function shutdown(signal: string) {
 
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
+
+// Lỗi bung ra từ callback/stream của thư viện (ngoài try/catch của processor)
+// không được phép giết cả worker — job liên quan sẽ fail qua retry/stalled-check.
+process.on("uncaughtException", (err) => {
+  logger.error({ err: err.message, stack: err.stack }, "uncaught exception (worker kept alive)");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason: String(reason) }, "unhandled rejection (worker kept alive)");
+});

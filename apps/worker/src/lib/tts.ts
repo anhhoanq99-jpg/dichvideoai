@@ -1,10 +1,11 @@
-import { rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 /**
  * Sinh 1 clip giọng đọc (mp3 24kHz) cho một câu phụ đề.
  * Mỗi lần gọi tạo connection mới — Edge TTS chỉ dùng được 1 lần/stream.
+ * msedge-tts nhận THƯ MỤC (phải tồn tại sẵn) và tự ghi audio.mp3 vào trong.
  */
 export async function synthesizeClip(input: {
   text: string;
@@ -12,22 +13,21 @@ export async function synthesizeClip(input: {
   /** 0.8 .. 1.3 */
   speed: number;
   dir: string;
-  /** tên file (không đuôi) */
+  /** tên thư mục con cho clip này */
   name: string;
 }): Promise<string> {
+  const clipDir = path.join(input.dir, input.name);
+  await mkdir(clipDir, { recursive: true });
   const tts = new MsEdgeTTS();
   await tts.setMetadata(
     input.voice,
     OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3,
   );
   const ratePct = Math.round((input.speed - 1) * 100);
-  const { audioFilePath } = await tts.toFile(path.join(input.dir, input.name), input.text, {
+  const { audioFilePath } = await tts.toFile(clipDir, input.text, {
     rate: `${ratePct >= 0 ? "+" : ""}${ratePct}%`,
   });
-  // msedge-tts đặt tên file cố định trong thư mục — đổi về tên mong muốn
-  const target = path.join(input.dir, `${input.name}.mp3`);
-  if (audioFilePath !== target) await rename(audioFilePath, target);
-  return target;
+  return audioFilePath;
 }
 
 const MAX_TTS_RETRIES = 3;
