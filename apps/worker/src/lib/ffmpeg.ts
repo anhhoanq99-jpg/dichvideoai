@@ -51,3 +51,20 @@ export async function extractAudio(videoPath: string, outPath: string): Promise<
     outPath,
   ]);
 }
+
+/** Grab one frame at tSec, scaled to width 640 (aspect kept) — for bbox refinement. */
+export async function extractFrameJpeg(
+  videoPath: string,
+  tSec: number,
+  outPath: string,
+): Promise<void> {
+  await execFileAsync(bin("ffmpeg"), [
+    "-y",
+    "-ss", tSec.toFixed(2),
+    "-i", videoPath,
+    "-frames:v", "1",
+    "-vf", "scale=640:-2",
+    "-q:v", "5",
+    outPath,
+  ]);
+}

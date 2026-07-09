@@ -1,5 +1,6 @@
 import { GoogleGenAI, MediaResolution, createPartFromUri } from "@google/genai";
 import { PRICING } from "../lib/usage";
+import { refineSegmentBoxes } from "./refine-boxes";
 import {
   normalizeSegments,
   type ExtractInput,
@@ -123,6 +124,7 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
         }))
         .filter((r) => !Number.isNaN(r.startMs) && !Number.isNaN(r.endMs)),
     );
+    onProgress(70);
 
     const inTok = res.usageMetadata?.promptTokenCount ?? 0;
     const outTok = res.usageMetadata?.candidatesTokenCount ?? 0;
@@ -130,8 +132,17 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
     // best-effort cleanup of uploaded file
     await ai.files.delete({ name: file.name! }).catch(() => {});
 
-    return {
+    // video-pass boxes are approximate → re-locate on still frames (much more accurate)
+    const refinedResult = await refineSegmentBoxes(
+      ai,
+      this.model,
+      input.localPath,
       segments,
+      (pct) => onProgress(70 + Math.round(pct * 0.25)),
+    );
+
+    return {
+      segments: refinedResult.segments,
       lang: input.sourceLang ?? "unknown",
       usage: [
         {
@@ -146,6 +157,7 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
           quantity: outTok,
           costUsdMicros: outTok * PRICING.gemini25FlashOutPerTok,
         },
+        ...refinedResult.usage,
       ],
     };
   }
