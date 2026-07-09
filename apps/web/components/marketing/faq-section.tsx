@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { Reveal, StaggerGroup, StaggerItem } from "./motion";
 
 const FAQS = [
   {
@@ -31,27 +36,56 @@ const FAQS = [
   },
 ];
 
-/** Phần 6 — câu hỏi thường gặp, accordion thuần HTML (details/summary). */
+/** Phần 6 — FAQ: các câu hiện so le, mở/gập câu trả lời có animation chiều cao. */
 export function FaqSection() {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
   return (
     <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-4 py-16">
-      <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
-        Câu hỏi thường gặp
-      </h2>
-      <div className="mt-8 space-y-3">
-        {FAQS.map((f) => (
-          <details
-            key={f.q}
-            className="group rounded-xl border border-white/5 bg-white/[0.03] px-5 py-4"
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-white">
-              {f.q}
-              <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400 transition-transform group-open:rotate-180" />
-            </summary>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">{f.a}</p>
-          </details>
-        ))}
-      </div>
+      <Reveal>
+        <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
+          Câu hỏi thường gặp
+        </h2>
+      </Reveal>
+      <StaggerGroup className="mt-8 space-y-3">
+        {FAQS.map((f, i) => {
+          const isOpen = openIdx === i;
+          return (
+            <StaggerItem
+              key={f.q}
+              className="rounded-xl border border-white/5 bg-white/[0.03] px-5 transition-colors duration-300 hover:border-white/15"
+            >
+              <button
+                type="button"
+                onClick={() => setOpenIdx(isOpen ? null : i)}
+                className="flex w-full items-center justify-between gap-4 py-4 text-left text-sm font-medium text-white"
+              >
+                {f.q}
+                <motion.span
+                  animate={{ rotate: isOpen ? 180 : 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="shrink-0"
+                >
+                  <ChevronDown className="h-4 w-4 text-neutral-400" />
+                </motion.span>
+              </button>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <p className="pb-4 text-sm leading-relaxed text-neutral-400">{f.a}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </StaggerItem>
+          );
+        })}
+      </StaggerGroup>
     </section>
   );
 }

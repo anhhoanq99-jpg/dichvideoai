@@ -1,4 +1,7 @@
+"use client";
+
 import { Download, Settings2, UploadCloud, Wand2 } from "lucide-react";
+import { Reveal, StaggerGroup, StaggerItem } from "./motion";
 
 const STEPS = [
   {
@@ -28,15 +31,21 @@ export function HowItWorksSection() {
   return (
     <section id="cach-hoat-dong" className="scroll-mt-20 border-y border-white/5 bg-white/[0.02] px-4 py-16">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
-          Bốn bước là xong
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-center text-neutral-400">
-          Từ video nước ngoài đến video tiếng Việt hoàn chỉnh — không cần phần mềm edit.
-        </p>
-        <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Reveal>
+          <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
+            Bốn bước là xong
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-neutral-400">
+            Từ video nước ngoài đến video tiếng Việt hoàn chỉnh — không cần phần mềm edit.
+          </p>
+        </Reveal>
+        <StaggerGroup className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="relative rounded-2xl border border-white/5 bg-[#0b0d14] p-5">
+            <StaggerItem
+              key={s.title}
+              lift
+              className="relative rounded-2xl border border-white/5 bg-[#0b0d14] p-5 transition-colors duration-300 hover:border-indigo-500/30"
+            >
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600">
                   <s.icon className="h-5 w-5 text-white" />
@@ -47,9 +56,9 @@ export function HowItWorksSection() {
               </div>
               <h3 className="mt-4 text-sm font-semibold text-white">{s.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">{s.desc}</p>
-            </li>
+            </StaggerItem>
           ))}
-        </ol>
+        </StaggerGroup>
       </div>
     </section>
   );

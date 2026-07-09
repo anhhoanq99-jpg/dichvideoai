@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Blocks,
   Eraser,
@@ -8,6 +10,7 @@ import {
   Stamp,
   Volume2,
 } from "lucide-react";
+import { Reveal, StaggerGroup, StaggerItem } from "./motion";
 
 const FEATURES = [
   {
@@ -52,30 +55,33 @@ const FEATURES = [
   },
 ];
 
-/** Phần 3 — lưới tính năng chính, 1 cột mobile / 2 tablet / 4 desktop. */
+/** Phần 3 — lưới tính năng: hiện so le khi cuộn tới, thẻ nâng nhẹ khi rê chuột. */
 export function FeaturesSection() {
   return (
     <section id="tinh-nang" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16">
-      <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
-        Mọi thứ để Việt hóa video
-      </h2>
-      <p className="mx-auto mt-3 max-w-xl text-center text-neutral-400">
-        Một nền tảng thay cho cả bộ công cụ: tách phụ đề, dịch, che chữ, render, lồng tiếng.
-      </p>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Reveal>
+        <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">
+          Mọi thứ để Việt hóa video
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-center text-neutral-400">
+          Một nền tảng thay cho cả bộ công cụ: tách phụ đề, dịch, che chữ, render, lồng tiếng.
+        </p>
+      </Reveal>
+      <StaggerGroup className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map((f) => (
-          <div
+          <StaggerItem
             key={f.title}
-            className="rounded-2xl border border-white/5 bg-white/[0.03] p-5 transition-colors hover:border-indigo-500/40 hover:bg-indigo-500/[0.06]"
+            lift
+            className="rounded-2xl border border-white/5 bg-white/[0.03] p-5 transition-colors duration-300 hover:border-indigo-500/40 hover:bg-indigo-500/[0.06]"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15">
               <f.icon className="h-5 w-5 text-indigo-400" />
             </span>
             <h3 className="mt-4 text-sm font-semibold text-white">{f.title}</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">{f.desc}</p>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerGroup>
     </section>
   );
 }

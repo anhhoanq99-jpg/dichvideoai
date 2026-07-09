@@ -1,13 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Clapperboard } from "lucide-react";
+import { Reveal } from "./motion";
 
-/** Phần 7 — dải CTA cuối trang + footer. */
+/** Phần 7 — dải CTA cuối trang (reveal khi cuộn tới) + footer. */
 export function SiteFooter() {
   return (
     <footer className="border-t border-white/5">
       {/* CTA band */}
       <div className="px-4 py-16">
-        <div className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-10 text-center sm:px-12">
+        <Reveal className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-10 text-center sm:px-12">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">
             Sẵn sàng Việt hóa video đầu tiên?
           </h2>
@@ -16,11 +19,11 @@ export function SiteFooter() {
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3 text-sm font-semibold text-indigo-700 transition-transform hover:scale-[1.02]"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3 text-sm font-semibold text-indigo-700 transition-all duration-200 hover:scale-[1.04] hover:shadow-lg hover:shadow-black/20 active:scale-95"
           >
             Bắt đầu ngay <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
+        </Reveal>
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 border-t border-white/5 px-4 py-8 sm:flex-row sm:justify-between">
