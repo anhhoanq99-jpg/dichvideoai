@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, subtitleTracks } from "@dichvideo/db";
-import { EDGE_VOICE_IDS } from "@dichvideo/shared";
+import { EDGE_VOICE_IDS, GEMINI_VOICE_IDS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
@@ -10,7 +10,12 @@ import { getOwnVideo } from "@/lib/video-access";
 
 const schema = z.object({
   trackId: z.string().uuid(),
-  voice: z.string().refine((v) => EDGE_VOICE_IDS.has(v), "Giọng không hợp lệ"),
+  voice: z
+    .string()
+    .refine(
+      (v) => EDGE_VOICE_IDS.has(v) || GEMINI_VOICE_IDS.has(v),
+      "Giọng không hợp lệ",
+    ),
   speed: z.number().min(0.8).max(1.3).default(1),
   aiVolume: z.number().int().min(0).max(200).default(100),
   bgVolume: z.number().int().min(0).max(100).default(20),

@@ -7,4 +7,5 @@ export * from "./render-presets";
 export * from "./translate-styles";
 export * from "./dub-presets";
 export * from "./edge-voices";
+export * from "./audio";
 export * from "./ass-builder";

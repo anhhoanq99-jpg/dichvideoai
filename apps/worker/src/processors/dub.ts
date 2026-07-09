@@ -10,6 +10,8 @@ import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
   DUB_VOICES,
   EDGE_VOICE_IDS,
+  GEMINI_VOICE_IDS,
+  geminiVoiceName,
   type DubParams,
   type JobPayload,
   type SubtitleSegment,
@@ -19,6 +21,7 @@ import { ffprobe } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import { cleanupJobDir, downloadFromR2, getR2, jobTempDir } from "../lib/r2";
 import { synthesizeClipWithRetry } from "../lib/tts";
+import { recordUsage, type UsageRecord } from "../lib/usage";
 import { logger } from "../logger";
 
 const execFileAsync = promisify(execFile);
@@ -81,7 +84,11 @@ export async function dubProcessor(job: Job<JobPayload>) {
     );
   if (!track) throw new Error("Không tìm thấy track phụ đề để lồng tiếng");
 
-  const voice = EDGE_VOICE_IDS.has(params.voice) ? params.voice : DUB_VOICES[0].id;
+  const voice =
+    EDGE_VOICE_IDS.has(params.voice) || GEMINI_VOICE_IDS.has(params.voice)
+      ? params.voice
+      : DUB_VOICES[0].id;
+  const isGemini = geminiVoiceName(voice) !== null;
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
   const bgVol = clamp(params.bgVolume ?? 20, 0, 100) / 100;
@@ -102,25 +109,28 @@ export async function dubProcessor(job: Job<JobPayload>) {
 
     // 1. TTS từng câu (5→55%)
     const clips: string[] = [];
+    const usage: UsageRecord[] = [];
     for (const [k, seg] of segments.entries()) {
-      clips.push(
-        await synthesizeClipWithRetry({
-          text: seg.text.replace(/\s+/g, " ").trim(),
-          voice,
-          speed,
-          dir,
-          name: `clip-${k}`,
-        }),
-      );
+      const r = await synthesizeClipWithRetry({
+        text: seg.text.replace(/\s+/g, " ").trim(),
+        voice,
+        speed,
+        dir,
+        name: `clip-${k}`,
+      });
+      clips.push(r.file);
+      usage.push(...r.usage);
       await job.updateProgress(5 + Math.round(((k + 1) / segments.length) * 50));
     }
+    const costUsdMicros = await recordUsage(job.data.jobId, usage);
 
     // 2. Ép mỗi clip khớp khe thời gian của câu (55→70%)
     const fitted: { file: string; durMs: number }[] = [];
     for (const [k, seg] of segments.entries()) {
       const rawMs = await audioDurationMs(clips[k]);
       const slot = slotMs(segments, k, videoDurMs);
-      const chain = atempoChain(rawMs / slot);
+      // Edge đã bake tốc độ vào giọng; Gemini không có tham số rate → áp bằng atempo
+      const chain = atempoChain(Math.max(rawMs / slot, isGemini ? speed : 1));
       const out = path.join(dir, `fit-${k}.wav`);
       // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
       const expMs = Math.min(chain ? slot : rawMs, slot);
@@ -216,11 +226,11 @@ export async function dubProcessor(job: Job<JobPayload>) {
 
     await db
       .update(jobs)
-      .set({ result: { r2Key: outKey, sizeBytes: size } })
+      .set({ result: { r2Key: outKey, sizeBytes: size }, costUsdMicros })
       .where(eq(jobs.id, job.data.jobId));
 
     logger.info(
-      { jobId: job.data.jobId, outKey, segments: segments.length, voice },
+      { jobId: job.data.jobId, outKey, segments: segments.length, voice, costUsdMicros },
       "dub done",
     );
     return { r2Key: outKey, sizeBytes: size };

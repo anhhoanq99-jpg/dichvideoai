@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, Mic } from "lucide-react";
-import { DUB_VOICES, EDGE_VOICES } from "@dichvideo/shared";
+import { Download, Loader2, Mic, Play } from "lucide-react";
+import { DUB_VOICES, EDGE_VOICES, GEMINI_VOICES } from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 
 interface DubPanelProps {
@@ -30,13 +30,16 @@ const LOCALES = [...new Set(EDGE_VOICES.map((v) => v.locale))]
     a.id === "vi-VN" ? -1 : b.id === "vi-VN" ? 1 : a.label.localeCompare(b.label, "vi"),
   );
 
-/** Lồng tiếng AI: 322 giọng đủ mọi quốc gia, lọc theo nước + giới tính. */
+/** Lồng tiếng AI: giọng thường (322, miễn phí) + giọng cao cấp Gemini, có nghe thử. */
 export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
   const [open, setOpen] = useState(false);
+  const [provider, setProvider] = useState<"edge" | "gemini">("edge");
   const [locale, setLocale] = useState("vi-VN");
   const [gender, setGender] = useState<"all" | "F" | "M">("all");
   const [voice, setVoice] = useState<string>(DUB_VOICES[0].id);
   const [speed, setSpeed] = useState(1);
+  const [previewing, setPreviewing] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [aiVolume, setAiVolume] = useState(100);
   const [bgVolume, setBgVolume] = useState(20);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -48,13 +51,16 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
     if (job?.status === "done") router.refresh();
   }, [job?.status, router]);
 
-  const voiceOptions = useMemo(
-    () =>
-      EDGE_VOICES.filter(
-        (v) => v.locale === locale && (gender === "all" || v.gender === gender),
-      ),
-    [locale, gender],
-  );
+  const voiceOptions = useMemo(() => {
+    if (provider === "gemini") {
+      return GEMINI_VOICES.filter((v) => gender === "all" || v.gender === gender).map(
+        (v) => ({ id: v.id, name: v.name, gender: v.gender }),
+      );
+    }
+    return EDGE_VOICES.filter(
+      (v) => v.locale === locale && (gender === "all" || v.gender === gender),
+    ).map((v) => ({ id: v.id, name: v.name, gender: v.gender }));
+  }, [provider, locale, gender]);
 
   // đổi bộ lọc → tự chọn giọng đầu tiên còn khớp
   useEffect(() => {
@@ -62,6 +68,26 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
       setVoice(voiceOptions[0].id);
     }
   }, [voiceOptions, voice]);
+
+  async function playPreview() {
+    if (previewing) return;
+    setPreviewing(true);
+    setError(null);
+    try {
+      audioRef.current?.pause();
+      const audio = new Audio(`/api/tts-preview?voice=${encodeURIComponent(voice)}`);
+      audioRef.current = audio;
+      audio.onended = () => setPreviewing(false);
+      audio.onerror = () => {
+        setPreviewing(false);
+        setError("Không phát được mẫu giọng — thử lại");
+      };
+      await audio.play();
+    } catch {
+      setPreviewing(false);
+      setError("Không phát được mẫu giọng — thử lại");
+    }
+  }
 
   if (!translatedTrackId) return null;
 
@@ -134,22 +160,39 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
       {open && !running && (
         <div className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm">
+            <label className="text-sm sm:col-span-2">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Quốc gia / ngôn ngữ ({LOCALES.length})
+                Loại giọng
               </span>
               <select
-                value={locale}
-                onChange={(e) => setLocale(e.target.value)}
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as typeof provider)}
                 className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               >
-                {LOCALES.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label} ({l.id})
-                  </option>
-                ))}
+                <option value="edge">Giọng thường — miễn phí (322 giọng, mọi quốc gia)</option>
+                <option value="gemini">
+                  Giọng cao cấp AI — tiếng Việt diễn cảm ({GEMINI_VOICES.length} giọng, tính phí API)
+                </option>
               </select>
             </label>
+            {provider === "edge" && (
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                  Quốc gia / ngôn ngữ ({LOCALES.length})
+                </span>
+                <select
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                >
+                  {LOCALES.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label} ({l.id})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="text-sm">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 Giới tính
@@ -164,21 +207,38 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
                 <option value="M">Nam</option>
               </select>
             </label>
-            <label className="text-sm">
+            <label className="text-sm sm:col-span-2">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 Giọng đọc ({voiceOptions.length} giọng)
               </span>
-              <select
-                value={voice}
-                onChange={(e) => setVoice(e.target.value)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-              >
-                {voiceOptions.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} — {v.gender === "F" ? "Nữ" : "Nam"}
-                  </option>
-                ))}
-              </select>
+              <span className="mt-1 flex gap-2">
+                <select
+                  value={voice}
+                  onChange={(e) => setVoice(e.target.value)}
+                  className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                >
+                  {voiceOptions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                      {provider === "edge" ? ` — ${v.gender === "F" ? "Nữ" : "Nam"}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void playPreview()}
+                  disabled={previewing}
+                  title="Nghe thử giọng này"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                >
+                  {previewing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  Nghe thử
+                </button>
+              </span>
             </label>
             <label className="text-sm">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">

@@ -1,6 +1,9 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { GoogleGenAI } from "@google/genai";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { geminiVoiceName, pcmToWav } from "@dichvideo/shared";
+import { PRICING, type UsageRecord } from "./usage";
 
 /**
  * Sinh 1 clip giọng đọc (mp3 24kHz) cho một câu phụ đề.
@@ -30,19 +33,84 @@ export async function synthesizeClip(input: {
   return audioFilePath;
 }
 
+/** Sinh 1 clip bằng giọng cao cấp Gemini TTS → wav 24kHz + usage để trừ chi phí. */
+export async function synthesizeGeminiClip(input: {
+  text: string;
+  /** tên voice thật, vd "Kore" */
+  voiceName: string;
+  dir: string;
+  name: string;
+}): Promise<{ file: string; usage: UsageRecord[] }> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình");
+  const ai = new GoogleGenAI({ apiKey });
+
+  const res = await ai.models.generateContent({
+    model: process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts",
+    contents: input.text,
+    config: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: input.voiceName } },
+      },
+    },
+  });
+  const data = res.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!data) throw new Error("Gemini TTS không trả về audio");
+
+  const file = path.join(input.dir, `${input.name}.wav`);
+  await writeFile(file, pcmToWav(Buffer.from(data, "base64")));
+
+  const inTok = res.usageMetadata?.promptTokenCount ?? 0;
+  const outTok = res.usageMetadata?.candidatesTokenCount ?? 0;
+  return {
+    file,
+    usage: [
+      {
+        provider: "gemini",
+        metric: "tokens_in",
+        quantity: inTok,
+        costUsdMicros: inTok * PRICING.geminiTtsInPerTok,
+      },
+      {
+        provider: "gemini",
+        metric: "tokens_out",
+        quantity: outTok,
+        costUsdMicros: outTok * PRICING.geminiTtsOutPerTok,
+      },
+    ],
+  };
+}
+
 const MAX_TTS_RETRIES = 3;
 
-/** Retry quanh lỗi mạng/websocket của Edge TTS. */
-export async function synthesizeClipWithRetry(
-  input: Parameters<typeof synthesizeClip>[0],
-): Promise<string> {
+/**
+ * Sinh clip theo id giọng bất kỳ: "gemini:Xxx" → Gemini TTS (trả phí),
+ * còn lại → Edge TTS (miễn phí). Có retry quanh lỗi mạng.
+ */
+export async function synthesizeClipWithRetry(input: {
+  text: string;
+  voice: string;
+  speed: number;
+  dir: string;
+  name: string;
+}): Promise<{ file: string; usage: UsageRecord[] }> {
+  const gemini = geminiVoiceName(input.voice);
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
-      return await synthesizeClip(input);
+      if (gemini) {
+        return await synthesizeGeminiClip({
+          text: input.text,
+          voiceName: gemini,
+          dir: input.dir,
+          name: input.name,
+        });
+      }
+      return { file: await synthesizeClip(input), usage: [] };
     } catch (err) {
       lastErr = err;
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
     }
   }
   throw new Error(

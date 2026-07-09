@@ -15,6 +15,9 @@ export const PRICING = {
   gemini25FlashInPerTok: 0.3e6 / 1_000_000,
   /** Gemini 2.5 Flash output per token ($2.50 / 1M) */
   gemini25FlashOutPerTok: 2.5e6 / 1_000_000,
+  /** Gemini 2.5 Flash TTS: text input ($0.50 / 1M), audio output ($10 / 1M tok) */
+  geminiTtsInPerTok: 0.5e6 / 1_000_000,
+  geminiTtsOutPerTok: 10e6 / 1_000_000,
 } as const;
 
 export async function recordUsage(jobId: string, records: UsageRecord[]) {
