@@ -16,6 +16,7 @@ import {
   TRANSLATION_STYLES,
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
+  estimateJobCredits,
   type TranslationStyleId,
 } from "@dichvideo/shared";
 import {
@@ -50,6 +51,24 @@ const STYLE_OPTIONS = TRANSLATION_STYLES.filter((s) => s.id !== "custom");
 
 type FileStatus = "waiting" | "uploading" | "done" | "error";
 
+/** Đọc thời lượng video (giây) ngay trên trình duyệt để ước tính credits. */
+function readDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(v.duration) ? Math.round(v.duration) : null);
+    };
+    v.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    v.src = url;
+  });
+}
+
 export default function UploadPage() {
   const { state, upload, cancel } = useMultipartUpload();
   const [dragOver, setDragOver] = useState(false);
@@ -64,6 +83,7 @@ export default function UploadPage() {
 
   const [files, setFiles] = useState<File[]>([]);
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
+  const [durations, setDurations] = useState<Record<string, number | null>>({});
   const [running, setRunning] = useState(false);
 
   const addFiles = useCallback((list: FileList | null) => {
@@ -84,6 +104,12 @@ export default function UploadPage() {
     if (accepted.length) {
       setFiles((prev) => [...prev, ...accepted]);
       setStatuses((prev) => [...prev, ...accepted.map(() => "waiting" as FileStatus)]);
+      // đọc thời lượng nền để hiện ước tính credits
+      for (const f of accepted) {
+        void readDuration(f).then((d) =>
+          setDurations((prev) => ({ ...prev, [`${f.name}:${f.size}`]: d })),
+        );
+      }
     }
   }, []);
 
@@ -260,6 +286,16 @@ export default function UploadPage() {
                   <span className="h-4 w-4 shrink-0 rounded-full border border-neutral-300 dark:border-neutral-600" />
                 )}
                 <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                {(() => {
+                  const d = durations[`${f.name}:${f.size}`];
+                  if (!d) return null;
+                  const extractCredits = estimateJobCredits(method, { durationSec: d });
+                  return (
+                    <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                      ~{extractCredits.toLocaleString("vi-VN")} credits + dịch 5/dòng
+                    </span>
+                  );
+                })()}
                 <span className="shrink-0 text-xs text-neutral-400">
                   {(f.size / 1e6).toFixed(1)} MB
                 </span>

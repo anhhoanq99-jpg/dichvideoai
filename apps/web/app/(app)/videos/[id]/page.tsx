@@ -84,11 +84,13 @@ export default async function VideoDetailPage({
       <RenderPanel
         videoId={video.id}
         translatedTrackId={translated?.id ?? null}
+        durationSec={video.durationSec}
       />
 
       <DubPanel
         videoId={video.id}
         translatedTrackId={translated?.id ?? null}
+        durationSec={video.durationSec}
       />
 
       {renderOutputs.length > 0 && (

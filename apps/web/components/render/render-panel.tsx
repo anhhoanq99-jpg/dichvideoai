@@ -8,6 +8,7 @@ import {
   LOGO_POSITIONS,
   RENDER_FONTS,
   STYLE_PRESETS,
+  estimateJobCredits,
   type CoverMode,
   type CoverRegion,
   type LogoPosition,
@@ -28,6 +29,7 @@ const COVER_OPTIONS: { value: CoverMode; label: string; hint: string }[] = [
 interface RenderPanelProps {
   videoId: string;
   translatedTrackId: string | null;
+  durationSec: number | null;
 }
 
 /** Cài đặt render lưu theo tên trong trình duyệt. */
@@ -56,7 +58,7 @@ interface SavedPreset {
 
 const PRESETS_KEY = "dichvideo:render-presets";
 
-export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
+export function RenderPanel({ videoId, translatedTrackId, durationSec }: RenderPanelProps) {
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
@@ -605,6 +607,9 @@ export function RenderPanel({ videoId, translatedTrackId }: RenderPanelProps) {
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Bắt đầu render
+            {durationSec
+              ? ` — ${estimateJobCredits("render", { durationSec }).toLocaleString("vi-VN")} credits`
+              : ""}
           </button>
         </div>
       )}

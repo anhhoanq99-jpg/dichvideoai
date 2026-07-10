@@ -3,12 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Loader2, Mic, Play } from "lucide-react";
-import { DUB_VOICES, EDGE_VOICES, GEMINI_VOICES } from "@dichvideo/shared";
+import {
+  DUB_VOICES,
+  EDGE_VOICES,
+  GEMINI_VOICES,
+  estimateJobCredits,
+} from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 
 interface DubPanelProps {
   videoId: string;
   translatedTrackId: string | null;
+  durationSec: number | null;
 }
 
 /** Tên quốc gia tiếng Việt từ mã locale ("ja-JP" → "Nhật Bản"). */
@@ -31,7 +37,7 @@ const LOCALES = [...new Set(EDGE_VOICES.map((v) => v.locale))]
   );
 
 /** Lồng tiếng AI: giọng thường (322, miễn phí) + giọng cao cấp Gemini, có nghe thử. */
-export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
+export function DubPanel({ videoId, translatedTrackId, durationSec }: DubPanelProps) {
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState<"edge" | "gemini">("edge");
   const [locale, setLocale] = useState("vi-VN");
@@ -294,6 +300,12 @@ export function DubPanel({ videoId, translatedTrackId }: DubPanelProps) {
             className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
           >
             Bắt đầu lồng tiếng
+            {durationSec
+              ? ` — ${estimateJobCredits("dub", {
+                  durationSec,
+                  premiumVoice: provider === "gemini",
+                }).toLocaleString("vi-VN")} credits`
+              : ""}
           </button>
         </div>
       )}

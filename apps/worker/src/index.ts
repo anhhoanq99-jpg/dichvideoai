@@ -67,9 +67,9 @@ worker.on("failed", async (job, err) => {
     .where(eq(jobs.id, job.data.jobId));
   logger.error({ jobId: job.data.jobId, type: job.name, err: err.message }, "job failed");
 
-  // hết lượt retry → hoàn credit đã trừ
+  // hết lượt retry (hoặc lỗi không thể phục hồi — fail ngay lần đầu) → hoàn credit đã trừ
   const attempts = job.opts.attempts ?? 1;
-  if (job.attemptsMade >= attempts) {
+  if (job.attemptsMade >= attempts || err.name === "UnrecoverableError") {
     await refundJobOnFinalFailure(db, job.data.jobId, job.data.userId).catch((e) =>
       logger.error({ jobId: job.data.jobId, err: String(e) }, "refund failed"),
     );

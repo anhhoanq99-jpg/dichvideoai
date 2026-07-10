@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, CreditCard, Home, Video } from "lucide-react";
+import { Clapperboard, CreditCard, History, Home, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Trang chủ", icon: Home },
   { href: "/videos", label: "Video của tôi", icon: Video },
+  { href: "/history", label: "Lịch sử", icon: History },
   { href: "/credits", label: "Nạp credits", icon: CreditCard },
 ] as const;
 
