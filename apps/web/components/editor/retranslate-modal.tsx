@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Sparkles, X } from "lucide-react";
-import { TRANSLATION_STYLES, type TranslationStyleId } from "@dichvideo/shared";
+import {
+  TARGET_LANGS,
+  TRANSLATION_STYLES,
+  type TargetLangId,
+  type TranslationStyleId,
+} from "@dichvideo/shared";
 import { useJobStream } from "@/hooks/use-job-stream";
 
 interface RetranslateModalProps {
@@ -14,6 +19,7 @@ interface RetranslateModalProps {
 /** Dịch lại toàn bộ bằng AI với phong cách chọn được (ghi đè bản dịch hiện tại). */
 export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateModalProps) {
   const [style, setStyle] = useState<TranslationStyleId>("natural");
+  const [targetLang, setTargetLang] = useState<TargetLangId>("vi");
   const [customPrompt, setCustomPrompt] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +44,7 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         style,
+        targetLang,
         ...(style === "custom" ? { customPrompt: customPrompt.trim() } : {}),
       }),
     });
@@ -84,6 +91,22 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
           </div>
         ) : (
           <div className="mt-4 space-y-3">
+            <label className="block text-sm">
+              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                Dịch sang
+              </span>
+              <select
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value as TargetLangId)}
+                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+              >
+                {TARGET_LANGS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="block text-sm">
               <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 Phong cách dịch

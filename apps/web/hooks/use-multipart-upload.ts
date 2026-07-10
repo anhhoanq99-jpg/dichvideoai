@@ -43,6 +43,9 @@ async function putPartWithRetry(
 export interface PipelineSettings {
   method: "ocr" | "stt";
   sourceLang?: string;
+  /** false = chỉ trích xuất phụ đề, không dịch */
+  translate?: boolean;
+  targetLang?: string;
   style: TranslationStyleId;
   glossary?: string;
 }

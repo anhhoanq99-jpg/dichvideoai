@@ -55,13 +55,19 @@ export async function probeProcessor(job: Job<JobPayload>) {
     await job.updateProgress(100);
 
     // pipeline một chạm: nếu upload kèm chain thì tự chạy bước trích xuất
-    const chain = job.data.params.chain as { method?: string } | undefined;
+    const chain = job.data.params.chain as
+      | { method?: string; translate?: boolean }
+      | undefined;
     if (chain?.method && EXTRACT_METHODS.includes(chain.method as ExtractMethod)) {
       const nextId = await chainJob({
         videoId: video.id,
         userId: job.data.userId,
         type: chain.method as ExtractMethod,
-        params: { sourceLang: video.sourceLang ?? null, thenTranslate: true },
+        params: {
+          sourceLang: video.sourceLang ?? null,
+          // mặc định có dịch; tab "Trích xuất phụ đề" gửi translate:false để dừng sau khi tách
+          thenTranslate: chain.translate !== false,
+        },
       });
       logger.info({ videoId: video.id, nextId, method: chain.method }, "chained extract");
     }

@@ -61,6 +61,8 @@ export const videos = pgTable(
     height: integer("height"),
     sizeBytes: bigint("size_bytes", { mode: "number" }),
     sourceLang: text("source_lang"),
+    /** Ngôn ngữ đích khi dịch (mặc định "vi") */
+    targetLang: text("target_lang"),
     /** User glossary: one "term=translation" per line, injected into translate prompt */
     glossary: text("glossary"),
     /** natural | formal | literal */

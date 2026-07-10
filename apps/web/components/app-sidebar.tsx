@@ -2,14 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, CreditCard, History, Home, Video } from "lucide-react";
+import {
+  Clapperboard,
+  CreditCard,
+  FileText,
+  History,
+  Languages,
+  Mic,
+  Receipt,
+  Video,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Trang chủ", icon: Home },
+  { href: "/videos/upload", label: "Dịch & lồng tiếng video", icon: Mic },
+  { href: "/extract", label: "Trích xuất phụ đề", icon: FileText },
+  { href: "/translate", label: "Dịch phụ đề (SRT)", icon: Languages },
   { href: "/videos", label: "Video của tôi", icon: Video },
   { href: "/history", label: "Lịch sử", icon: History },
-  { href: "/credits", label: "Nạp credits", icon: CreditCard },
+  { href: "/transactions", label: "Lịch sử giao dịch", icon: Receipt },
+  { href: "/credits", label: "Nạp tiền", icon: CreditCard },
 ] as const;
 
 export function AppSidebar() {
@@ -23,7 +35,12 @@ export function AppSidebar() {
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          // "/videos" không được sáng khi đang ở "/videos/upload" (tab riêng)
+          const active =
+            href === "/videos"
+              ? pathname === "/videos" ||
+                (pathname.startsWith("/videos/") && !pathname.startsWith("/videos/upload"))
+              : pathname.startsWith(href);
           return (
             <Link
               key={href}

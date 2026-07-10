@@ -13,10 +13,12 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  TARGET_LANGS,
   TRANSLATION_STYLES,
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
   estimateJobCredits,
+  type TargetLangId,
   type TranslationStyleId,
 } from "@dichvideo/shared";
 import {
@@ -78,6 +80,7 @@ export default function UploadPage() {
   // thiết lập pipeline (áp cho tất cả video trong danh sách)
   const [method, setMethod] = useState<"ocr" | "stt">("ocr");
   const [sourceLang, setSourceLang] = useState("");
+  const [targetLang, setTargetLang] = useState<TargetLangId>("vi");
   const [style, setStyle] = useState<TranslationStyleId>("natural");
   const [glossary, setGlossary] = useState("");
 
@@ -120,6 +123,7 @@ export default function UploadPage() {
     const pipeline: PipelineSettings = {
       method,
       ...(sourceLang ? { sourceLang } : {}),
+      targetLang,
       style,
       ...(glossary.trim() ? { glossary: glossary.trim() } : {}),
     };
@@ -173,7 +177,7 @@ export default function UploadPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <label className="text-sm">
             <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
               Ngôn ngữ gốc
@@ -193,7 +197,24 @@ export default function UploadPage() {
           </label>
           <label className="text-sm">
             <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              Phong cách dịch (sang tiếng Việt)
+              Dịch sang
+            </span>
+            <select
+              value={targetLang}
+              disabled={running}
+              onChange={(e) => setTargetLang(e.target.value as TargetLangId)}
+              className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+            >
+              {TARGET_LANGS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              Phong cách dịch
             </span>
             <select
               value={style}

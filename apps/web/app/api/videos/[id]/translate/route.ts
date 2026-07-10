@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, subtitleTracks, videos } from "@dichvideo/db";
-import { TRANSLATION_STYLE_IDS } from "@dichvideo/shared";
+import { TARGET_LANG_IDS, TRANSLATION_STYLE_IDS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
@@ -10,6 +10,7 @@ import { getOwnVideo } from "@/lib/video-access";
 
 const schema = z.object({
   style: z.enum(TRANSLATION_STYLE_IDS).default("natural"),
+  targetLang: z.enum(TARGET_LANG_IDS).default("vi"),
   customPrompt: z.string().max(2000).optional(),
   glossary: z.string().max(10_000).optional(),
 });
@@ -50,12 +51,14 @@ export async function POST(
     .update(videos)
     .set({
       translationStyle: body.data.style,
+      targetLang: body.data.targetLang,
       glossary: body.data.glossary ?? video.glossary,
     })
     .where(eq(videos.id, video.id));
 
   const jobParams = {
     style: body.data.style,
+    targetLang: body.data.targetLang,
     ...(body.data.customPrompt ? { customPrompt: body.data.customPrompt } : {}),
   };
   const [job] = await db

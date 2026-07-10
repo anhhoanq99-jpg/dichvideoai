@@ -35,10 +35,15 @@ export async function translateProcessor(job: Job<JobPayload>) {
     typeof job.data.params.customPrompt === "string"
       ? job.data.params.customPrompt
       : null;
+  const targetLang =
+    typeof job.data.params.targetLang === "string"
+      ? job.data.params.targetLang
+      : (video.targetLang ?? "vi");
   const result = await translateSegments(
     {
       segments: original.segments as SubtitleSegment[],
       style,
+      targetLang,
       customPrompt,
       glossary: video.glossary,
     },
@@ -59,7 +64,7 @@ export async function translateProcessor(job: Job<JobPayload>) {
   await db.insert(subtitleTracks).values({
     videoId: video.id,
     kind: "translated",
-    lang: "vi",
+    lang: targetLang,
     segments: result.segments,
   });
   await db

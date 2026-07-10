@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
 import { PRICING, type UsageRecord } from "./usage";
@@ -165,6 +166,8 @@ export async function translateSegments(
   input: {
     segments: SubtitleSegment[];
     style: TranslationStyle;
+    /** mã ngôn ngữ đích (vi, en, zh...) — mặc định "vi" */
+    targetLang?: string | null;
     /** dùng khi style === "custom": mô tả phong cách do user nhập */
     customPrompt?: string | null;
     glossary?: string | null;
@@ -189,8 +192,12 @@ export async function translateSegments(
       ? `Phong cách dịch theo yêu cầu của người dùng:\n${(input.customPrompt ?? "").trim() || "Dịch tự nhiên, dễ hiểu."}`
       : (STYLE_INSTRUCTIONS[input.style] ?? STYLE_INSTRUCTIONS.natural);
 
+  const langName = targetLangName(input.targetLang ?? "vi");
+
   let system =
-    "Bạn là dịch giả phụ đề chuyên nghiệp, dịch sang TIẾNG VIỆT. " +
+    `Bạn là dịch giả phụ đề chuyên nghiệp, dịch sang ${langName}. ` +
+    `Mọi hướng dẫn phong cách bên dưới áp dụng cho NGÔN NGỮ ĐÍCH (${langName}) — ` +
+    "diễn đạt như người bản xứ của ngôn ngữ đó, ví dụ minh họa chỉ để tham khảo cách xử lý.\n" +
     styleInstruction +
     "\nQuy tắc bắt buộc:\n" +
     "- Trả về đúng số dòng với đúng chỉ số i như đầu vào, không gộp, không tách, không bỏ dòng.\n" +
@@ -221,7 +228,7 @@ export async function translateSegments(
     const byId = await structuredCall(
       ctx,
       system,
-      `${contextBlock}Dịch các dòng phụ đề sau sang tiếng Việt:\n${payload}`,
+      `${contextBlock}Dịch các dòng phụ đề sau sang ${langName}:\n${payload}`,
       chunk,
     );
     for (const seg of chunk) {
@@ -233,8 +240,8 @@ export async function translateSegments(
   // Pass 2 (60→100%): editorial polish — rewrite stiff lines only
   if (POLISH_STYLES.includes(input.style)) {
     const polishSystem =
-      "Bạn là biên tập viên phụ đề tiếng Việt cho phim lồng tiếng. " +
-      "Nhiệm vụ: rà từng dòng bản dịch, dòng nào nghe cứng, máy móc, 'vô tri' hoặc lệch phong cách thì VIẾT LẠI; dòng đã hay thì GIỮ NGUYÊN. " +
+      `Bạn là biên tập viên phụ đề ${langName} cho phim lồng tiếng. ` +
+      "Nhiệm vụ: rà từng dòng bản dịch, dòng nào nghe cứng, máy móc, 'vô tri' hoặc lệch phong cách thì VIẾT LẠI cho tự nhiên như người bản xứ; dòng đã hay thì GIỮ NGUYÊN. " +
       "Dựa vào câu gốc để không làm sai nghĩa. Giữ nguyên số dòng và chỉ số i. Giữ xưng hô nhất quán.\n" +
       `Phong cách phải giữ đúng: ${styleInstruction}` +
       (brief ? `\n\nNGỮ CẢNH TOÀN PHIM:\n${brief}` : "");
@@ -247,7 +254,7 @@ export async function translateSegments(
         const byId = await structuredCall(
           ctx,
           polishSystem,
-          `Biên tập các dòng sau (trả về bản tiếng Việt cuối cùng cho từng i):\n${payload}`,
+          `Biên tập các dòng sau (trả về bản dịch ${langName} cuối cùng cho từng i):\n${payload}`,
           chunk,
         );
         for (const seg of slice) {
