@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
+import { isDailyQuotaError, withGeminiRetry } from "./gemini-limits";
 import { PRICING, type UsageRecord } from "./usage";
 
 export type TranslationStyle = TranslationStyleId;
@@ -107,20 +108,25 @@ function track(ctx: Ctx, res: { usageMetadata?: { promptTokenCount?: number; can
 async function buildStoryBrief(ctx: Ctx, segments: SubtitleSegment[]): Promise<string> {
   const fullText = segments.map((s) => s.text).join("\n").slice(0, 100_000);
   try {
-    const res = await ctx.ai.models.generateContent({
-      model: ctx.model,
-      contents:
-        "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
-        "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
-        "2. Các nhân vật chính và QUAN HỆ giữa họ → đề xuất cách xưng hô tiếng Việt cho từng cặp (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
-        "3. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
-        "Chỉ trả về nội dung tóm tắt, tối đa 300 từ.\n\n" +
-        fullText,
-      config: { temperature: 0.2 },
-    });
+    const res = await withGeminiRetry("story-brief", () =>
+      ctx.ai.models.generateContent({
+        model: ctx.model,
+        contents:
+          "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
+          "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
+          "2. Các nhân vật chính và QUAN HỆ giữa họ → đề xuất cách xưng hô tiếng Việt cho từng cặp (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
+          "3. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
+          "Chỉ trả về nội dung tóm tắt, tối đa 300 từ.\n\n" +
+          fullText,
+        config: { temperature: 0.2 },
+      }),
+    );
     track(ctx, res);
     return res.text?.trim() ?? "";
   } catch (err) {
+    // hết hạn mức ngày thì các bước sau cũng sẽ chết — dừng luôn cho job fail sạch
+    if (err instanceof Error && err.name === "UnrecoverableError") throw err;
+    if (isDailyQuotaError(err)) throw err;
     logger.warn({ err: String(err) }, "story brief failed — translating without it");
     return "";
   }
@@ -134,16 +140,19 @@ async function structuredCall(
 ): Promise<Map<number, string>> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await ctx.ai.models.generateContent({
-      model: ctx.model,
-      contents: prompt,
-      config: {
-        systemInstruction: system,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-        temperature: 0.3,
-      },
-    });
+    // withGeminiRetry: chờ đúng delay khi chạm hạn mức phút, fail ngay khi hết hạn mức ngày
+    const res = await withGeminiRetry("translate", () =>
+      ctx.ai.models.generateContent({
+        model: ctx.model,
+        contents: prompt,
+        config: {
+          systemInstruction: system,
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0.3,
+        },
+      }),
+    );
     track(ctx, res);
     try {
       const rows = JSON.parse(res.text ?? "[]") as { i: number; text: string }[];

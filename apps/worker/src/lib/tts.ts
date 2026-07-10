@@ -4,6 +4,11 @@ import { GoogleGenAI } from "@google/genai";
 import { UnrecoverableError } from "bullmq";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { geminiVoiceName, pcmToWav } from "@dichvideo/shared";
+import {
+  dailyQuotaMessage,
+  isDailyQuotaError,
+  rateLimitDelayMs,
+} from "./gemini-limits";
 import { PRICING, type UsageRecord } from "./usage";
 
 /**
@@ -45,21 +50,6 @@ async function geminiThrottle(): Promise<void> {
   const wait = geminiNextSlotAt - now;
   geminiNextSlotAt = Math.max(now, geminiNextSlotAt) + GEMINI_INTERVAL_MS;
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-}
-
-/** Lỗi 429 → số ms cần chờ theo RetryInfo của Google (null nếu không phải 429). */
-export function rateLimitDelayMs(err: unknown): number | null {
-  const s = err instanceof Error ? err.message : String(err);
-  if (!/429|RESOURCE_EXHAUSTED/i.test(s)) return null;
-  const m = /retry in ([\d.]+)\s*s/i.exec(s) ?? /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(s);
-  const sec = m ? Number.parseFloat(m[1]) : 60;
-  return Math.ceil((Number.isFinite(sec) ? sec : 60) * 1000) + 1500;
-}
-
-/** Hết hạn mức NGÀY (free tier 10 lượt/ngày) — retry vô ích, phải dừng ngay. */
-export function isDailyQuotaError(err: unknown): boolean {
-  const s = err instanceof Error ? err.message : String(err);
-  return /RESOURCE_EXHAUSTED|429/i.test(s) && /PerDay/i.test(s);
 }
 
 /** Sinh 1 clip bằng giọng cao cấp Gemini TTS → wav 24kHz + usage để trừ chi phí. */
@@ -142,11 +132,7 @@ export async function synthesizeClipWithRetry(input: {
     } catch (err) {
       // hết hạn mức NGÀY của Gemini free tier → dừng hẳn, không retry, không đợi BullMQ thử lại
       if (isDailyQuotaError(err)) {
-        throw new UnrecoverableError(
-          "Giọng cao cấp đã hết hạn mức trong ngày của gói Gemini miễn phí (10 lượt/ngày). " +
-            "Hãy dùng giọng thường (miễn phí, không giới hạn) hoặc nâng key Gemini lên gói trả phí rồi thử lại. " +
-            "Credits của job này sẽ được hoàn tự động.",
-        );
+        throw new UnrecoverableError(dailyQuotaMessage());
       }
       lastErr = err;
       const rateLimited = rateLimitDelayMs(err);

@@ -4,17 +4,45 @@ import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { MAX_COVER_REGIONS, type CoverRegion } from "@dichvideo/shared";
 
+/** Xem trước phụ đề ngay trên khung hình — chỉnh style là thấy liền, không tốn credits. */
+export interface SubPreview {
+  /** vị trí khung phụ đề (chuẩn hóa 0..1) — mép dưới khung là chân chữ */
+  box: CoverRegion;
+  text: string;
+  /** cỡ chữ theo px của video gốc (sẽ tự scale theo khung preview) */
+  fontSize: number;
+  bold: boolean;
+  color: string;
+  boxed: boolean;
+  boxColor: string;
+  /** 0..100 */
+  boxOpacity: number;
+}
+
 interface RegionSelectorProps {
   previewUrl: string;
   regions: CoverRegion[];
   onChange: (regions: CoverRegion[]) => void;
+  subPreview?: SubPreview | null;
 }
 
 /** Drag rectangles over a paused video frame; emits normalized (0..1) coords. */
-export function RegionSelector({ previewUrl, regions, onChange }: RegionSelectorProps) {
+export function RegionSelector({
+  previewUrl,
+  regions,
+  onChange,
+  subPreview,
+}: RegionSelectorProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [draft, setDraft] = useState<CoverRegion | null>(null);
+
+  // scale cỡ chữ ASS (theo video gốc) về px của khung preview
+  const previewScale =
+    boxRef.current && videoRef.current?.videoWidth
+      ? boxRef.current.getBoundingClientRect().width / videoRef.current.videoWidth
+      : 0.3;
 
   function toNorm(e: React.PointerEvent) {
     const rect = boxRef.current!.getBoundingClientRect();
@@ -52,7 +80,43 @@ export function RegionSelector({ previewUrl, regions, onChange }: RegionSelector
           setDraft(null);
         }}
       >
-        <video src={previewUrl} muted playsInline preload="metadata" className="w-full" />
+        <video
+          ref={videoRef}
+          src={previewUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="w-full"
+        />
+        {/* phụ đề xem trước — căn giữa, bám mép dưới khung như bản render thật */}
+        {subPreview && (
+          <div
+            className="pointer-events-none absolute flex items-end justify-center"
+            style={{
+              left: `${subPreview.box.x * 100}%`,
+              top: `${subPreview.box.y * 100}%`,
+              width: `${subPreview.box.w * 100}%`,
+              height: `${subPreview.box.h * 100}%`,
+            }}
+          >
+            <span
+              className="max-w-full px-1 text-center leading-tight"
+              style={{
+                fontSize: Math.max(9, subPreview.fontSize * previewScale),
+                fontWeight: subPreview.bold ? 700 : 400,
+                color: subPreview.color,
+                textShadow: subPreview.boxed ? "none" : "0 0 3px #000, 0 0 3px #000",
+                backgroundColor: subPreview.boxed
+                  ? `${subPreview.boxColor}${Math.round((subPreview.boxOpacity / 100) * 255)
+                      .toString(16)
+                      .padStart(2, "0")}`
+                  : "transparent",
+              }}
+            >
+              {subPreview.text}
+            </span>
+          </div>
+        )}
         {[...regions, ...(draft ? [draft] : [])].map((r, idx) => (
           <div
             key={idx}

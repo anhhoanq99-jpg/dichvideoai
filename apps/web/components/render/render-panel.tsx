@@ -313,6 +313,24 @@ export function RenderPanel({ videoId, translatedTrackId, durationSec }: RenderP
               previewUrl={previewUrl}
               regions={regions}
               onChange={setRegions}
+              subPreview={(() => {
+                // xem trước phụ đề đúng chỗ nó sẽ nằm khi render
+                const bottom =
+                  placeOver && regions.length > 0
+                    ? regions.reduce((a, b) => (a.y + a.h >= b.y + b.h ? a : b))
+                    : null;
+                if (!bottom) return null;
+                return {
+                  box: { x: 0.05, y: bottom.y, w: 0.9, h: bottom.h },
+                  text: "Phụ đề xem trước — chỉnh kiểu chữ là thấy ngay",
+                  fontSize,
+                  bold,
+                  color: primaryColor,
+                  boxed,
+                  boxColor,
+                  boxOpacity,
+                };
+              })()}
             />
           )}
 

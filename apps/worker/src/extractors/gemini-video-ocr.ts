@@ -1,4 +1,5 @@
 import { GoogleGenAI, MediaResolution, createPartFromUri } from "@google/genai";
+import { withGeminiRetry } from "../lib/gemini-limits";
 import { PRICING } from "../lib/usage";
 import {
   normalizeSegments,
@@ -65,21 +66,23 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
     const langHint = input.sourceLang
       ? ` The subtitles are in language code "${input.sourceLang}".`
       : "";
-    const res = await ai.models.generateContent({
-      model: this.model,
-      contents: [
-        createPartFromUri(file.uri!, file.mimeType!),
-        `Extract every burned-in (hardcoded) subtitle line shown in this video.${langHint} ` +
-          "Return ONLY the on-screen subtitle captions, not scene descriptions, signs, watermarks or channel names. " +
-          "For each distinct subtitle line, give the timestamp where it appears (start) and disappears (end), " +
-          "and its exact text. Preserve original language and punctuation.",
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-        mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
-      },
-    });
+    const res = await withGeminiRetry("gemini-ocr", () =>
+      ai.models.generateContent({
+        model: this.model,
+        contents: [
+          createPartFromUri(file.uri!, file.mimeType!),
+          `Extract every burned-in (hardcoded) subtitle line shown in this video.${langHint} ` +
+            "Return ONLY the on-screen subtitle captions, not scene descriptions, signs, watermarks or channel names. " +
+            "For each distinct subtitle line, give the timestamp where it appears (start) and disappears (end), " +
+            "and its exact text. Preserve original language and punctuation.",
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+          mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
+        },
+      }),
+    );
     onProgress(90);
 
     const raw = JSON.parse(res.text ?? "[]") as {
