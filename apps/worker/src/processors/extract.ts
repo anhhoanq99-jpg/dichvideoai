@@ -80,11 +80,15 @@ async function runExtraction(job: Job<JobPayload>, extractor: SubtitleExtractor)
 
     // pipeline một chạm: trích xong tự dịch (style/glossary đã lưu trên video)
     if (job.data.params.thenTranslate === true) {
+      const finish = job.data.params.finish;
       const nextId = await chainJob({
         videoId: video.id,
         userId: job.data.userId,
         type: "translate",
-        params: { style: video.translationStyle ?? "natural" },
+        params: {
+          style: video.translationStyle ?? "natural",
+          ...(finish ? { finish } : {}),
+        },
       });
       logger.info({ videoId: video.id, nextId }, "chained translate");
     }

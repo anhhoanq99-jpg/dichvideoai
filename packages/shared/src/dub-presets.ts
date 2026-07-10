@@ -55,6 +55,8 @@ export interface DubParams {
   trackId: string;
   /** id giọng Edge TTS bất kỳ trong EDGE_VOICES (322 giọng, đủ mọi quốc gia) */
   voice: string;
+  /** lồng tiếng lên file khác video gốc (vd: bản đã render phụ đề) */
+  sourceR2Key?: string;
   /** 0.8 .. 1.3 — tốc độ đọc cơ bản (trước khi ép khớp thời lượng) */
   speed: number;
   /** 0 .. 200 (%) — âm lượng giọng AI */

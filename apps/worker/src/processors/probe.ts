@@ -56,7 +56,7 @@ export async function probeProcessor(job: Job<JobPayload>) {
 
     // pipeline một chạm: nếu upload kèm chain thì tự chạy bước trích xuất
     const chain = job.data.params.chain as
-      | { method?: string; translate?: boolean }
+      | { method?: string; translate?: boolean; finish?: Record<string, unknown> }
       | undefined;
     if (chain?.method && EXTRACT_METHODS.includes(chain.method as ExtractMethod)) {
       const nextId = await chainJob({
@@ -67,6 +67,7 @@ export async function probeProcessor(job: Job<JobPayload>) {
           sourceLang: video.sourceLang ?? null,
           // mặc định có dịch; tab "Trích xuất phụ đề" gửi translate:false để dừng sau khi tách
           thenTranslate: chain.translate !== false,
+          ...(chain.finish ? { finish: chain.finish } : {}),
         },
       });
       logger.info({ videoId: video.id, nextId, method: chain.method }, "chained extract");

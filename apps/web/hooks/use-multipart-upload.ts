@@ -48,6 +48,8 @@ export interface PipelineSettings {
   targetLang?: string;
   style: TranslationStyleId;
   glossary?: string;
+  /** trọn gói: dịch xong tự render + lồng tiếng ra video hoàn chỉnh */
+  finish?: { render: boolean; dub: boolean; voice?: string };
 }
 
 export function useMultipartUpload() {

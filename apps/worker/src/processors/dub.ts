@@ -98,10 +98,16 @@ export async function dubProcessor(job: Job<JobPayload>) {
   );
   if (segments.length === 0) throw new Error("Track không có câu nào để đọc");
 
+  // trọn gói: lồng tiếng lên bản đã render phụ đề thay vì video gốc
+  const srcKey =
+    typeof params.sourceR2Key === "string" && params.sourceR2Key
+      ? params.sourceR2Key
+      : video.r2Key;
+
   const dir = await jobTempDir(job.data.jobId);
   try {
-    const srcPath = path.join(dir, path.basename(video.r2Key));
-    await downloadFromR2(video.r2Key, srcPath);
+    const srcPath = path.join(dir, path.basename(srcKey));
+    await downloadFromR2(srcKey, srcPath);
     const meta = await ffprobe(srcPath);
     await job.updateProgress(5);
 

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobs, videos } from "@dichvideo/db";
-import { EXTRACT_METHODS, TARGET_LANG_IDS, UPLOAD_STYLE_IDS } from "@dichvideo/shared";
+import {
+  EDGE_VOICE_IDS,
+  EXTRACT_METHODS,
+  GEMINI_VOICE_IDS,
+  TARGET_LANG_IDS,
+  UPLOAD_STYLE_IDS,
+} from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { completeMultipart } from "@/lib/r2";
@@ -24,6 +30,17 @@ const schema = z.object({
       targetLang: z.enum(TARGET_LANG_IDS).default("vi"),
       style: z.enum(UPLOAD_STYLE_IDS).default("natural"),
       glossary: z.string().max(10_000).optional(),
+      /** trọn gói: dịch xong tự render + lồng tiếng, ra thẳng video hoàn chỉnh */
+      finish: z
+        .object({
+          render: z.boolean().default(true),
+          dub: z.boolean().default(false),
+          voice: z
+            .string()
+            .refine((v) => EDGE_VOICE_IDS.has(v) || GEMINI_VOICE_IDS.has(v))
+            .optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -65,7 +82,13 @@ export async function POST(
     .where(eq(videos.id, video.id));
 
   const probeParams = p
-    ? { chain: { method: p.method, translate: p.translate } }
+    ? {
+        chain: {
+          method: p.method,
+          translate: p.translate,
+          ...(p.finish && p.translate ? { finish: p.finish } : {}),
+        },
+      }
     : {};
   const [job] = await db
     .insert(jobs)

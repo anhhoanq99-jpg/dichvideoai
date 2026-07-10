@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  DUB_VOICES,
   TARGET_LANGS,
   TRANSLATION_STYLES,
   UPLOAD_ALLOWED_TYPES,
@@ -83,6 +84,10 @@ export default function UploadPage() {
   const [targetLang, setTargetLang] = useState<TargetLangId>("vi");
   const [style, setStyle] = useState<TranslationStyleId>("natural");
   const [glossary, setGlossary] = useState("");
+  // hoàn thiện tự động: ra thẳng video hoàn chỉnh
+  const [autoRender, setAutoRender] = useState(true);
+  const [autoDub, setAutoDub] = useState(true);
+  const [dubVoice, setDubVoice] = useState<string>(DUB_VOICES[0].id);
 
   const [files, setFiles] = useState<File[]>([]);
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
@@ -126,6 +131,15 @@ export default function UploadPage() {
       targetLang,
       style,
       ...(glossary.trim() ? { glossary: glossary.trim() } : {}),
+      ...(autoRender || autoDub
+        ? {
+            finish: {
+              render: autoRender,
+              dub: autoDub,
+              ...(autoDub ? { voice: dubVoice } : {}),
+            },
+          }
+        : {}),
     };
 
     let okCount = 0;
@@ -229,6 +243,53 @@ export default function UploadPage() {
               ))}
             </select>
           </label>
+        </div>
+
+        {/* Hoàn thiện tự động — ra thẳng video hoàn chỉnh */}
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/20">
+          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            Hoàn thiện tự động — nhận về video xong xuôi, không cần bấm gì thêm
+          </p>
+          <div className="mt-2 space-y-2">
+            <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={autoRender}
+                disabled={running}
+                onChange={(e) => setAutoRender(e.target.checked)}
+              />
+              Tự render: che chữ gốc + gắn phụ đề dịch vào video
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                <input
+                  type="checkbox"
+                  checked={autoDub}
+                  disabled={running}
+                  onChange={(e) => setAutoDub(e.target.checked)}
+                />
+                Tự lồng tiếng — giọng:
+              </label>
+              <select
+                value={dubVoice}
+                disabled={running || !autoDub}
+                onChange={(e) => setDubVoice(e.target.value)}
+                className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800"
+              >
+                {DUB_VOICES.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {autoRender && autoDub && (
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Video cuối có cả phụ đề dịch lẫn giọng đọc khớp thời gian — tải về ở mục
+                &quot;Video đã xuất&quot; hoặc trang Lịch sử.
+              </p>
+            )}
+          </div>
         </div>
 
         <details>

@@ -14,6 +14,8 @@ import {
   type RenderParams,
   type SubtitleSegment,
 } from "@dichvideo/shared";
+import { DUB_VOICES } from "@dichvideo/shared";
+import { chainJob } from "../lib/chain";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import {
   buildFiltergraph,
@@ -178,6 +180,27 @@ export async function renderProcessor(job: Job<JobPayload>) {
       { jobId: job.data.jobId, outKey, sizeMb: Math.round(size / 1e6) },
       "render done",
     );
+
+    // trọn gói: render xong tự lồng tiếng LÊN BẢN ĐÃ RENDER (video cuối có cả phụ đề lẫn giọng đọc)
+    const finish = (job.data.params as { finish?: { dub?: boolean; voice?: string } })
+      .finish;
+    if (finish?.dub) {
+      const nextId = await chainJob({
+        videoId: video.id,
+        userId: job.data.userId,
+        type: "dub",
+        params: {
+          trackId: params.trackId,
+          voice: finish.voice ?? DUB_VOICES[0].id,
+          speed: 1,
+          aiVolume: 100,
+          bgVolume: 20,
+          sourceR2Key: outKey,
+        },
+      });
+      logger.info({ videoId: video.id, nextId }, "chained dub on rendered output");
+    }
+
     return { r2Key: outKey, sizeBytes: size };
   } finally {
     await cleanupJobDir(job.data.jobId);
