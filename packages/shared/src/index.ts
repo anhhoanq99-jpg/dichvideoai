@@ -10,3 +10,4 @@ export * from "./edge-voices";
 export * from "./audio";
 export * from "./target-langs";
 export * from "./ass-builder";
+export * from "./video-sources";

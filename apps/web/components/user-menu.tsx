@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
@@ -13,12 +14,12 @@ interface UserMenuProps {
 
 export function UserMenu({ name, email, image }: UserMenuProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -27,7 +28,7 @@ export function UserMenu({ name, email, image }: UserMenuProps) {
   }, []);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={menuRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -35,8 +36,13 @@ export function UserMenu({ name, email, image }: UserMenuProps) {
         className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-neutral-100 text-sm font-medium text-neutral-700 dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-200"
       >
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={name} className="h-full w-full object-cover" />
+          <Image
+            src={image}
+            alt={name}
+            width={36}
+            height={36}
+            className="h-full w-full object-cover"
+          />
         ) : (
           name.charAt(0).toUpperCase()
         )}

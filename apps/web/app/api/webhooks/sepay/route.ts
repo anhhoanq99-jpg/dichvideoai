@@ -47,16 +47,16 @@ export async function POST(req: NextRequest) {
 
   // tìm mã DVxxxxxxxx trong nội dung CK (ngân hàng thường viết hoa, bỏ dấu cách)
   const haystack = `${tx.content ?? ""} ${tx.description ?? ""}`.replace(/\s+/g, "");
-  const m = /DV([a-zA-Z0-9]{8})/i.exec(haystack);
-  if (!m) {
+  const codeMatch = /DV([a-zA-Z0-9]{8})/i.exec(haystack);
+  if (!codeMatch) {
     return NextResponse.json({ success: true, skipped: "no user code" });
   }
-  const prefix = m[1].toLowerCase();
-  const [u] = await db
+  const userIdPrefix = codeMatch[1].toLowerCase();
+  const [userRow] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(sql`lower(left(${schema.user.id}, 8)) = ${prefix}`);
-  if (!u) {
+    .where(sql`lower(left(${schema.user.id}, 8)) = ${userIdPrefix}`);
+  if (!userRow) {
     return NextResponse.json({ success: true, skipped: "user not found" });
   }
 
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (credits <= 0) return NextResponse.json({ success: true, skipped: "amount too small" });
 
   await applyCreditDelta(db, {
-    userId: u.id,
+    userId: userRow.id,
     delta: credits,
     reason: "topup",
     refType: "sepay_tx",

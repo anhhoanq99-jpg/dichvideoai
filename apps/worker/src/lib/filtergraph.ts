@@ -2,6 +2,7 @@ import type {
   AspectId,
   CoverMode,
   CoverRegion,
+  LogoImageParams,
   LogoParams,
 } from "@dichvideo/shared";
 
@@ -11,6 +12,8 @@ export interface FiltergraphInput {
   coverMode: CoverMode;
   /** manual cover regions — each blurred/boxed for the whole duration */
   regions?: CoverRegion[];
+  /** 1..10 — mức làm mờ (mặc định 5) */
+  blurStrength?: number;
   aspect: AspectId;
   /** absolute path to subs.ass */
   assPath: string;
@@ -18,6 +21,8 @@ export interface FiltergraphInput {
   fontsDir: string;
   /** user watermark text drawn on top of everything */
   logo?: LogoParams & { fontFile: string };
+  /** watermark hình ảnh — file đã tải về local, đưa vào ffmpeg là input thứ 2 ([1:v]) */
+  logoImage?: Pick<LogoImageParams, "position" | "scalePct" | "opacity" | "fx" | "fy">;
 }
 
 /** Escape a path for use inside an ffmpeg filter argument (Windows colons/backslashes). */
@@ -140,12 +145,15 @@ export function buildFiltergraph(input: FiltergraphInput): string {
 
   // 1. cover original text — one step per manual region, source pixel space
   if (input.coverMode !== "none" && input.regions?.length) {
+    // mức mờ 1..10 → bán kính boxblur (mặc định 5 ≈ bán kính 12 như trước)
+    const strength = Math.min(10, Math.max(1, input.blurStrength ?? 5));
+    const blurRadius = Math.round(strength * 2.4);
     input.regions.forEach((region, idx) => {
       const r = regionToPixels(region, input.srcWidth, input.srcHeight);
       if (input.coverMode === "blur") {
         steps.push(
           `${current}split[m${idx}][fb${idx}]`,
-          `[fb${idx}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=luma_radius=12:luma_power=2[bl${idx}]`,
+          `[fb${idx}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=luma_radius=${blurRadius}:luma_power=2[bl${idx}]`,
           `[m${idx}][bl${idx}]overlay=${r.x}:${r.y}[cov${idx}]`,
         );
       } else {
@@ -170,18 +178,50 @@ export function buildFiltergraph(input: FiltergraphInput): string {
   }
 
   // 3. burn Vietnamese subs
-  const subOut = input.logo ? "[sub]" : "[v]";
+  const hasWatermark = Boolean(input.logo || input.logoImage);
+  const subOut = hasWatermark ? "[sub]" : "[v]";
   steps.push(
     `${current}ass=filename='${escapeFilterPath(input.assPath)}':fontsdir='${escapeFilterPath(input.fontsDir)}'${subOut}`,
   );
 
-  // 4. user watermark on top
-  if (input.logo) {
+  // 4. user watermark on top — chữ (drawtext) hoặc hình ảnh (overlay input [1:v])
+  if (input.logoImage) {
+    const img = input.logoImage;
+    const alpha = Math.min(Math.max(img.opacity, 0), 100) / 100;
+    const out = outputResolution({
+      srcWidth: input.srcWidth,
+      srcHeight: input.srcHeight,
+      aspect: input.aspect,
+    });
+    const logoWidth = Math.max(
+      16,
+      Math.round((out.w * Math.min(60, Math.max(3, img.scalePct))) / 100 / 2) * 2,
+    );
+    const OVERLAY_XY: Record<string, string> = {
+      tl: `x=${LOGO_MARGIN}:y=${LOGO_MARGIN}`,
+      tr: `x=W-w-${LOGO_MARGIN}:y=${LOGO_MARGIN}`,
+      bl: `x=${LOGO_MARGIN}:y=H-h-${LOGO_MARGIN}`,
+      br: `x=W-w-${LOGO_MARGIN}:y=H-h-${LOGO_MARGIN}`,
+    };
+    // vị trí tự do (user kéo trên preview) — phần của khoảng trống còn lại
+    const overlayXY =
+      img.fx !== undefined && img.fy !== undefined
+        ? `x=(W-w)*${img.fx.toFixed(4)}:y=(H-h)*${img.fy.toFixed(4)}`
+        : OVERLAY_XY[img.position];
+    steps.push(
+      `[1:v]scale=${logoWidth}:-1,format=rgba,colorchannelmixer=aa=${alpha}[lg]`,
+      `[sub][lg]overlay=${overlayXY}[v]`,
+    );
+  } else if (input.logo) {
     const text = sanitizeDrawText(input.logo.text);
     const alpha = Math.min(Math.max(input.logo.opacity, 0), 100) / 100;
     const color = `0x${input.logo.color.replace("#", "")}@${alpha}`;
+    const drawXY =
+      input.logo.fx !== undefined && input.logo.fy !== undefined
+        ? `x=(w-tw)*${input.logo.fx.toFixed(4)}:y=(h-th)*${input.logo.fy.toFixed(4)}`
+        : LOGO_XY[input.logo.position];
     steps.push(
-      `[sub]drawtext=fontfile='${escapeFilterPath(input.logo.fontFile)}':text='${text}':fontsize=${input.logo.fontSize}:fontcolor=${color}:borderw=2:bordercolor=0x000000@${Math.min(alpha, 0.5)}:${LOGO_XY[input.logo.position]}[v]`,
+      `[sub]drawtext=fontfile='${escapeFilterPath(input.logo.fontFile)}':text='${text}':fontsize=${input.logo.fontSize}:fontcolor=${color}:borderw=2:bordercolor=0x000000@${Math.min(alpha, 0.5)}:${drawXY}[v]`,
     );
   }
 

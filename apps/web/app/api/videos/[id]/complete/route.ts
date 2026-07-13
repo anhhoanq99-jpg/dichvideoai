@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { jobs, videos } from "@dichvideo/db";
+import { videos } from "@dichvideo/db";
 import {
-  EDGE_VOICE_IDS,
   EXTRACT_METHODS,
-  GEMINI_VOICE_IDS,
   TARGET_LANG_IDS,
   UPLOAD_STYLE_IDS,
+  isValidVoiceId,
 } from "@dichvideo/shared";
 import { db } from "@/lib/db";
-import { enqueuePipelineJob } from "@/lib/queue";
 import { completeMultipart } from "@/lib/r2";
-import { getSession } from "@/lib/session";
-import { getOwnVideo } from "@/lib/video-access";
+import {
+  createPipelineJob,
+  jsonError,
+  parseJsonBody,
+  requireOwnVideo,
+} from "@/lib/api-helpers";
 
 const schema = z.object({
   uploadId: z.string().min(1),
@@ -35,10 +37,7 @@ const schema = z.object({
         .object({
           render: z.boolean().default(true),
           dub: z.boolean().default(false),
-          voice: z
-            .string()
-            .refine((v) => EDGE_VOICE_IDS.has(v) || GEMINI_VOICE_IDS.has(v))
-            .optional(),
+          voice: z.string().refine(isValidVoiceId).optional(),
         })
         .optional(),
     })
@@ -49,63 +48,42 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  }
-  const { id } = await params;
-  const video = await getOwnVideo(id, session.user.id);
-  if (!video?.r2Key || video.status !== "uploading") {
-    return NextResponse.json({ error: "Video không hợp lệ" }, { status: 404 });
+  const auth = await requireOwnVideo(params);
+  if (auth.response) return auth.response;
+  const { session, video } = auth;
+  if (!video.r2Key || video.status !== "uploading") {
+    return jsonError("Video không hợp lệ", 404);
   }
 
-  const body = schema.safeParse(await req.json());
-  if (!body.success) {
-    return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
-  }
+  const body = await parseJsonBody(req, schema);
+  if (body.response) return body.response;
 
   await completeMultipart(video.r2Key, body.data.uploadId, body.data.parts);
-  const p = body.data.pipeline;
+  const pipeline = body.data.pipeline;
   await db
     .update(videos)
     .set({
       status: "processing",
-      ...(p
+      ...(pipeline
         ? {
-            sourceLang: p.sourceLang ?? null,
-            targetLang: p.targetLang,
-            translationStyle: p.style,
-            glossary: p.glossary ?? null,
+            sourceLang: pipeline.sourceLang ?? null,
+            targetLang: pipeline.targetLang,
+            translationStyle: pipeline.style,
+            glossary: pipeline.glossary ?? null,
           }
         : {}),
     })
     .where(eq(videos.id, video.id));
 
-  const probeParams = p
+  const probeParams = pipeline
     ? {
         chain: {
-          method: p.method,
-          translate: p.translate,
-          ...(p.finish && p.translate ? { finish: p.finish } : {}),
+          method: pipeline.method,
+          translate: pipeline.translate,
+          ...(pipeline.finish && pipeline.translate ? { finish: pipeline.finish } : {}),
         },
       }
     : {};
-  const [job] = await db
-    .insert(jobs)
-    .values({
-      videoId: video.id,
-      userId: session.user.id,
-      type: "probe",
-      params: probeParams,
-    })
-    .returning();
-
-  await enqueuePipelineJob("probe", {
-    jobId: job.id,
-    videoId: video.id,
-    userId: session.user.id,
-    params: probeParams,
-  });
-
+  const job = await createPipelineJob("probe", video.id, session.user.id, probeParams);
   return NextResponse.json({ ok: true, probeJobId: job.id });
 }

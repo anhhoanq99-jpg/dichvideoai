@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { JobStatus } from "@dichvideo/shared";
 
 export interface JobStreamInfo {
-  status: "queued" | "active" | "done" | "failed" | "cancelled";
+  status: JobStatus;
   progress: number;
   error: string | null;
   result: unknown;
+}
+
+function isTerminal(status: JobStatus) {
+  return status === "done" || status === "failed" || status === "cancelled";
 }
 
 /**
@@ -18,25 +23,23 @@ export function useJobStream(jobId: string | null) {
 
   useEffect(() => {
     if (!jobId) return;
-    let stop = false;
+    let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    const eventSource = new EventSource(`/api/jobs/${jobId}/stream`);
 
-    es.onmessage = (ev) => {
-      if (stop) return;
+    eventSource.onmessage = (ev) => {
+      if (cancelled) return;
       const data: JobStreamInfo = JSON.parse(ev.data);
       setJob(data);
-      if (data.status === "done" || data.status === "failed" || data.status === "cancelled") {
-        es.close();
-      }
+      if (isTerminal(data.status)) eventSource.close();
     };
 
-    es.onerror = () => {
+    eventSource.onerror = () => {
       // EventSource retries by itself; add polling as belt-and-braces
-      if (stop || pollTimer) return;
+      if (cancelled || pollTimer) return;
       const poll = async () => {
-        if (stop) return;
+        if (cancelled) return;
         try {
           const res = await fetch(`/api/jobs/${jobId}`);
           if (res.ok) {
@@ -47,8 +50,8 @@ export function useJobStream(jobId: string | null) {
               error: data.error,
               result: null,
             });
-            if (data.status === "done" || data.status === "failed") {
-              es.close();
+            if (isTerminal(data.status)) {
+              eventSource.close();
               return;
             }
           }
@@ -61,8 +64,8 @@ export function useJobStream(jobId: string | null) {
     };
 
     return () => {
-      stop = true;
-      es.close();
+      cancelled = true;
+      eventSource.close();
       if (pollTimer) clearTimeout(pollTimer);
     };
   }, [jobId]);

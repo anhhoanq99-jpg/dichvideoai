@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { jobs, subtitleTracks } from "@dichvideo/db";
 import {
   COVER_MODES,
   MAX_COVER_REGIONS,
   RENDER_FONTS,
   STYLE_PRESETS,
+  isValidVoiceId,
 } from "@dichvideo/shared";
-import { db } from "@/lib/db";
-import { enqueuePipelineJob } from "@/lib/queue";
-import { getSession } from "@/lib/session";
-import { getOwnVideo } from "@/lib/video-access";
+import {
+  createPipelineJob,
+  findVideoTrack,
+  jsonError,
+  parseJsonBody,
+  requireOwnVideo,
+} from "@/lib/api-helpers";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -28,6 +30,7 @@ const schema = z.object({
   aspect: z.enum(["keep", "16:9", "9:16", "1:1"]).default("keep"),
   coverMode: z.enum(COVER_MODES).default("none"),
   regions: z.array(regionSchema).max(MAX_COVER_REGIONS).optional(),
+  blurStrength: z.number().int().min(1).max(10).optional(),
   subBox: regionSchema.optional(),
   logo: z
     .object({
@@ -36,6 +39,29 @@ const schema = z.object({
       fontSize: z.number().int().min(12).max(96),
       color: z.string().regex(HEX),
       opacity: z.number().int().min(0).max(100),
+      fx: z.number().min(0).max(1).optional(),
+      fy: z.number().min(0).max(1).optional(),
+    })
+    .optional(),
+  logoImage: z
+    .object({
+      r2Key: z.string().min(1).max(300),
+      position: z.enum(["tl", "tr", "bl", "br"]),
+      scalePct: z.number().int().min(3).max(60),
+      opacity: z.number().int().min(0).max(100),
+      fx: z.number().min(0).max(1).optional(),
+      fy: z.number().min(0).max(1).optional(),
+    })
+    .optional(),
+  // render xong tự lồng tiếng lên bản đã render (luồng "Xuất File" của studio)
+  finish: z
+    .object({
+      dub: z.boolean().default(false),
+      voice: z.string().refine(isValidVoiceId).optional(),
+      speed: z.number().min(0.8).max(1.3).optional(),
+      aiVolume: z.number().int().min(0).max(200).optional(),
+      bgVolume: z.number().int().min(0).max(100).optional(),
+      origVoiceVolume: z.number().int().min(0).max(100).optional(),
     })
     .optional(),
   // style overrides
@@ -54,59 +80,27 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  }
-  const { id } = await params;
-  const video = await getOwnVideo(id, session.user.id);
-  if (!video) {
-    return NextResponse.json({ error: "Không tìm thấy video" }, { status: 404 });
-  }
-  if (!video.durationSec) {
-    return NextResponse.json({ error: "Video chưa xử lý xong" }, { status: 409 });
-  }
+  const auth = await requireOwnVideo(params);
+  if (auth.response) return auth.response;
+  const { session, video } = auth;
+  if (!video.durationSec) return jsonError("Video chưa xử lý xong", 409);
 
-  const body = schema.safeParse(await req.json());
-  if (!body.success) {
-    return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
-  }
+  const body = await parseJsonBody(req, schema);
+  if (body.response) return body.response;
   if (body.data.coverMode !== "none" && !body.data.regions?.length) {
-    return NextResponse.json(
-      { error: "Khoanh ít nhất một vùng cần che trước" },
-      { status: 400 },
-    );
+    return jsonError("Khoanh ít nhất một vùng cần che trước", 400);
+  }
+  // logo ảnh phải là file do chính user này upload
+  if (
+    body.data.logoImage &&
+    !body.data.logoImage.r2Key.startsWith(`logos/${session.user.id}/`)
+  ) {
+    return jsonError("Logo không hợp lệ", 400);
   }
 
-  const [track] = await db
-    .select({ id: subtitleTracks.id })
-    .from(subtitleTracks)
-    .where(
-      and(
-        eq(subtitleTracks.id, body.data.trackId),
-        eq(subtitleTracks.videoId, video.id),
-      ),
-    );
-  if (!track) {
-    return NextResponse.json({ error: "Track phụ đề không hợp lệ" }, { status: 400 });
-  }
+  const track = await findVideoTrack(body.data.trackId, video.id);
+  if (!track) return jsonError("Track phụ đề không hợp lệ", 400);
 
-  const [job] = await db
-    .insert(jobs)
-    .values({
-      videoId: video.id,
-      userId: session.user.id,
-      type: "render",
-      params: body.data,
-    })
-    .returning();
-
-  await enqueuePipelineJob("render", {
-    jobId: job.id,
-    videoId: video.id,
-    userId: session.user.id,
-    params: body.data,
-  });
-
+  const job = await createPipelineJob("render", video.id, session.user.id, body.data);
   return NextResponse.json({ ok: true, jobId: job.id });
 }

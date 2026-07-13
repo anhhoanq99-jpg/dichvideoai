@@ -1,10 +1,5 @@
 import { spawn } from "node:child_process";
-import path from "node:path";
-
-function ffmpegBin(): string {
-  const dir = process.env.FFMPEG_DIR;
-  return dir ? path.join(dir, "ffmpeg") : "ffmpeg";
-}
+import { ffBin } from "./ffmpeg";
 
 export interface FfmpegRunOptions {
   args: string[];
@@ -24,14 +19,14 @@ export function runFfmpeg(opts: FfmpegRunOptions): Promise<void> {
     opts.timeoutMs ?? Math.max(10 * 60_000, opts.durationSec * 2500);
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(ffmpegBin(), [...opts.args, "-progress", "pipe:1", "-nostats"], {
+    const proc = spawn(ffBin("ffmpeg"), [...opts.args, "-progress", "pipe:1", "-nostats"], {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     const stderrTail: string[] = [];
     let lastPct = -1;
 
-    const killer = setTimeout(() => {
+    const killTimer = setTimeout(() => {
       proc.kill("SIGKILL");
       reject(new Error(`FFmpeg quá thời gian cho phép (${Math.round(timeoutMs / 60000)} phút)`));
     }, timeoutMs);
@@ -39,9 +34,9 @@ export function runFfmpeg(opts: FfmpegRunOptions): Promise<void> {
     proc.stdout.on("data", (buf: Buffer) => {
       const text = buf.toString();
       // -progress emits key=value lines; out_time_us/out_time_ms both appear across versions
-      const m = /out_time_(?:us|ms)=(\d+)/.exec(text);
-      if (m && opts.onProgress && opts.durationSec > 0) {
-        const outSec = Number(m[1]) / 1_000_000;
+      const progressMatch = /out_time_(?:us|ms)=(\d+)/.exec(text);
+      if (progressMatch && opts.onProgress && opts.durationSec > 0) {
+        const outSec = Number(progressMatch[1]) / 1_000_000;
         const pct = Math.min(99, Math.round((outSec / opts.durationSec) * 100));
         if (pct > lastPct) {
           lastPct = pct;
@@ -56,12 +51,12 @@ export function runFfmpeg(opts: FfmpegRunOptions): Promise<void> {
     });
 
     proc.on("error", (err) => {
-      clearTimeout(killer);
+      clearTimeout(killTimer);
       reject(err);
     });
 
     proc.on("close", (code) => {
-      clearTimeout(killer);
+      clearTimeout(killTimer);
       if (code === 0) resolve();
       else {
         const tail = stderrTail.join("").split("\n").slice(-8).join("\n");

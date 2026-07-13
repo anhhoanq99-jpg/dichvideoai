@@ -12,3 +12,7 @@ Thumbs.db
 .turbo/
 coverage/
 .drizzle-tmp/
+
+# deploy
+.vercel/
+*.pem

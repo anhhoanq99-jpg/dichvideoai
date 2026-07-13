@@ -7,6 +7,11 @@ config({ path: path.resolve(__dirname, "../../.env") });
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@dichvideo/shared", "@dichvideo/db"],
+  images: {
+    formats: ["image/avif", "image/webp"],
+    // avatar Google của user đăng nhập
+    remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
+  },
 };
 
 export default nextConfig;

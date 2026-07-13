@@ -1,9 +1,6 @@
 /** Credits tặng khi đăng ký — đủ Việt hóa thử ~2 video ngắn. */
 export const SIGNUP_TRIAL_CREDITS = 10_000;
 
-/** Trial limit: max video duration processable per job for users who never topped up. */
-export const TRIAL_MAX_VIDEO_MINUTES = 5;
-
 /** Neo giá trị: 1 credit = 1 VND (100.000đ = 100.000 credits) — cùng thang đối thủ. */
 export const VND_PER_CREDIT = 1;
 
@@ -41,13 +38,38 @@ export function topupBonusPercent(amountVnd: number): number {
   return 0;
 }
 
+/** Một mức nạp hiển thị cho người dùng (landing + trang Nạp credits). */
+export interface TopupPack {
+  vnd: number;
+  /** % tặng thêm theo thang topupBonusPercent */
+  bonus: number;
+  /** tổng credits nhận được (đã gồm bonus) */
+  credits: number;
+  /** gói được làm nổi bật trên UI */
+  popular: boolean;
+}
+
+/** Các mức nạp chuẩn — nguồn duy nhất cho landing page và trang Nạp credits. */
+export function topupPacks(): TopupPack[] {
+  return [100_000, 200_000, 500_000, 1_000_000, 2_000_000, 5_000_000].map((vnd) => {
+    const bonus = topupBonusPercent(vnd);
+    return {
+      vnd,
+      bonus,
+      credits: Math.floor(vnd * (1 + bonus / 100)),
+      popular: vnd === 1_000_000,
+    };
+  });
+}
+
 /** Ước tính credit cho một job — dùng chung cho worker (trừ tiền) và web (hiển thị). */
 export function estimateJobCredits(
-  type: "probe" | "stt" | "ocr" | "translate" | "render" | "dub",
+  type: "import" | "probe" | "stt" | "ocr" | "translate" | "render" | "dub",
   input: { durationSec?: number | null; lines?: number; premiumVoice?: boolean },
 ): number {
   const minutes = Math.max(1, Math.ceil((input.durationSec ?? 0) / 60));
   switch (type) {
+    case "import": // tải video từ link — miễn phí
     case "probe":
       return 0;
     case "stt":

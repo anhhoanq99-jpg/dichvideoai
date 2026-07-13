@@ -14,7 +14,7 @@ export interface ExtractResult {
 }
 
 export interface SubtitleExtractor {
-  readonly id: "groq-whisper" | "gemini-video-ocr" | "paddle-ocr";
+  readonly id: "groq-whisper" | "gemini-video-ocr";
   extract(
     input: ExtractInput,
     onProgress: (pct: number) => void,

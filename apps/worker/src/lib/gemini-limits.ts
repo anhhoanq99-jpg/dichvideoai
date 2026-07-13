@@ -3,17 +3,28 @@ import { logger } from "../logger";
 
 /** Lỗi 429 → số ms cần chờ theo RetryInfo của Google (null nếu không phải 429). */
 export function rateLimitDelayMs(err: unknown): number | null {
-  const s = err instanceof Error ? err.message : String(err);
-  if (!/429|RESOURCE_EXHAUSTED/i.test(s)) return null;
-  const m = /retry in ([\d.]+)\s*s/i.exec(s) ?? /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(s);
-  const sec = m ? Number.parseFloat(m[1]) : 60;
+  const message = err instanceof Error ? err.message : String(err);
+  if (!/429|RESOURCE_EXHAUSTED/i.test(message)) return null;
+  const delayMatch =
+    /retry in ([\d.]+)\s*s/i.exec(message) ??
+    /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(message);
+  const sec = delayMatch ? Number.parseFloat(delayMatch[1]) : 60;
   return Math.ceil((Number.isFinite(sec) ? sec : 60) * 1000) + 1500;
 }
 
 /** Hết hạn mức NGÀY của gói miễn phí — retry vô ích, phải dừng ngay. */
 export function isDailyQuotaError(err: unknown): boolean {
-  const s = err instanceof Error ? err.message : String(err);
-  return /RESOURCE_EXHAUSTED|429/i.test(s) && /PerDay/i.test(s);
+  const message = err instanceof Error ? err.message : String(err);
+  return /RESOURCE_EXHAUSTED|429/i.test(message) && /PerDay/i.test(message);
+}
+
+/** Key trả trước hết tiền / billing chết — retry vô ích, phải dừng ngay. */
+export function isBillingDepletedError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    /429|RESOURCE_EXHAUSTED/i.test(message) &&
+    /prepayment credits are depleted|billing/i.test(message)
+  );
 }
 
 export function dailyQuotaMessage(): string {
@@ -21,6 +32,14 @@ export function dailyQuotaMessage(): string {
     "Key Gemini miễn phí đã hết hạn mức trong NGÀY (dịch/OCR: 20 lượt, giọng cao cấp: 10 lượt mỗi ngày). " +
     "Nâng key lên gói trả phí tại aistudio.google.com (mục Billing) để dùng không giới hạn, " +
     "hoặc thử lại vào ngày mai. Credits của job này được hoàn tự động."
+  );
+}
+
+export function billingDepletedMessage(): string {
+  return (
+    "Key Gemini đã hết tiền trả trước — nạp thêm tại aistudio.google.com (mục Billing). " +
+    "Bước dịch tự chuyển sang nguồn miễn phí (Groq) nếu đã cấu hình; " +
+    "riêng OCR và giọng đọc cao cấp cần key Gemini còn hạn mức. Credits của job này được hoàn tự động."
   );
 }
 
@@ -40,6 +59,9 @@ export async function withGeminiRetry<T>(
       return await fn();
     } catch (err) {
       if (isDailyQuotaError(err)) throw new UnrecoverableError(dailyQuotaMessage());
+      if (isBillingDepletedError(err)) {
+        throw new UnrecoverableError(billingDepletedMessage());
+      }
       lastErr = err;
       const wait = rateLimitDelayMs(err) ?? 1500 * (attempt + 1);
       logger.warn(

@@ -1,5 +1,6 @@
 import type { Job } from "bullmq";
 import type { JobPayload, JobType } from "@dichvideo/shared";
+import { importProcessor } from "./import";
 import { probeProcessor } from "./probe";
 import { ocrProcessor, sttProcessor } from "./extract";
 import { translateProcessor } from "./translate";
@@ -9,6 +10,7 @@ import { dubProcessor } from "./dub";
 type Processor = (job: Job<JobPayload>) => Promise<unknown>;
 
 export const processors: Record<JobType, Processor> = {
+  import: importProcessor,
   probe: probeProcessor,
   stt: sttProcessor,
   ocr: ocrProcessor,

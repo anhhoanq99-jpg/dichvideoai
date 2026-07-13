@@ -3,6 +3,7 @@ export const QUEUES = {
 } as const;
 
 export const JOB_TYPES = [
+  "import",
   "probe",
   "stt",
   "ocr",

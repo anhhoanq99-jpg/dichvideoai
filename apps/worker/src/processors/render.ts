@@ -1,9 +1,7 @@
-import { stat, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import type { Job } from "bullmq";
-import { createReadStream } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
@@ -22,7 +20,7 @@ import {
   outputResolution,
   subBoxToMargins,
 } from "../lib/filtergraph";
-import { cleanupJobDir, downloadFromR2, getR2, jobTempDir } from "../lib/r2";
+import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
 import { logger } from "../logger";
 
 const FONTS_DIR = path.resolve(
@@ -127,15 +125,24 @@ export async function renderProcessor(job: Job<JobPayload>) {
           }
         : undefined;
 
+    // logo hình ảnh: tải từ R2 về rồi đưa vào ffmpeg làm input thứ 2 ([1:v])
+    let logoImagePath: string | null = null;
+    if (params.logoImage?.r2Key) {
+      logoImagePath = path.join(dir, `logo${path.extname(params.logoImage.r2Key) || ".png"}`);
+      await downloadFromR2(params.logoImage.r2Key, logoImagePath);
+    }
+
     const graph = buildFiltergraph({
       srcWidth: video.width,
       srcHeight: video.height,
       coverMode: params.coverMode,
       regions: params.regions,
+      blurStrength: params.blurStrength,
       aspect: params.aspect,
       assPath,
       fontsDir: FONTS_DIR,
-      logo,
+      logo: logoImagePath ? undefined : logo,
+      logoImage: logoImagePath ? params.logoImage : undefined,
     });
 
     const outPath = path.join(dir, "out.mp4");
@@ -143,6 +150,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
       args: [
         "-y",
         "-i", srcPath,
+        ...(logoImagePath ? ["-i", logoImagePath] : []),
         "-filter_complex", graph,
         "-map", "[v]",
         "-map", "0:a?",
@@ -160,30 +168,31 @@ export async function renderProcessor(job: Job<JobPayload>) {
     await job.updateProgress(90);
 
     const outKey = `outputs/${job.data.userId}/${video.id}/${job.data.jobId}.mp4`;
-    const { size } = await stat(outPath);
-    await getR2().send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET!,
-        Key: outKey,
-        Body: createReadStream(outPath),
-        ContentType: "video/mp4",
-        ContentLength: size,
-      }),
-    );
+    const { sizeBytes } = await uploadToR2(outKey, outPath, "video/mp4");
 
     await db
       .update(jobs)
-      .set({ result: { r2Key: outKey, sizeBytes: size } })
+      .set({ result: { r2Key: outKey, sizeBytes } })
       .where(eq(jobs.id, job.data.jobId));
 
     logger.info(
-      { jobId: job.data.jobId, outKey, sizeMb: Math.round(size / 1e6) },
+      { jobId: job.data.jobId, outKey, sizeMb: Math.round(sizeBytes / 1e6) },
       "render done",
     );
 
     // trọn gói: render xong tự lồng tiếng LÊN BẢN ĐÃ RENDER (video cuối có cả phụ đề lẫn giọng đọc)
-    const finish = (job.data.params as { finish?: { dub?: boolean; voice?: string } })
-      .finish;
+    const finish = (
+      job.data.params as {
+        finish?: {
+          dub?: boolean;
+          voice?: string;
+          speed?: number;
+          aiVolume?: number;
+          bgVolume?: number;
+          origVoiceVolume?: number;
+        };
+      }
+    ).finish;
     if (finish?.dub) {
       const nextId = await chainJob({
         videoId: video.id,
@@ -192,16 +201,19 @@ export async function renderProcessor(job: Job<JobPayload>) {
         params: {
           trackId: params.trackId,
           voice: finish.voice ?? DUB_VOICES[0].id,
-          speed: 1,
-          aiVolume: 100,
-          bgVolume: 20,
+          speed: finish.speed ?? 1,
+          aiVolume: finish.aiVolume ?? 100,
+          bgVolume: finish.bgVolume ?? 20,
+          ...(finish.origVoiceVolume !== undefined
+            ? { origVoiceVolume: finish.origVoiceVolume }
+            : {}),
           sourceR2Key: outKey,
         },
       });
       logger.info({ videoId: video.id, nextId }, "chained dub on rendered output");
     }
 
-    return { r2Key: outKey, sizeBytes: size };
+    return { r2Key: outKey, sizeBytes };
   } finally {
     await cleanupJobDir(job.data.jobId);
   }

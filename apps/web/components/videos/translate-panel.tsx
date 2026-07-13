@@ -1,22 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Languages, Loader2, PencilLine } from "lucide-react";
+import { useState } from "react";
+import { Languages, PencilLine } from "lucide-react";
 import Link from "next/link";
-import { useJobPoll } from "@/hooks/use-job-poll";
+import { useJobRunner } from "@/hooks/use-job-runner";
+import { JobError, JobProgress } from "@/components/jobs/job-ui";
+import { selectClass } from "@/components/ui/form-styles";
+import type { Lang } from "@/lib/i18n";
 
-const STYLES = [
-  { value: "natural", label: "Tự nhiên (khuyên dùng)" },
-  { value: "formal", label: "Trang trọng" },
-  { value: "literal", label: "Sát nghĩa" },
-] as const;
+const T = {
+  vi: {
+    styles: [
+      { value: "natural", label: "Tự nhiên (khuyên dùng)" },
+      { value: "formal", label: "Trang trọng" },
+      { value: "literal", label: "Sát nghĩa" },
+    ],
+    title: "Dịch sang tiếng Việt",
+    openEditor: "Mở trình chỉnh sửa",
+    translating: "Đang dịch…",
+    styleLabel: "Phong cách:",
+    hideGlossary: "Ẩn thuật ngữ",
+    showGlossary: "+ Thuật ngữ / tên nhân vật",
+    glossaryPh:
+      "Mỗi dòng một cặp: thuật ngữ=bản dịch\nVí dụ:\n叶凡=Diệp Phàm\nsenpai=tiền bối",
+    glossaryHint: "AI sẽ tuân theo bảng này để đồng nhất tên nhân vật và thuật ngữ.",
+    errStart: "Không bắt đầu được dịch",
+    retranslate: "Dịch lại",
+    translate: "Dịch sang tiếng Việt",
+    overwriteWarning:
+      "Lưu ý: dịch lại sẽ ghi đè bản dịch hiện tại (kể cả các chỉnh sửa tay).",
+    errFallback: "Dịch thất bại",
+  },
+  en: {
+    styles: [
+      { value: "natural", label: "Natural (recommended)" },
+      { value: "formal", label: "Formal" },
+      { value: "literal", label: "Literal" },
+    ],
+    title: "Translate to Vietnamese",
+    openEditor: "Open editor",
+    translating: "Translating…",
+    styleLabel: "Style:",
+    hideGlossary: "Hide glossary",
+    showGlossary: "+ Glossary / character names",
+    glossaryPh:
+      "One pair per line: term=translation\nExample:\n叶凡=Diep Pham\nsenpai=senior",
+    glossaryHint: "The AI follows this table to keep names and terms consistent.",
+    errStart: "Could not start translation",
+    retranslate: "Retranslate",
+    translate: "Translate to Vietnamese",
+    overwriteWarning:
+      "Note: retranslating overwrites the current translation (including manual edits).",
+    errFallback: "Translation failed",
+  },
+} as const;
 
 interface TranslatePanelProps {
   videoId: string;
   hasOriginalTrack: boolean;
   hasTranslatedTrack: boolean;
   initialGlossary: string | null;
+  lang?: Lang;
 }
 
 export function TranslatePanel({
@@ -24,82 +68,47 @@ export function TranslatePanel({
   hasOriginalTrack,
   hasTranslatedTrack,
   initialGlossary,
+  lang = "vi",
 }: TranslatePanelProps) {
+  const t = T[lang];
   const [style, setStyle] = useState<string>("natural");
   const [glossary, setGlossary] = useState(initialGlossary ?? "");
   const [showGlossary, setShowGlossary] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const job = useJobPoll(jobId);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (job?.status === "done") {
-      router.refresh();
-    }
-  }, [job?.status, router]);
+  const { job, running, error, start } = useJobRunner();
 
   if (!hasOriginalTrack) return null;
-
-  const running = job?.status === "queued" || job?.status === "active";
-
-  async function start() {
-    setError(null);
-    const res = await fetch(`/api/videos/${videoId}/translate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ style, ...(glossary.trim() ? { glossary } : {}) }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Không bắt đầu được dịch");
-      return;
-    }
-    setJobId(data.jobId);
-  }
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Languages className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-          Dịch sang tiếng Việt
+          <Languages className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+          {t.title}
         </h2>
         {hasTranslatedTrack && !running && (
           <Link
             href={`/videos/${videoId}/editor`}
-            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
           >
-            <PencilLine className="h-4 w-4" /> Mở trình chỉnh sửa
+            <PencilLine className="h-4 w-4" /> {t.openEditor}
           </Link>
         )}
       </div>
 
       {running ? (
-        <div className="mt-3">
-          <p className="flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Đang dịch… {job?.progress ?? 0}%
-          </p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-            <div
-              className="h-full rounded-full bg-indigo-600 transition-all dark:bg-indigo-500"
-              style={{ width: `${job?.progress ?? 0}%` }}
-            />
-          </div>
-        </div>
+        <JobProgress className="mt-3" label={t.translating} progress={job?.progress ?? 0} />
       ) : (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm text-neutral-600 dark:text-neutral-300">
-              Phong cách:
+              {t.styleLabel}
             </label>
             <select
               value={style}
               onChange={(e) => setStyle(e.target.value)}
-              className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+              className={selectClass}
             >
-              {STYLES.map((s) => (
+              {t.styles.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
@@ -108,9 +117,9 @@ export function TranslatePanel({
             <button
               type="button"
               onClick={() => setShowGlossary((v) => !v)}
-              className="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+              className="text-sm text-primary-600 hover:underline dark:text-primary-400"
             >
-              {showGlossary ? "Ẩn thuật ngữ" : "+ Thuật ngữ / tên nhân vật"}
+              {showGlossary ? t.hideGlossary : t.showGlossary}
             </button>
           </div>
 
@@ -120,35 +129,37 @@ export function TranslatePanel({
                 value={glossary}
                 onChange={(e) => setGlossary(e.target.value)}
                 rows={4}
-                placeholder={"Mỗi dòng một cặp: thuật ngữ=bản dịch\nVí dụ:\n叶凡=Diệp Phàm\nsenpai=tiền bối"}
+                placeholder={t.glossaryPh}
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               />
               <p className="mt-1 text-xs text-neutral-400">
-                AI sẽ tuân theo bảng này để đồng nhất tên nhân vật và thuật ngữ.
+                {t.glossaryHint}
               </p>
             </div>
           )}
 
           <button
             type="button"
-            onClick={() => void start()}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+            onClick={() =>
+              void start(
+                `/api/videos/${videoId}/translate`,
+                { style, ...(glossary.trim() ? { glossary } : {}) },
+                t.errStart,
+              )
+            }
+            className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
           >
-            {hasTranslatedTrack ? "Dịch lại" : "Dịch sang tiếng Việt"}
+            {hasTranslatedTrack ? t.retranslate : t.translate}
           </button>
           {hasTranslatedTrack && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              Lưu ý: dịch lại sẽ ghi đè bản dịch hiện tại (kể cả các chỉnh sửa tay).
+              {t.overwriteWarning}
             </p>
           )}
         </div>
       )}
 
-      {(error || job?.status === "failed") && (
-        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error ?? job?.error ?? "Dịch thất bại"}
-        </p>
-      )}
+      <JobError className="mt-3" error={error} job={job} fallback={t.errFallback} />
     </section>
   );
 }

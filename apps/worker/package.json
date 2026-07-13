@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1081.0",
-    "@aws-sdk/s3-request-presigner": "^3.1081.0",
     "@dichvideo/db": "workspace:*",
     "@dichvideo/shared": "workspace:*",
     "@google/genai": "^1.52.0",

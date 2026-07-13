@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
+import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
-export const metadata: Metadata = { title: "Chính sách bảo mật — Dịch Video AI" };
+export const metadata: Metadata = {
+  title: "Chính sách bảo mật — Dịch Video AI",
+  description:
+    "Chính sách bảo mật của Dịch Video AI: dữ liệu thu thập, cách lưu trữ video và quyền xóa dữ liệu của bạn.",
+  alternates: { canonical: "/bao-mat" },
+};
 
-const SECTIONS: { title: string; body: string[] }[] = [
+const SECTIONS: LegalSection[] = [
   {
     title: "1. Dữ liệu chúng tôi thu thập",
     body: [
@@ -51,25 +55,10 @@ const SECTIONS: { title: string; body: string[] }[] = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#0b0d14] text-neutral-200">
-      <SiteHeader />
-      <main className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-3xl font-bold text-white">Chính sách bảo mật</h1>
-        <p className="mt-2 text-sm text-neutral-400">Cập nhật: 10/07/2026</p>
-        <div className="mt-8 space-y-8">
-          {SECTIONS.map((s) => (
-            <section key={s.title}>
-              <h2 className="text-lg font-semibold text-white">{s.title}</h2>
-              {s.body.map((p) => (
-                <p key={p} className="mt-2 text-sm leading-relaxed text-neutral-400">
-                  {p}
-                </p>
-              ))}
-            </section>
-          ))}
-        </div>
-      </main>
-      <SiteFooter />
-    </div>
+    <LegalPage
+      heading="Chính sách bảo mật"
+      updatedAt="10/07/2026"
+      sections={SECTIONS}
+    />
   );
 }

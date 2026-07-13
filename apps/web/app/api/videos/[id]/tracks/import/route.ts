@@ -3,8 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { subtitleTracks } from "@dichvideo/db";
 import { parseSrt } from "@dichvideo/shared";
 import { db } from "@/lib/db";
-import { getSession } from "@/lib/session";
-import { getOwnVideo } from "@/lib/video-access";
+import { requireOwnVideo } from "@/lib/api-helpers";
 
 const MAX_SRT_BYTES = 2 * 1024 * 1024;
 
@@ -12,15 +11,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  }
-  const { id } = await params;
-  const video = await getOwnVideo(id, session.user.id);
-  if (!video) {
-    return NextResponse.json({ error: "Không tìm thấy video" }, { status: 404 });
-  }
+  const auth = await requireOwnVideo(params);
+  if (auth.response) return auth.response;
+  const { video } = auth;
 
   const form = await req.formData();
   const file = form.get("file");

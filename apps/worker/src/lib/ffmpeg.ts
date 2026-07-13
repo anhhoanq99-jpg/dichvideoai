@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 /** Resolve binary path — FFMPEG_DIR for Windows dev, bare name on Linux (PATH). */
-function bin(name: "ffmpeg" | "ffprobe"): string {
+export function ffBin(name: "ffmpeg" | "ffprobe"): string {
   const dir = process.env.FFMPEG_DIR;
   return dir ? path.join(dir, name) : name;
 }
@@ -18,7 +18,7 @@ export interface ProbeResult {
 }
 
 export async function ffprobe(localPath: string): Promise<ProbeResult> {
-  const { stdout } = await execFileAsync(bin("ffprobe"), [
+  const { stdout } = await execFileAsync(ffBin("ffprobe"), [
     "-v", "error",
     "-print_format", "json",
     "-show_format",
@@ -41,7 +41,7 @@ export async function ffprobe(localPath: string): Promise<ProbeResult> {
 
 /** Extract mono 16kHz FLAC for STT — keeps 60-min audio well under Groq's 100MB cap. */
 export async function extractAudio(videoPath: string, outPath: string): Promise<void> {
-  await execFileAsync(bin("ffmpeg"), [
+  await execFileAsync(ffBin("ffmpeg"), [
     "-y",
     "-i", videoPath,
     "-vn",
@@ -52,19 +52,25 @@ export async function extractAudio(videoPath: string, outPath: string): Promise<
   ]);
 }
 
-/** Grab one frame at tSec, scaled to width 640 (aspect kept) — for bbox refinement. */
-export async function extractFrameJpeg(
-  videoPath: string,
-  tSec: number,
-  outPath: string,
-): Promise<void> {
-  await execFileAsync(bin("ffmpeg"), [
+/** Thời lượng audio chính xác tới ms (ffprobe của video chỉ làm tròn giây). */
+export async function audioDurationMs(file: string): Promise<number> {
+  const { stdout } = await execFileAsync(ffBin("ffprobe"), [
+    "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    file,
+  ]);
+  return Math.round(parseFloat(stdout.trim()) * 1000);
+}
+
+/** Tạo file WAV im lặng dài `ms` — chèn giữa các câu khi ghép track thuyết minh. */
+export async function makeSilence(file: string, ms: number): Promise<void> {
+  await execFileAsync(ffBin("ffmpeg"), [
     "-y",
-    "-ss", tSec.toFixed(2),
-    "-i", videoPath,
-    "-frames:v", "1",
-    "-vf", "scale=640:-2",
-    "-q:v", "5",
-    outPath,
+    "-f", "lavfi",
+    "-i", "anullsrc=r=24000:cl=mono",
+    "-t", (ms / 1000).toFixed(3),
+    "-c:a", "pcm_s16le",
+    file,
   ]);
 }

@@ -1,60 +1,65 @@
 import { execFile } from "node:child_process";
-import { stat, writeFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import type { Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
   DUB_VOICES,
-  EDGE_VOICE_IDS,
-  GEMINI_VOICE_IDS,
-  geminiVoiceName,
+  isValidVoiceId,
+  voiceProvider,
   type DubParams,
   type JobPayload,
   type SubtitleSegment,
 } from "@dichvideo/shared";
 import { slotMs, atempoChain } from "../lib/dub-timing";
-import { ffprobe } from "../lib/ffmpeg";
+import { audioDurationMs, ffBin, ffprobe, makeSilence } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
-import { cleanupJobDir, downloadFromR2, getR2, jobTempDir } from "../lib/r2";
+import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
 import { synthesizeClipWithRetry } from "../lib/tts";
 import { recordUsage, type UsageRecord } from "../lib/usage";
 import { logger } from "../logger";
 
 const execFileAsync = promisify(execFile);
 
-function ffBin(name: "ffmpeg" | "ffprobe"): string {
-  const dir = process.env.FFMPEG_DIR;
-  return dir ? path.join(dir, name) : name;
-}
-
-/** Thời lượng audio chính xác tới ms (ffprobe của video chỉ làm tròn giây). */
-async function audioDurationMs(file: string): Promise<number> {
-  const { stdout } = await execFileAsync(ffBin("ffprobe"), [
-    "-v", "error",
-    "-show_entries", "format=duration",
-    "-of", "default=noprint_wrappers=1:nokey=1",
-    file,
-  ]);
-  return Math.round(parseFloat(stdout.trim()) * 1000);
-}
-
-async function makeSilence(file: string, ms: number): Promise<void> {
-  await execFileAsync(ffBin("ffmpeg"), [
-    "-y",
-    "-f", "lavfi",
-    "-i", "anullsrc=r=24000:cl=mono",
-    "-t", (ms / 1000).toFixed(3),
-    "-c:a", "pcm_s16le",
-    file,
-  ]);
-}
-
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Filter âm lượng cho audio gốc: trong khoảng các câu thoại → origVoiceVol,
+ * ngoài câu → bgVol. Hai mức bằng nhau (hoặc quá nhiều câu làm biểu thức
+ * vượt giới hạn args) → volume phẳng như cũ.
+ */
+function buildOriginalVolumeFilter(
+  segments: SubtitleSegment[],
+  bgVol: number,
+  origVoiceVol: number,
+): string {
+  if (Math.abs(origVoiceVol - bgVol) < 0.005) return `volume=${bgVol}`;
+
+  // gộp các câu sát nhau (<300ms) cho biểu thức gọn
+  const spans: { start: number; end: number }[] = [];
+  for (const seg of segments) {
+    const start = seg.startMs / 1000;
+    const end = seg.endMs / 1000;
+    const last = spans[spans.length - 1];
+    if (last && start - last.end < 0.3) last.end = Math.max(last.end, end);
+    else spans.push({ start, end });
+  }
+  if (spans.length > 400) {
+    logger.warn(
+      { spans: spans.length },
+      "quá nhiều câu — bỏ hạ giọng gốc theo câu, dùng âm lượng phẳng",
+    );
+    return `volume=${bgVol}`;
+  }
+
+  const inSpeech = spans
+    .map(({ start, end }) => `between(t,${start.toFixed(3)},${end.toFixed(3)})`)
+    .join("+");
+  return `volume=volume='if(gt(${inSpeech},0),${origVoiceVol},${bgVol})':eval=frame`;
 }
 
 /**
@@ -84,14 +89,16 @@ export async function dubProcessor(job: Job<JobPayload>) {
     );
   if (!track) throw new Error("Không tìm thấy track phụ đề để lồng tiếng");
 
-  const voice =
-    EDGE_VOICE_IDS.has(params.voice) || GEMINI_VOICE_IDS.has(params.voice)
-      ? params.voice
-      : DUB_VOICES[0].id;
-  const isGemini = geminiVoiceName(voice) !== null;
+  const voice = isValidVoiceId(params.voice) ? params.voice : DUB_VOICES[0].id;
+  // edge & gcloud bake tốc độ ngay khi tổng hợp; gemini & eleven không có
+  // tham số rate → phải áp tốc độ bằng atempo lúc ép khớp khe thoại
+  const speedBaked = ["edge", "gcloud"].includes(voiceProvider(voice));
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
   const bgVol = clamp(params.bgVolume ?? 20, 0, 100) / 100;
+  // âm lượng tiếng gốc TRONG lúc AI đọc (hạ giọng nói gốc); mặc định = bgVol
+  const origVoiceVol =
+    clamp(params.origVoiceVolume ?? params.bgVolume ?? 20, 0, 100) / 100;
 
   const segments = (track.segments as SubtitleSegment[]).filter(
     (s) => s.text.trim().length > 0 && s.endMs > s.startMs,
@@ -117,34 +124,33 @@ export async function dubProcessor(job: Job<JobPayload>) {
     const clips: string[] = [];
     const usage: UsageRecord[] = [];
     for (const [k, seg] of segments.entries()) {
-      const r = await synthesizeClipWithRetry({
+      const clip = await synthesizeClipWithRetry({
         text: seg.text.replace(/\s+/g, " ").trim(),
         voice,
         speed,
         dir,
         name: `clip-${k}`,
       });
-      clips.push(r.file);
-      usage.push(...r.usage);
+      clips.push(clip.file);
+      usage.push(...clip.usage);
       await job.updateProgress(5 + Math.round(((k + 1) / segments.length) * 50));
     }
     const costUsdMicros = await recordUsage(job.data.jobId, usage);
 
     // 2. Ép mỗi clip khớp khe thời gian của câu (55→70%)
     const fitted: { file: string; durMs: number }[] = [];
-    for (const [k, seg] of segments.entries()) {
+    for (const [k] of segments.entries()) {
       const rawMs = await audioDurationMs(clips[k]);
       const slot = slotMs(segments, k, videoDurMs);
-      // Edge đã bake tốc độ vào giọng; Gemini không có tham số rate → áp bằng atempo
-      const chain = atempoChain(Math.max(rawMs / slot, isGemini ? speed : 1));
+      const atempoFilter = atempoChain(Math.max(rawMs / slot, speedBaked ? 1 : speed));
       const out = path.join(dir, `fit-${k}.wav`);
       // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
-      const expMs = Math.min(chain ? slot : rawMs, slot);
-      const fades = `afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, (expMs - 25) / 1000).toFixed(3)}:d=0.025`;
+      const expectedMs = Math.min(atempoFilter ? slot : rawMs, slot);
+      const fades = `afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, (expectedMs - 25) / 1000).toFixed(3)}:d=0.025`;
       await execFileAsync(ffBin("ffmpeg"), [
         "-y",
         "-i", clips[k],
-        "-af", chain ? `${chain},${fades}` : fades,
+        "-af", atempoFilter ? `${atempoFilter},${fades}` : fades,
         "-ar", "24000",
         "-ac", "1",
         "-c:a", "pcm_s16le",
@@ -188,11 +194,14 @@ export async function dubProcessor(job: Job<JobPayload>) {
 
     // 4. Trộn với audio gốc + mux, video stream copy (75→95%)
     const outPath = path.join(dir, "out.mp4");
-    const mixWithOriginal = meta.hasAudio && bgVol > 0;
+    const mixWithOriginal = meta.hasAudio && (bgVol > 0 || origVoiceVol > 0);
+    // tiếng gốc: GIỮA các câu = bgVol (nhạc nền), TRONG câu = origVoiceVol
+    // (hạ giọng nói gốc đúng lúc AI đọc — mô phỏng tách giọng/nhạc)
+    const originalAudioFilter = buildOriginalVolumeFilter(segments, bgVol, origVoiceVol);
     const audioArgs = mixWithOriginal
       ? [
           "-filter_complex",
-          `[0:a]volume=${bgVol}[a0];[1:a]volume=${aiVol}[a1];[a0][a1]amix=inputs=2:duration=first:normalize=0[aout]`,
+          `[0:a]${originalAudioFilter}[a0];[1:a]volume=${aiVol}[a1];[a0][a1]amix=inputs=2:duration=first:normalize=0[aout]`,
           "-map", "0:v",
           "-map", "[aout]",
         ]
@@ -219,27 +228,18 @@ export async function dubProcessor(job: Job<JobPayload>) {
     await job.updateProgress(95);
 
     const outKey = `outputs/${job.data.userId}/${video.id}/${job.data.jobId}-dub.mp4`;
-    const { size } = await stat(outPath);
-    await getR2().send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET!,
-        Key: outKey,
-        Body: createReadStream(outPath),
-        ContentType: "video/mp4",
-        ContentLength: size,
-      }),
-    );
+    const { sizeBytes } = await uploadToR2(outKey, outPath, "video/mp4");
 
     await db
       .update(jobs)
-      .set({ result: { r2Key: outKey, sizeBytes: size }, costUsdMicros })
+      .set({ result: { r2Key: outKey, sizeBytes }, costUsdMicros })
       .where(eq(jobs.id, job.data.jobId));
 
     logger.info(
       { jobId: job.data.jobId, outKey, segments: segments.length, voice, costUsdMicros },
       "dub done",
     );
-    return { r2Key: outKey, sizeBytes: size };
+    return { r2Key: outKey, sizeBytes };
   } finally {
     await cleanupJobDir(job.data.jobId);
   }

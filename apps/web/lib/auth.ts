@@ -21,6 +21,11 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     },
   },
+  // email + mật khẩu: đăng nhập được từ điện thoại/LAN (Google OAuth kén redirect URI)
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 6,
+  },
   user: {
     additionalFields: {
       creditBalance: {
@@ -45,5 +50,3 @@ export const auth = betterAuth({
   },
   plugins: [nextCookies()],
 });
-
-export type Session = typeof auth.$Infer.Session;

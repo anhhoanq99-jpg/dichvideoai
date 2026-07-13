@@ -1,7 +1,7 @@
 import { createDb, usageEvents } from "@dichvideo/db";
 
 export interface UsageRecord {
-  provider: "groq" | "gemini" | "azure-tts" | "r2";
+  provider: "groq" | "gemini" | "azure-tts" | "eleven" | "gcloud" | "r2";
   metric: "tokens_in" | "tokens_out" | "audio_sec" | "chars" | "bytes";
   quantity: number;
   costUsdMicros: number;

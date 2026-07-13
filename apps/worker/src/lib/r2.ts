@@ -1,8 +1,8 @@
-import { createWriteStream } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Readable } from "node:stream";
 import os from "node:os";
 
@@ -44,4 +44,23 @@ export async function downloadFromR2(key: string, destPath: string): Promise<voi
   );
   if (!res.Body) throw new Error(`R2 object empty: ${key}`);
   await pipeline(res.Body as Readable, createWriteStream(destPath));
+}
+
+/** Upload file kết quả (render/dub) lên R2; trả về kích thước file. */
+export async function uploadToR2(
+  key: string,
+  filePath: string,
+  contentType: string,
+): Promise<{ sizeBytes: number }> {
+  const { size } = await stat(filePath);
+  await getR2().send(
+    new PutObjectCommand({
+      Bucket: requireEnv("R2_BUCKET"),
+      Key: key,
+      Body: createReadStream(filePath),
+      ContentType: contentType,
+      ContentLength: size,
+    }),
+  );
+  return { sizeBytes: size };
 }

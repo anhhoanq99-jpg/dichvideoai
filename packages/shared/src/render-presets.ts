@@ -135,6 +135,23 @@ export interface LogoParams {
   color: string;
   /** 0..100 */
   opacity: number;
+  /** vị trí tự do 0..1 (phần của khoảng trống còn lại) — ghi đè position góc */
+  fx?: number;
+  fy?: number;
+}
+
+/** Watermark HÌNH ẢNH (PNG/JPG user upload lên R2) chèn vào video. */
+export interface LogoImageParams {
+  /** key R2 của file logo đã upload (logos/{userId}/...) */
+  r2Key: string;
+  position: LogoPosition;
+  /** % chiều rộng video xuất (3..60) */
+  scalePct: number;
+  /** 0..100 */
+  opacity: number;
+  /** vị trí tự do 0..1 (phần của khoảng trống còn lại) — ghi đè position góc */
+  fx?: number;
+  fy?: number;
 }
 
 export interface RenderParams extends StyleOverrides {
@@ -144,6 +161,8 @@ export interface RenderParams extends StyleOverrides {
   coverMode: CoverMode;
   /** manual cover regions — blurred/boxed for the whole duration */
   regions?: CoverRegion[];
+  /** 1..10 — mức làm mờ vùng che (mặc định 5) */
+  blurStrength?: number;
   /**
    * Normalized (0..1, source space) box where subtitles render: text centers
    * horizontally inside it, bottom-anchored at its lower edge, wraps to its
@@ -152,4 +171,6 @@ export interface RenderParams extends StyleOverrides {
   subBox?: CoverRegion;
   /** watermark chữ của người dùng chèn lên video */
   logo?: LogoParams;
+  /** watermark hình ảnh (thay cho logo chữ) */
+  logoImage?: LogoImageParams;
 }

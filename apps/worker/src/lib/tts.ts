@@ -3,7 +3,12 @@ import path from "node:path";
 import { GoogleGenAI } from "@google/genai";
 import { UnrecoverableError } from "bullmq";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
-import { geminiVoiceName, pcmToWav } from "@dichvideo/shared";
+import {
+  elevenVoiceId,
+  gcloudVoiceName,
+  geminiVoiceName,
+  pcmToWav,
+} from "@dichvideo/shared";
 import {
   dailyQuotaMessage,
   isDailyQuotaError,
@@ -81,23 +86,123 @@ export async function synthesizeGeminiClip(input: {
   const file = path.join(input.dir, `${input.name}.wav`);
   await writeFile(file, pcmToWav(Buffer.from(data, "base64")));
 
-  const inTok = res.usageMetadata?.promptTokenCount ?? 0;
-  const outTok = res.usageMetadata?.candidatesTokenCount ?? 0;
+  const inputTokens = res.usageMetadata?.promptTokenCount ?? 0;
+  const outputTokens = res.usageMetadata?.candidatesTokenCount ?? 0;
   return {
     file,
     usage: [
       {
         provider: "gemini",
         metric: "tokens_in",
-        quantity: inTok,
-        costUsdMicros: inTok * PRICING.geminiTtsInPerTok,
+        quantity: inputTokens,
+        costUsdMicros: inputTokens * PRICING.geminiTtsInPerTok,
       },
       {
         provider: "gemini",
         metric: "tokens_out",
-        quantity: outTok,
-        costUsdMicros: outTok * PRICING.geminiTtsOutPerTok,
+        quantity: outputTokens,
+        costUsdMicros: outputTokens * PRICING.geminiTtsOutPerTok,
       },
+    ],
+  };
+}
+
+/**
+ * Sinh 1 clip bằng ElevenLabs (model multilingual, đọc được tiếng Việt).
+ * Cần ELEVENLABS_API_KEY — gói free ~10.000 credits/tháng (~10 phút).
+ */
+export async function synthesizeElevenClip(input: {
+  text: string;
+  /** voice_id thật của ElevenLabs, vd Adam = "pNInz6obpgDQGcFmaJgB" */
+  voiceId: string;
+  dir: string;
+  name: string;
+}): Promise<{ file: string; usage: UsageRecord[] }> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    throw new UnrecoverableError(
+      "Giọng ElevenLabs cần ELEVENLABS_API_KEY (đăng ký free tại elevenlabs.io) — thêm vào .env rồi chạy lại.",
+    );
+  }
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${input.voiceId}?output_format=mp3_44100_64`,
+    {
+      method: "POST",
+      headers: { "xi-api-key": apiKey, "content-type": "application/json" },
+      body: JSON.stringify({
+        text: input.text,
+        model_id: process.env.ELEVENLABS_MODEL ?? "eleven_multilingual_v2",
+      }),
+    },
+  );
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    if (res.status === 401 || /quota_exceeded/i.test(detail)) {
+      throw new UnrecoverableError(
+        `ElevenLabs từ chối (hết hạn mức tháng hoặc key sai): ${detail}`,
+      );
+    }
+    throw new Error(`ElevenLabs ${res.status}: ${detail}`);
+  }
+  const file = path.join(input.dir, `${input.name}.mp3`);
+  await writeFile(file, Buffer.from(await res.arrayBuffer()));
+  return {
+    file,
+    usage: [
+      // gói free — chưa tính chi phí; đổi khi lên gói trả phí
+      { provider: "eleven", metric: "chars", quantity: input.text.length, costUsdMicros: 0 },
+    ],
+  };
+}
+
+/**
+ * Sinh 1 clip bằng Google Cloud TTS (8 giọng tiếng Việt Wavenet/Standard).
+ * Cần GOOGLE_TTS_API_KEY — free 1tr ký tự Wavenet + 4tr Standard mỗi tháng.
+ */
+export async function synthesizeGCloudClip(input: {
+  text: string;
+  /** tên voice thật, vd "vi-VN-Wavenet-A" */
+  voiceName: string;
+  /** 0.8 .. 1.3 — Google hỗ trợ speakingRate nên bake luôn */
+  speed: number;
+  dir: string;
+  name: string;
+}): Promise<{ file: string; usage: UsageRecord[] }> {
+  const apiKey = process.env.GOOGLE_TTS_API_KEY;
+  if (!apiKey) {
+    throw new UnrecoverableError(
+      "Giọng Google Cloud cần GOOGLE_TTS_API_KEY (bật Text-to-Speech API trong Google Cloud Console) — thêm vào .env rồi chạy lại.",
+    );
+  }
+  const languageCode = input.voiceName.split("-").slice(0, 2).join("-");
+  const res = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        input: { text: input.text },
+        voice: { languageCode, name: input.voiceName },
+        audioConfig: { audioEncoding: "MP3", speakingRate: input.speed },
+      }),
+    },
+  );
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    if (res.status === 403) {
+      throw new UnrecoverableError(`Google Cloud TTS từ chối key: ${detail}`);
+    }
+    throw new Error(`Google Cloud TTS ${res.status}: ${detail}`);
+  }
+  const data = (await res.json()) as { audioContent?: string };
+  if (!data.audioContent) throw new Error("Google Cloud TTS không trả về audio");
+  const file = path.join(input.dir, `${input.name}.mp3`);
+  await writeFile(file, Buffer.from(data.audioContent, "base64"));
+  return {
+    file,
+    usage: [
+      // trong hạn mức free hằng tháng — chưa tính chi phí
+      { provider: "gcloud", metric: "chars", quantity: input.text.length, costUsdMicros: 0 },
     ],
   };
 }
@@ -106,8 +211,9 @@ const MAX_TTS_RETRIES = 6;
 
 /**
  * Sinh clip theo id giọng bất kỳ: "gemini:Xxx" → Gemini TTS (trả phí),
+ * "eleven:Xxx" → ElevenLabs, "gcloud:Xxx" → Google Cloud TTS,
  * còn lại → Edge TTS (miễn phí). Retry quanh lỗi mạng; gặp 429 thì chờ
- * đúng thời gian Google yêu cầu rồi thử lại.
+ * đúng thời gian provider yêu cầu rồi thử lại.
  */
 export async function synthesizeClipWithRetry(input: {
   text: string;
@@ -117,6 +223,8 @@ export async function synthesizeClipWithRetry(input: {
   name: string;
 }): Promise<{ file: string; usage: UsageRecord[] }> {
   const gemini = geminiVoiceName(input.voice);
+  const eleven = elevenVoiceId(input.voice);
+  const gcloud = gcloudVoiceName(input.voice);
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
@@ -128,9 +236,28 @@ export async function synthesizeClipWithRetry(input: {
           name: input.name,
         });
       }
+      if (eleven) {
+        return await synthesizeElevenClip({
+          text: input.text,
+          voiceId: eleven,
+          dir: input.dir,
+          name: input.name,
+        });
+      }
+      if (gcloud) {
+        return await synthesizeGCloudClip({
+          text: input.text,
+          voiceName: gcloud,
+          speed: input.speed,
+          dir: input.dir,
+          name: input.name,
+        });
+      }
       return { file: await synthesizeClip(input), usage: [] };
     } catch (err) {
-      // hết hạn mức NGÀY của Gemini free tier → dừng hẳn, không retry, không đợi BullMQ thử lại
+      // lỗi không cứu được (thiếu key, hết hạn mức tháng...) → dừng hẳn, không retry
+      if (err instanceof UnrecoverableError) throw err;
+      // hết hạn mức NGÀY của Gemini free tier → dừng hẳn, không đợi BullMQ thử lại
       if (isDailyQuotaError(err)) {
         throw new UnrecoverableError(dailyQuotaMessage());
       }

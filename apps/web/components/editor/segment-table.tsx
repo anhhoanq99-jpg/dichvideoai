@@ -2,10 +2,29 @@
 
 import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { X } from "lucide-react";
 import type { SubtitleSegment } from "@dichvideo/shared";
+import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-function fmt(ms: number) {
+const T = {
+  vi: {
+    cpsOk: "Tốc độ đọc ổn",
+    cpsWarn: (limit: number) =>
+      `Quá ${limit} ký tự/giây — người xem khó đọc kịp, nên rút gọn câu`,
+    chars: "ký tự",
+    deleteRow: "Xóa dòng này",
+  },
+  en: {
+    cpsOk: "Reading speed OK",
+    cpsWarn: (limit: number) =>
+      `Over ${limit} chars/second — viewers can't keep up, consider shortening`,
+    chars: "chars",
+    deleteRow: "Delete this line",
+  },
+} as const;
+
+function formatTimestamp(ms: number) {
   const m = Math.floor(ms / 60_000);
   const s = Math.floor((ms % 60_000) / 1000);
   const milli = Math.floor((ms % 1000) / 100);
@@ -28,6 +47,9 @@ interface SegmentTableProps {
   autoScroll: boolean;
   onEdit: (i: number, text: string) => void;
   onRowClick: (startMs: number) => void;
+  /** có truyền → hiện nút xóa từng dòng */
+  onDelete?: (i: number) => void;
+  lang?: Lang;
 }
 
 export function SegmentTable({
@@ -37,14 +59,17 @@ export function SegmentTable({
   autoScroll,
   onEdit,
   onRowClick,
+  onDelete,
+  lang = "vi",
 }: SegmentTableProps) {
+  const t = T[lang];
   const parentRef = useRef<HTMLDivElement>(null);
   const originalByI = new Map(original.map((s) => [s.i, s.text]));
 
   const virtualizer = useVirtualizer({
     count: translated.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 88,
+    estimateSize: () => 108,
     overscan: 10,
   });
 
@@ -55,7 +80,7 @@ export function SegmentTable({
   }, [activeIndex, autoScroll, virtualizer]);
 
   return (
-    <div ref={parentRef} className="h-full overflow-y-auto">
+    <div ref={parentRef} className="h-full overflow-y-auto p-2">
       <div
         style={{ height: virtualizer.getTotalSize(), position: "relative" }}
         className="w-full"
@@ -75,31 +100,32 @@ export function SegmentTable({
                 width: "100%",
                 transform: `translateY(${row.start}px)`,
               }}
-              className={cn(
-                "border-b border-neutral-100 px-3 py-2 dark:border-neutral-800",
-                isActive && "bg-indigo-50/70 dark:bg-indigo-950/30",
-              )}
+              className="px-1 py-1"
             >
+              <div
+                className={cn(
+                  "rounded-xl border px-3 py-2 transition-colors",
+                  isActive
+                    ? "border-primary-400 bg-primary-50/70 shadow-sm shadow-primary-500/10 dark:border-primary-700 dark:bg-primary-950/30"
+                    : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:border-neutral-700",
+                )}
+              >
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => onRowClick(seg.startMs)}
-                  className="font-mono text-xs text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  className="font-mono text-xs text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400"
                 >
-                  #{row.index + 1} · {fmt(seg.startMs)} → {fmt(seg.endMs)} ·{" "}
+                  #{row.index + 1} · {formatTimestamp(seg.startMs)} → {formatTimestamp(seg.endMs)} ·{" "}
                   {seg.endMs - seg.startMs}ms
                 </button>
                 {(() => {
-                  const v = cps(seg);
-                  if (v === null) return null;
-                  const slow = v <= CPS_WARN;
+                  const charsPerSec = cps(seg);
+                  if (charsPerSec === null) return null;
+                  const slow = charsPerSec <= CPS_WARN;
                   return (
                     <span
-                      title={
-                        slow
-                          ? "Tốc độ đọc ổn"
-                          : `Quá ${CPS_WARN} ký tự/giây — người xem khó đọc kịp, nên rút gọn câu`
-                      }
+                      title={slow ? t.cpsOk : t.cpsWarn(CPS_WARN)}
                       className={cn(
                         "shrink-0 font-mono text-[10px]",
                         slow
@@ -107,10 +133,20 @@ export function SegmentTable({
                           : "font-semibold text-red-500",
                       )}
                     >
-                      {seg.text.replace(/\s/g, "").length} ký tự · {v} C/S
+                      {seg.text.replace(/\s/g, "").length} {t.chars} · {charsPerSec} C/S
                     </span>
                   );
                 })()}
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(seg.i)}
+                    title={t.deleteRow}
+                    className="shrink-0 rounded p-0.5 text-neutral-300 hover:bg-red-50 hover:text-red-600 dark:text-neutral-600 dark:hover:bg-red-950/40"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
               <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
                 {originalByI.get(seg.i) ?? ""}
@@ -119,8 +155,9 @@ export function SegmentTable({
                 value={seg.text}
                 onChange={(e) => onEdit(seg.i, e.target.value)}
                 rows={Math.max(1, seg.text.split("\n").length)}
-                className="mt-1 w-full resize-none rounded border border-transparent bg-transparent text-sm leading-snug focus:border-indigo-400 focus:bg-white focus:outline-none dark:focus:bg-neutral-900"
+                className="mt-1 w-full resize-none rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-sm leading-snug focus:border-primary-400 focus:bg-white focus:outline-none dark:focus:bg-neutral-900"
               />
+              </div>
             </div>
           );
         })}

@@ -1,63 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
-import { isDailyQuotaError, withGeminiRetry } from "./gemini-limits";
+import { isDailyQuotaError, rateLimitDelayMs, withGeminiRetry } from "./gemini-limits";
+import { POLISH_STYLES, STYLE_INSTRUCTIONS } from "./translation-style-prompts";
 import { PRICING, type UsageRecord } from "./usage";
 
 export type TranslationStyle = TranslationStyleId;
 
-const STYLE_INSTRUCTIONS: Record<TranslationStyle, string> = {
-  natural:
-    "Dịch như người Việt NÓI CHUYỆN thật ngoài đời, không phải văn viết. Yêu cầu:\n" +
-    "- Dịch theo Ý, tuyệt đối không dịch từng từ theo cấu trúc câu gốc (tránh kiểu 'Google dịch' lủng củng).\n" +
-    "- Dùng từ ngữ đời thường, trợ từ tự nhiên (à, nhé, đấy, thôi, mà, cơ, hả...) đúng chỗ.\n" +
-    "- Đảo lại trật tự câu cho đúng cách người Việt diễn đạt; câu ngắn gọn như lời thoại phim lồng tiếng.\n" +
-    "- Giữ đúng cảm xúc: giận thì gắt, đùa thì tếu, buồn thì trầm — chọn từ theo sắc thái nhân vật.\n" +
-    "- Thành ngữ/tục ngữ gốc → thay bằng thành ngữ Việt tương đương, không dịch nghĩa đen.\n" +
-    "Ví dụ mức chất lượng yêu cầu (tự đặt, minh họa cách diễn đạt):\n" +
-    '- DỞ: "Tôi không thể tin điều này đang xảy ra" → HAY: "Không thể tin nổi luôn á!"\n' +
-    '- DỞ: "Bạn có muốn đi cùng với tôi không?" → HAY: "Đi với tớ không?"\n' +
-    '- DỞ: "Điều đó không phải là vấn đề của tôi" → HAY: "Việc đó đâu liên quan gì đến tôi."',
-  "gioi-tre":
-    "Dịch theo phong cách GIỚI TRẺ Việt Nam trên mạng xã hội: hài hước, tếu táo, cà khịa nhẹ nhàng đúng lúc. " +
-    "Dùng từ lóng/từ hot phổ biến (xỉu ngang, ảo thật đấy, đỉnh nóc, ét ô ét, u là trời, khum, chằm Zn...) NHƯNG đúng ngữ cảnh và không lạm dụng đến mức khó hiểu hay sai nghĩa. " +
-    "Câu ngắn, giọng vui, có thể chêm biểu cảm khi phù hợp. Vẫn giữ đúng ý gốc.",
-  "review-phim":
-    "Dịch theo giọng THUYẾT MINH REVIEW PHIM: lôi cuốn, li kỳ, giữ chân người xem. " +
-    "Kể lại lời thoại mạch lạc, nhấn vào diễn biến và cảm xúc nhân vật, tạo cảm giác tò mò muốn xem tiếp. Bám sát nội dung, không bịa thêm tình tiết.",
-  "ngan-gon":
-    "Dịch NGẮN GỌN tối đa: giữ trọn ý chính, cắt mọi từ thừa, câu càng ngắn càng tốt để người xem đọc kịp. Ưu tiên từ đơn giản, dễ hiểu.",
-  "co-trang":
-    "Dịch theo văn phong CỔ TRANG / KIẾM HIỆP: xưng hô ta - ngươi, huynh - đệ, tỷ - muội, tại hạ, các hạ... đúng vai vế nhân vật. " +
-    "Dùng từ Hán Việt hợp bối cảnh (công tử, cô nương, sư phụ, giang hồ, võ công...), giọng trang nhã có chất thơ nhưng vẫn dễ hiểu với khán giả Việt.",
-  "ngon-tinh":
-    "Dịch theo văn phong NGÔN TÌNH: giàu cảm xúc, kịch tính, lãng mạn, sến nhẹ đúng chất phim tình cảm. " +
-    "Xưng hô tình cảm hợp quan hệ nhân vật (anh - em, chàng - nàng...), câu thoại da diết ở cảnh xúc động, gắt gỏng có kịch tính ở cảnh mâu thuẫn.",
-  "tam-trang":
-    "Dịch theo giọng TÂM TRẠNG / TRIẾT LÝ: sâu lắng, đồng cảm, chữa lành. " +
-    "Câu chữ nhẹ nhàng, giàu suy ngẫm, chọn từ tinh tế truyền tải cảm xúc; tránh khẩu ngữ suồng sã.",
-  "khoa-hoc":
-    "Dịch nội dung KHOA HỌC / KỸ THUẬT: thuật ngữ chính xác và nhất quán (giữ nguyên thuật ngữ tiếng Anh thông dụng nếu dịch ra sẽ khó hiểu), " +
-    "diễn đạt gần gũi, sinh động, dễ hiểu với người xem phổ thông.",
-  "hanh-dong":
-    "Dịch theo phong cách HÀNH ĐỘNG / KỊCH TÍNH: câu ngắn, nhanh, mạnh, dồn dập. Lời thoại dứt khoát, khẩu lệnh gọn sắc, giữ nhịp căng thẳng của cảnh phim.",
-  formal: "Dịch trang trọng, lịch sự, phù hợp nội dung tài liệu/tin tức.",
-  literal: "Dịch sát nghĩa nhất có thể, ưu tiên độ chính xác hơn độ mượt.",
-  custom: "", // thay bằng prompt người dùng nhập lúc chạy
-};
-
-/** Các style thiên văn nói — chạy thêm pass biên tập cho mượt. */
-const POLISH_STYLES: TranslationStyle[] = [
-  "natural",
-  "gioi-tre",
-  "ngon-tinh",
-  "co-trang",
-];
-
 const CHUNK_SIZE = 60;
 const CONTEXT_LINES = 5;
 const MAX_RETRIES = 2;
+const GROQ_MAX_RETRIES = 4;
 
 const RESPONSE_SCHEMA = {
   type: "array",
@@ -76,92 +31,201 @@ export interface TranslateResult {
   usage: UsageRecord[];
 }
 
-interface Ctx {
-  ai: GoogleGenAI;
-  model: string;
+interface TranslateContext {
+  gemini: GoogleGenAI | null;
+  groq: Groq | null;
+  /** provider đang dùng — tự hạ từ gemini xuống groq khi hết hạn mức ngày */
+  provider: "gemini" | "groq";
+  geminiModel: string;
+  groqModel: string;
   usage: UsageRecord[];
 }
 
-function track(ctx: Ctx, res: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }) {
-  const inTok = res.usageMetadata?.promptTokenCount ?? 0;
-  const outTok = res.usageMetadata?.candidatesTokenCount ?? 0;
+interface GenerateOptions {
+  system?: string;
+  prompt: string;
+  /** true → bắt model trả JSON danh sách dòng dịch */
+  json: boolean;
+  temperature: number;
+}
+
+function recordGeminiUsage(
+  ctx: TranslateContext,
+  res: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } },
+) {
+  const inputTokens = res.usageMetadata?.promptTokenCount ?? 0;
+  const outputTokens = res.usageMetadata?.candidatesTokenCount ?? 0;
   ctx.usage.push(
     {
       provider: "gemini",
       metric: "tokens_in",
-      quantity: inTok,
-      costUsdMicros: inTok * PRICING.gemini25FlashInPerTok,
+      quantity: inputTokens,
+      costUsdMicros: inputTokens * PRICING.gemini25FlashInPerTok,
     },
     {
       provider: "gemini",
       metric: "tokens_out",
-      quantity: outTok,
-      costUsdMicros: outTok * PRICING.gemini25FlashOutPerTok,
+      quantity: outputTokens,
+      costUsdMicros: outputTokens * PRICING.gemini25FlashOutPerTok,
     },
   );
+}
+
+function recordGroqUsage(
+  ctx: TranslateContext,
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null,
+) {
+  // gói miễn phí của Groq — không tính chi phí
+  ctx.usage.push(
+    {
+      provider: "groq",
+      metric: "tokens_in",
+      quantity: usage?.prompt_tokens ?? 0,
+      costUsdMicros: 0,
+    },
+    {
+      provider: "groq",
+      metric: "tokens_out",
+      quantity: usage?.completion_tokens ?? 0,
+      costUsdMicros: 0,
+    },
+  );
+}
+
+async function generateGemini(ctx: TranslateContext, opts: GenerateOptions) {
+  const res = await withGeminiRetry(opts.json ? "translate" : "story-brief", () =>
+    ctx.gemini!.models.generateContent({
+      model: ctx.geminiModel,
+      contents: opts.prompt,
+      config: {
+        ...(opts.system ? { systemInstruction: opts.system } : {}),
+        ...(opts.json
+          ? { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA }
+          : {}),
+        temperature: opts.temperature,
+      },
+    }),
+  );
+  recordGeminiUsage(ctx, res);
+  return res.text ?? "";
+}
+
+async function generateGroq(ctx: TranslateContext, opts: GenerateOptions) {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= GROQ_MAX_RETRIES; attempt++) {
+    try {
+      const res = await ctx.groq!.chat.completions.create({
+        model: ctx.groqModel,
+        temperature: opts.temperature,
+        ...(opts.json ? { response_format: { type: "json_object" as const } } : {}),
+        messages: [
+          ...(opts.system
+            ? [{ role: "system" as const, content: opts.system }]
+            : []),
+          {
+            role: "user" as const,
+            content: opts.json
+              ? `${opts.prompt}\n\nTrả về DUY NHẤT một JSON object dạng {"lines":[{"i":<số thứ tự giữ nguyên>,"text":"<bản dịch>"},...]}, không thêm chữ nào khác.`
+              : opts.prompt,
+          },
+        ],
+      });
+      recordGroqUsage(ctx, res.usage);
+      return res.choices[0]?.message?.content ?? "";
+    } catch (err) {
+      lastErr = err;
+      const wait = rateLimitDelayMs(err) ?? 2000 * (attempt + 1);
+      logger.warn(
+        { attempt, waitMs: wait, err: String(err).slice(0, 200) },
+        "groq call retrying",
+      );
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+  throw new Error(
+    `Groq thất bại sau ${GROQ_MAX_RETRIES + 1} lần: ${lastErr instanceof Error ? lastErr.message : lastErr}`,
+  );
+}
+
+function isGeminiUnavailable(err: unknown) {
+  // UnrecoverableError = hết hạn mức ngày / hết tiền trả trước (fail nhanh từ withGeminiRetry)
+  return (
+    (err instanceof Error && err.name === "UnrecoverableError") ||
+    isDailyQuotaError(err)
+  );
+}
+
+/**
+ * Gọi model đang chọn. Gemini lỗi (hết hạn mức ngày, hết tiền trả trước,
+ * hay lỗi dai dẳng sau khi đã retry) mà có key Groq → tự chuyển sang Groq
+ * (Llama, miễn phí) cho phần còn lại của job thay vì fail.
+ */
+async function generate(ctx: TranslateContext, opts: GenerateOptions) {
+  if (ctx.provider === "gemini") {
+    try {
+      return await generateGemini(ctx, opts);
+    } catch (err) {
+      if (!ctx.groq) throw err;
+      ctx.provider = "groq";
+      logger.warn(
+        { groqModel: ctx.groqModel, err: String(err).slice(0, 200) },
+        "Gemini không dùng được — tự chuyển sang Groq (miễn phí) cho job này",
+      );
+    }
+  }
+  return generateGroq(ctx, opts);
 }
 
 /**
  * Global-context pass: read ALL source lines once, produce a brief the
  * translator uses for consistent pronouns, tone and terminology.
  */
-async function buildStoryBrief(ctx: Ctx, segments: SubtitleSegment[]): Promise<string> {
+async function buildStoryBrief(ctx: TranslateContext, segments: SubtitleSegment[]): Promise<string> {
   const fullText = segments.map((s) => s.text).join("\n").slice(0, 100_000);
   try {
-    const res = await withGeminiRetry("story-brief", () =>
-      ctx.ai.models.generateContent({
-        model: ctx.model,
-        contents:
-          "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
-          "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
-          "2. Các nhân vật chính và QUAN HỆ giữa họ → đề xuất cách xưng hô tiếng Việt cho từng cặp (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
-          "3. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
-          "Chỉ trả về nội dung tóm tắt, tối đa 300 từ.\n\n" +
-          fullText,
-        config: { temperature: 0.2 },
-      }),
-    );
-    track(ctx, res);
-    return res.text?.trim() ?? "";
+    const text = await generate(ctx, {
+      prompt:
+        "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
+        "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
+        "2. Các nhân vật chính và QUAN HỆ giữa họ → đề xuất cách xưng hô tiếng Việt cho từng cặp (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
+        "3. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
+        "Chỉ trả về nội dung tóm tắt, tối đa 300 từ.\n\n" +
+        fullText,
+      json: false,
+      temperature: 0.2,
+    });
+    return text.trim();
   } catch (err) {
-    // hết hạn mức ngày thì các bước sau cũng sẽ chết — dừng luôn cho job fail sạch
-    if (err instanceof Error && err.name === "UnrecoverableError") throw err;
-    if (isDailyQuotaError(err)) throw err;
+    // Gemini chết hẳn (và không có Groq dự phòng) → dừng luôn cho job fail sạch
+    if (isGeminiUnavailable(err)) throw err;
     logger.warn({ err: String(err) }, "story brief failed — translating without it");
     return "";
   }
 }
 
 async function structuredCall(
-  ctx: Ctx,
+  ctx: TranslateContext,
   system: string,
   prompt: string,
   expected: { i: number }[],
 ): Promise<Map<number, string>> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    // withGeminiRetry: chờ đúng delay khi chạm hạn mức phút, fail ngay khi hết hạn mức ngày
-    const res = await withGeminiRetry("translate", () =>
-      ctx.ai.models.generateContent({
-        model: ctx.model,
-        contents: prompt,
-        config: {
-          systemInstruction: system,
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-          temperature: 0.3,
-        },
-      }),
-    );
-    track(ctx, res);
+    const text = await generate(ctx, { system, prompt, json: true, temperature: 0.3 });
     try {
-      const rows = JSON.parse(res.text ?? "[]") as { i: number; text: string }[];
-      const byId = new Map(rows.map((r) => [r.i, r.text]));
-      const missing = expected.filter((s) => !byId.get(s.i)?.trim());
+      // Gemini trả mảng theo schema; Groq (json_object) trả {"lines":[...]}
+      const parsed = JSON.parse(text || "[]") as unknown;
+      const rows = (
+        Array.isArray(parsed)
+          ? parsed
+          : ((parsed as { lines?: unknown }).lines ?? [])
+      ) as { i: number; text: string }[];
+      const textByIndex = new Map(rows.map((r) => [r.i, r.text]));
+      const missing = expected.filter((s) => !textByIndex.get(s.i)?.trim());
       if (missing.length > 0) {
         throw new Error(`thiếu ${missing.length} dòng (i=${missing[0].i}…)`);
       }
-      return byId;
+      return textByIndex;
     } catch (err) {
       lastErr = err;
     }
@@ -184,11 +248,19 @@ export async function translateSegments(
   },
   onProgress: (pct: number) => void,
 ): Promise<TranslateResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình");
-  const ctx: Ctx = {
-    ai: new GoogleGenAI({ apiKey }),
-    model: input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-2.5-flash",
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!geminiKey && !groqKey) {
+    throw new Error("Chưa cấu hình GEMINI_API_KEY hoặc GROQ_API_KEY");
+  }
+  const ctx: TranslateContext = {
+    gemini: geminiKey ? new GoogleGenAI({ apiKey: geminiKey }) : null,
+    groq: groqKey ? new Groq({ apiKey: groqKey }) : null,
+    // ưu tiên Gemini (chất lượng dịch tốt hơn); thiếu key → chạy thẳng Groq
+    provider: geminiKey ? "gemini" : "groq",
+    geminiModel:
+      input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-2.5-flash",
+    groqModel: process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile",
     usage: [],
   };
 
@@ -234,14 +306,14 @@ export async function translateSegments(
           )}\n\n`
         : "";
     const payload = JSON.stringify(chunk.map((s) => ({ i: s.i, text: s.text })));
-    const byId = await structuredCall(
+    const textByIndex = await structuredCall(
       ctx,
       system,
       `${contextBlock}Dịch các dòng phụ đề sau sang ${langName}:\n${payload}`,
       chunk,
     );
     for (const seg of chunk) {
-      translated.push({ ...seg, text: byId.get(seg.i)!.trim() });
+      translated.push({ ...seg, text: textByIndex.get(seg.i)!.trim() });
     }
     onProgress(5 + Math.round(((chunkIdx + 1) / chunks.length) * 55));
   }
@@ -260,14 +332,14 @@ export async function translateSegments(
         slice.map((s, k) => ({ i: s.i, goc: chunk[k].text, viet: s.text })),
       );
       try {
-        const byId = await structuredCall(
+        const textByIndex = await structuredCall(
           ctx,
           polishSystem,
           `Biên tập các dòng sau (trả về bản dịch ${langName} cuối cùng cho từng i):\n${payload}`,
           chunk,
         );
         for (const seg of slice) {
-          const polished = byId.get(seg.i)?.trim();
+          const polished = textByIndex.get(seg.i)?.trim();
           if (polished) seg.text = polished;
         }
       } catch (err) {

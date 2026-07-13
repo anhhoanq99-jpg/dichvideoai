@@ -22,6 +22,7 @@ export const videoStatus = pgEnum("video_status", [
 export const subtitleKind = pgEnum("subtitle_kind", ["original", "translated"]);
 
 export const jobType = pgEnum("job_type", [
+  "import",
   "probe",
   "stt",
   "ocr",

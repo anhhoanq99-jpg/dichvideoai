@@ -1,8 +1,63 @@
 @import "tailwindcss";
 
+/* dark theo class .dark của next-themes (nhớ lựa chọn user) thay vì theo OS */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Bộ màu thương hiệu — chỉnh MỘT chỗ này là đổi cả trang ----
+   primary: cam san hô "điện ảnh" (CTA, link, tiến độ)
+   accent : tím — các tính năng AI (dịch, giọng cao cấp)
+   success: xanh ngọc — hoàn tất, lồng tiếng, tải về
+   cinema : nền tối ấm của landing page */
+@theme {
+  --color-primary-50: #fef4f0;
+  --color-primary-100: #fde5dc;
+  --color-primary-200: #fbc8b8;
+  --color-primary-300: #f8a288;
+  --color-primary-400: #f47454;
+  --color-primary-500: #ee5631;
+  --color-primary-600: #d94318;
+  --color-primary-700: #b53512;
+  --color-primary-800: #912d14;
+  --color-primary-900: #762a15;
+  --color-primary-950: #401208;
+
+  --color-accent-50: #f7f2ff;
+  --color-accent-100: #eee4ff;
+  --color-accent-200: #ddccff;
+  --color-accent-300: #c4a5fb;
+  --color-accent-400: #a878f5;
+  --color-accent-500: #8f4fec;
+  --color-accent-600: #7c3add;
+  --color-accent-700: #6a28c4;
+  --color-accent-800: #5922a0;
+  --color-accent-900: #4a1e82;
+  --color-accent-950: #2e0e58;
+
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b9;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
+  --color-success-950: #022c22;
+
+  --color-cinema: #14100c;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fdfcfb;
+  --foreground: #1c1917;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0f0d0b;
+  --foreground: #efedeb;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +67,134 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* dùng đúng font Geist đã self-host qua next/font (trước đây bị Arial ghi đè) */
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ---- Nền tảng trải nghiệm: bàn phím, hover, chuyển theme mượt ---- */
+
+/* vòng focus rõ ràng cho người dùng bàn phím — mọi phần tử tương tác */
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* link neo (#tinh-nang, #faq...) cuộn mượt — phải đặt trên html, đặt trên div không có tác dụng */
+  html {
+    scroll-behavior: smooth;
+  }
+  /* hover/focus đổi màu chuyển mượt — CHỈ áp lên phần tử tương tác.
+     Trước đây áp lên * (mọi phần tử) khiến bảng phụ đề hàng trăm dòng
+     phải tính transition mỗi lần cuộn/render — gây giật trên máy yếu. */
+  a,
+  label,
+  summary,
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease,
+      box-shadow 0.18s ease,
+      opacity 0.18s ease;
+  }
+  /* đổi dark/light: nền + chữ toàn trang chuyển mượt qua body */
+  body {
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease;
+  }
+  button,
+  [role="button"] {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease,
+      box-shadow 0.18s ease,
+      opacity 0.18s ease,
+      transform 0.1s ease;
+  }
+  /* bấm nút có phản hồi "nhún" nhẹ */
+  button:not(:disabled):active,
+  [role="button"]:active {
+    transform: scale(0.97);
+  }
+}
+
+/* ---- Hiệu ứng landing page (CSS thuần, thay framer-motion) ---- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/* chạy ngay khi tải trang (hero) — delay đặt qua --reveal-delay */
+.animate-fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--reveal-delay, 0s);
+}
+
+/* hiện dần khi cuộn tới — JS chỉ gắn class .is-visible (components/marketing/reveal.tsx) */
+.reveal,
+.stagger-group > * {
+  opacity: 0;
+}
+.reveal.is-visible,
+.stagger-group.is-visible > * {
+  opacity: 1;
+  animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.reveal.is-visible {
+  animation-delay: var(--reveal-delay, 0s);
+}
+.stagger-group.is-visible > *:nth-child(2) { animation-delay: 80ms; }
+.stagger-group.is-visible > *:nth-child(3) { animation-delay: 160ms; }
+.stagger-group.is-visible > *:nth-child(4) { animation-delay: 240ms; }
+.stagger-group.is-visible > *:nth-child(5) { animation-delay: 320ms; }
+.stagger-group.is-visible > *:nth-child(6) { animation-delay: 400ms; }
+.stagger-group.is-visible > *:nth-child(7) { animation-delay: 480ms; }
+.stagger-group.is-visible > *:nth-child(8) { animation-delay: 560ms; }
+
+/* thẻ nâng nhẹ khi rê chuột (chỉ transform — không reflow) */
+.lift {
+  transition: transform 0.2s ease-out;
+}
+.lift:hover {
+  transform: translateY(-5px);
+}
+
+/* glow nền hero "thở" chậm — giữ translateX(-50%) căn giữa */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.06);
+  }
+}
+.animate-glow-pulse {
+  animation: glow-pulse 9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .reveal.is-visible,
+  .stagger-group.is-visible > *,
+  .animate-glow-pulse {
+    animation: none;
+  }
+  .reveal,
+  .stagger-group > * {
+    opacity: 1;
+  }
 }

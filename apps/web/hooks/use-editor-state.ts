@@ -86,6 +86,37 @@ export function useEditorState(
     [persist],
   );
 
+  /** Thêm 1 dòng phụ đề mới tại mốc thời gian (giữ i duy nhất, sắp theo startMs). */
+  const insertSegment = useCallback(
+    (startMs: number) => {
+      setSegments((prev) => {
+        const maxI = prev.reduce((max, s) => Math.max(max, s.i), -1);
+        const next = [
+          ...prev,
+          { i: maxI + 1, startMs, endMs: startMs + 2000, text: "" },
+        ].sort((a, b) => a.startMs - b.startMs);
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  const deleteSegment = useCallback(
+    (i: number) => {
+      setSegments((prev) => {
+        const next = prev.filter((s) => s.i !== i);
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
   const saveNow = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     void persist(segments);
@@ -97,5 +128,13 @@ export function useEditorState(
     };
   }, []);
 
-  return { segments, saveState, updateSegmentText, replaceAll, saveNow };
+  return {
+    segments,
+    saveState,
+    updateSegmentText,
+    insertSegment,
+    deleteSegment,
+    replaceAll,
+    saveNow,
+  };
 }

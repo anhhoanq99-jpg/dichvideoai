@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Sparkles, X } from "lucide-react";
 import {
   TARGET_LANGS,
@@ -8,52 +8,77 @@ import {
   type TargetLangId,
   type TranslationStyleId,
 } from "@dichvideo/shared";
-import { useJobStream } from "@/hooks/use-job-stream";
+import { useJobRunner } from "@/hooks/use-job-runner";
+import { JobError } from "@/components/jobs/job-ui";
+import type { Lang } from "@/lib/i18n";
+import { fieldLabelClass, selectClass } from "@/components/ui/form-styles";
+import { cn } from "@/lib/utils";
+
+const T = {
+  vi: {
+    title: "Dịch lại bằng AI",
+    describeStyle: "Hãy mô tả phong cách dịch bạn muốn",
+    startFail: "Không bắt đầu được",
+    translating: (n: number) => `Đang dịch lại ${n} dòng…`,
+    autoReload: "Xong sẽ tự tải lại trang với bản dịch mới.",
+    targetLang: "Dịch sang",
+    style: "Phong cách dịch",
+    customPh:
+      "Mô tả phong cách bạn muốn, vd: dịch kiểu giọng miền Nam thân mật, xưng tui - bà...",
+    overwriteWarn:
+      "Bản dịch hiện tại (kể cả chỗ bạn đã sửa tay) sẽ bị thay bằng bản dịch mới.",
+    failed: "Dịch thất bại",
+    cancel: "Hủy",
+    retranslateAll: "Dịch lại toàn bộ",
+  },
+  en: {
+    title: "Retranslate with AI",
+    describeStyle: "Please describe the translation style you want",
+    startFail: "Could not start",
+    translating: (n: number) => `Retranslating ${n} lines…`,
+    autoReload: "The page will reload automatically with the new translation.",
+    targetLang: "Translate to",
+    style: "Translation style",
+    customPh:
+      "Describe the style you want, e.g.: casual friendly tone, keep slang natural...",
+    overwriteWarn:
+      "The current translation (including your manual edits) will be replaced by the new one.",
+    failed: "Translation failed",
+    cancel: "Cancel",
+    retranslateAll: "Retranslate all",
+  },
+} as const;
 
 interface RetranslateModalProps {
   videoId: string;
   lineCount: number;
   onClose: () => void;
+  lang?: Lang;
 }
 
 /** Dịch lại toàn bộ bằng AI với phong cách chọn được (ghi đè bản dịch hiện tại). */
-export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateModalProps) {
+export function RetranslateModal({ videoId, lineCount, onClose, lang = "vi" }: RetranslateModalProps) {
+  const t = T[lang];
   const [style, setStyle] = useState<TranslationStyleId>("natural");
   const [targetLang, setTargetLang] = useState<TargetLangId>("vi");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const job = useJobStream(jobId);
-
-  const running =
-    jobId !== null && (!job || job.status === "queued" || job.status === "active");
-
   // bản dịch mới đã lưu server-side — nạp lại trang để đồng bộ editor
-  useEffect(() => {
-    if (job?.status === "done") window.location.reload();
-  }, [job?.status]);
+  const { job, running, error, setError, start } = useJobRunner({ onDone: "reload" });
 
-  async function start() {
-    setError(null);
+  async function startRetranslate() {
     if (style === "custom" && !customPrompt.trim()) {
-      setError("Hãy mô tả phong cách dịch bạn muốn");
+      setError(t.describeStyle);
       return;
     }
-    const res = await fetch(`/api/videos/${videoId}/translate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    await start(
+      `/api/videos/${videoId}/translate`,
+      {
         style,
         targetLang,
         ...(style === "custom" ? { customPrompt: customPrompt.trim() } : {}),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Không bắt đầu được");
-      return;
-    }
-    setJobId(data.jobId);
+      },
+      t.startFail,
+    );
   }
 
   return (
@@ -61,7 +86,7 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
       <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="h-4 w-4 text-violet-500" /> Dịch lại bằng AI
+            <Sparkles className="h-4 w-4 text-accent-500" /> {t.title}
           </h3>
           <button
             type="button"
@@ -77,28 +102,28 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
           <div className="mt-5 space-y-3 text-center">
             <p className="flex items-center justify-center gap-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Đang dịch lại {lineCount} dòng… {job?.progress ?? 0}%
+              {t.translating(lineCount)} {job?.progress ?? 0}%
             </p>
             <div className="h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
               <div
-                className="h-full rounded-full bg-violet-600 transition-all"
+                className="h-full rounded-full bg-accent-600 transition-all"
                 style={{ width: `${job?.progress ?? 0}%` }}
               />
             </div>
             <p className="text-xs text-neutral-400">
-              Xong sẽ tự tải lại trang với bản dịch mới.
+              {t.autoReload}
             </p>
           </div>
         ) : (
           <div className="mt-4 space-y-3">
             <label className="block text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Dịch sang
+              <span className={cn(fieldLabelClass, "font-medium")}>
+                {t.targetLang}
               </span>
               <select
                 value={targetLang}
                 onChange={(e) => setTargetLang(e.target.value as TargetLangId)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                className={cn(selectClass, "mt-1 w-full")}
               >
                 {TARGET_LANGS.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -108,13 +133,13 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
               </select>
             </label>
             <label className="block text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Phong cách dịch
+              <span className={cn(fieldLabelClass, "font-medium")}>
+                {t.style}
               </span>
               <select
                 value={style}
                 onChange={(e) => setStyle(e.target.value as TranslationStyleId)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                className={cn(selectClass, "mt-1 w-full")}
               >
                 {TRANSLATION_STYLES.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -132,20 +157,16 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 rows={3}
-                placeholder="Mô tả phong cách bạn muốn, vd: dịch kiểu giọng miền Nam thân mật, xưng tui - bà..."
+                placeholder={t.customPh}
                 className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
               />
             )}
 
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-              Bản dịch hiện tại (kể cả chỗ bạn đã sửa tay) sẽ bị thay bằng bản dịch mới.
+              {t.overwriteWarn}
             </p>
 
-            {(error || job?.status === "failed") && (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                {error ?? job?.error ?? "Dịch thất bại"}
-              </p>
-            )}
+            <JobError error={error} job={job} fallback={t.failed} />
 
             <div className="flex justify-end gap-2">
               <button
@@ -153,14 +174,14 @@ export function RetranslateModal({ videoId, lineCount, onClose }: RetranslateMod
                 onClick={onClose}
                 className="rounded-md border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-700"
               >
-                Hủy
+                {t.cancel}
               </button>
               <button
                 type="button"
-                onClick={() => void start()}
-                className="rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+                onClick={() => void startRetranslate()}
+                className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
               >
-                Dịch lại toàn bộ
+                {t.retranslateAll}
               </button>
             </div>
           </div>

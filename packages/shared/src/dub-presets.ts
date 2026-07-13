@@ -1,3 +1,5 @@
+import { EDGE_VOICE_IDS } from "./edge-voices";
+
 /** Giọng lồng tiếng — Edge TTS (miễn phí). Provider trả phí thêm sau. */
 export const DUB_VOICES = [
   {
@@ -13,13 +15,6 @@ export const DUB_VOICES = [
     provider: "edge" as const,
   },
 ] as const;
-
-export type DubVoiceId = (typeof DUB_VOICES)[number]["id"];
-
-export const DUB_VOICE_IDS = DUB_VOICES.map((v) => v.id) as [
-  DubVoiceId,
-  ...DubVoiceId[],
-];
 
 /**
  * Giọng cao cấp — Gemini TTS (đa ngôn ngữ, đọc tiếng Việt tự nhiên, diễn cảm).
@@ -51,6 +46,81 @@ export function geminiVoiceName(id: string): string | null {
   return id.startsWith("gemini:") ? id.slice("gemini:".length) : null;
 }
 
+/**
+ * Giọng ElevenLabs (premade, id công khai) — cần ELEVENLABS_API_KEY riêng,
+ * gói free ~10.000 credits/tháng (~10 phút audio). Đọc tiếng Việt qua model
+ * multilingual (giọng gốc tiếng Anh nên có chút accent).
+ */
+// 14 giọng đã kiểm chứng chạy được trên gói FREE (13/07/2026); các giọng
+// premade khác (Rachel, Josh, Domi...) ElevenLabs khóa sau gói trả phí.
+export const ELEVEN_VOICES = [
+  // ---- Nam ----
+  { id: "eleven:pNInz6obpgDQGcFmaJgB", name: "Adam — nam trầm ấm", gender: "M" },
+  { id: "eleven:ErXwobaYiN019PkySvjV", name: "Antoni — nam ấm áp", gender: "M" },
+  { id: "eleven:VR6AewLTigWG4xSOukaG", name: "Arnold — nam mạnh mẽ", gender: "M" },
+  { id: "eleven:nPczCjzI2devNBz1zQrb", name: "Brian — nam trầm tĩnh", gender: "M" },
+  { id: "eleven:N2lVS1w4EtoT3dr4eOWO", name: "Callum — nam khàn cá tính", gender: "M" },
+  { id: "eleven:IKne3meq5aSn9XLyUdCD", name: "Charlie — nam tự nhiên", gender: "M" },
+  { id: "eleven:onwK4e9ZLuTAKqWW03F9", name: "Daniel — nam đọc tin", gender: "M" },
+  { id: "eleven:JBFqnCBsd6RMkjVDRZzb", name: "George — nam ấm trầm", gender: "M" },
+  { id: "eleven:SOYHLrjzK2X1ezoPC6cr", name: "Harry — nam trẻ khỏe", gender: "M" },
+  { id: "eleven:TX3LPaxmHKxFdv7VOQHJ", name: "Liam — nam rõ ràng", gender: "M" },
+  // ---- Nữ ----
+  { id: "eleven:Xb7hH8MSUJpSbSDYk0k2", name: "Alice — nữ đọc tin", gender: "F" },
+  { id: "eleven:pFZP5JQG7iQjIQuC4Bku", name: "Lily — nữ ấm áp", gender: "F" },
+  { id: "eleven:XrExE9yKIg1WjnnlVkGX", name: "Matilda — nữ thân thiện", gender: "F" },
+  { id: "eleven:EXAVITQu4vr4xnSDxMaL", name: "Sarah — nữ nhẹ nhàng", gender: "F" },
+] as const;
+
+export const ELEVEN_VOICE_IDS = new Set<string>(ELEVEN_VOICES.map((v) => v.id));
+
+/** "eleven:pNIn..." → voice_id thật gửi cho API ElevenLabs. */
+export function elevenVoiceId(id: string): string | null {
+  return id.startsWith("eleven:") ? id.slice("eleven:".length) : null;
+}
+
+/**
+ * Giọng Google Cloud TTS tiếng Việt — cần GOOGLE_TTS_API_KEY riêng,
+ * free 1 triệu ký tự Wavenet + 4 triệu ký tự Standard mỗi tháng.
+ */
+export const GCLOUD_VOICES = [
+  { id: "gcloud:vi-VN-Wavenet-A", name: "Google Wavenet A — nữ tự nhiên", gender: "F" },
+  { id: "gcloud:vi-VN-Wavenet-B", name: "Google Wavenet B — nam tự nhiên", gender: "M" },
+  { id: "gcloud:vi-VN-Wavenet-C", name: "Google Wavenet C — nữ trầm", gender: "F" },
+  { id: "gcloud:vi-VN-Wavenet-D", name: "Google Wavenet D — nam trầm", gender: "M" },
+  { id: "gcloud:vi-VN-Standard-A", name: "Google Standard A — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Standard-B", name: "Google Standard B — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Standard-C", name: "Google Standard C — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Standard-D", name: "Google Standard D — nam", gender: "M" },
+] as const;
+
+export const GCLOUD_VOICE_IDS = new Set<string>(GCLOUD_VOICES.map((v) => v.id));
+
+/** "gcloud:vi-VN-Wavenet-A" → tên voice thật gửi cho Google Cloud TTS. */
+export function gcloudVoiceName(id: string): string | null {
+  return id.startsWith("gcloud:") ? id.slice("gcloud:".length) : null;
+}
+
+export type VoiceProvider = "edge" | "gemini" | "eleven" | "gcloud";
+
+/** Provider của một id giọng (theo tiền tố) — mặc định edge (không tiền tố). */
+export function voiceProvider(id: string): VoiceProvider {
+  if (id.startsWith("gemini:")) return "gemini";
+  if (id.startsWith("eleven:")) return "eleven";
+  if (id.startsWith("gcloud:")) return "gcloud";
+  return "edge";
+}
+
+/** Id giọng thuộc một trong các catalog đã hỗ trợ — dùng validate mọi API. */
+export function isValidVoiceId(id: string): boolean {
+  return (
+    EDGE_VOICE_IDS.has(id) ||
+    GEMINI_VOICE_IDS.has(id) ||
+    ELEVEN_VOICE_IDS.has(id) ||
+    GCLOUD_VOICE_IDS.has(id)
+  );
+}
+
 export interface DubParams {
   trackId: string;
   /** id giọng Edge TTS bất kỳ trong EDGE_VOICES (322 giọng, đủ mọi quốc gia) */
@@ -61,6 +131,11 @@ export interface DubParams {
   speed: number;
   /** 0 .. 200 (%) — âm lượng giọng AI */
   aiVolume: number;
-  /** 0 .. 100 (%) — âm lượng audio gốc giữ lại (nhạc nền); 0 = tắt tiếng gốc */
+  /** 0 .. 100 (%) — âm lượng audio gốc GIỮA các câu thoại (nhạc nền); 0 = tắt */
   bgVolume: number;
+  /**
+   * 0 .. 100 (%) — âm lượng audio gốc TRONG lúc AI đọc (hạ giọng nói gốc
+   * xuống để không chồng tiếng). Bỏ trống = dùng bgVolume (không hạ thêm).
+   */
+  origVoiceVolume?: number;
 }

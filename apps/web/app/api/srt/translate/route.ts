@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { jobs, subtitleTracks, videos } from "@dichvideo/db";
+import { subtitleTracks, videos } from "@dichvideo/db";
 import {
   TARGET_LANG_IDS,
   TRANSLATION_STYLE_IDS,
   parseSrt,
 } from "@dichvideo/shared";
 import { db } from "@/lib/db";
-import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
+import { createPipelineJob, jsonError, parseJsonBody } from "@/lib/api-helpers";
 
 const schema = z.object({
   fileName: z.string().min(1).max(200),
@@ -26,20 +26,13 @@ const schema = z.object({
  */
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  }
-  const body = schema.safeParse(await req.json().catch(() => null));
-  if (!body.success) {
-    return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
-  }
+  if (!session) return jsonError("Chưa đăng nhập", 401);
+  const body = await parseJsonBody(req, schema);
+  if (body.response) return body.response;
 
   const segments = parseSrt(body.data.content);
   if (segments.length === 0) {
-    return NextResponse.json(
-      { error: "Không đọc được câu phụ đề nào — kiểm tra định dạng .srt/.vtt" },
-      { status: 400 },
-    );
+    return jsonError("Không đọc được câu phụ đề nào — kiểm tra định dạng .srt/.vtt", 400);
   }
 
   const durationSec = Math.ceil((segments[segments.length - 1]?.endMs ?? 0) / 1000);
@@ -68,22 +61,7 @@ export async function POST(req: NextRequest) {
     targetLang: body.data.targetLang,
     ...(body.data.customPrompt ? { customPrompt: body.data.customPrompt } : {}),
   };
-  const [job] = await db
-    .insert(jobs)
-    .values({
-      videoId: video.id,
-      userId: session.user.id,
-      type: "translate",
-      params: jobParams,
-    })
-    .returning();
-
-  await enqueuePipelineJob("translate", {
-    jobId: job.id,
-    videoId: video.id,
-    userId: session.user.id,
-    params: jobParams,
-  });
+  const job = await createPipelineJob("translate", video.id, session.user.id, jobParams);
 
   return NextResponse.json({
     ok: true,

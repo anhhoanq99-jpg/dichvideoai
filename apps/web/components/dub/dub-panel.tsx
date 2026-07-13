@@ -1,254 +1,114 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Download, Loader2, Mic, Play } from "lucide-react";
+import { useState } from "react";
+import { Mic } from "lucide-react";
+import { estimateJobCredits } from "@dichvideo/shared";
+import { useJobRunner } from "@/hooks/use-job-runner";
+import { JobDownloadLink, JobError, JobProgress } from "@/components/jobs/job-ui";
+import { fieldLabelClass } from "@/components/ui/form-styles";
+import type { Lang } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import {
-  DUB_VOICES,
-  EDGE_VOICES,
-  GEMINI_VOICES,
-  estimateJobCredits,
-} from "@dichvideo/shared";
-import { useJobStream } from "@/hooks/use-job-stream";
+  DEFAULT_VOICE_SELECTION,
+  VoicePicker,
+  resolveVoice,
+  type VoiceSelection,
+} from "./voice-picker";
+
+const T = {
+  vi: {
+    title: "Lồng tiếng Việt AI",
+    setup: "Thiết lập lồng tiếng",
+    running: "Đang lồng tiếng…",
+    download: "Tải video đã lồng tiếng",
+    speed: "Tốc độ đọc:",
+    aiVol: "Âm lượng giọng AI:",
+    bgVol: "Âm thanh gốc giữ lại (nhạc nền):",
+    bgVolOff: " — tắt hẳn tiếng gốc",
+    note: "Câu nào dài hơn khoảng trống trên video sẽ tự tăng tốc đọc để khớp thời gian. Hình ảnh giữ nguyên chất lượng (không render lại hình).",
+    startFail: "Không bắt đầu được lồng tiếng",
+    start: "Bắt đầu lồng tiếng",
+    failed: "Lồng tiếng thất bại",
+  },
+  en: {
+    title: "AI Dubbing",
+    setup: "Set up dubbing",
+    running: "Dubbing…",
+    download: "Download dubbed video",
+    speed: "Speaking speed:",
+    aiVol: "AI voice volume:",
+    bgVol: "Original audio kept (background music):",
+    bgVolOff: " — original audio fully off",
+    note: "Lines longer than the available gap are read faster automatically to stay in sync. Picture quality is untouched (no video re-render).",
+    startFail: "Could not start dubbing",
+    start: "Start dubbing",
+    failed: "Dubbing failed",
+  },
+} as const;
 
 interface DubPanelProps {
   videoId: string;
   translatedTrackId: string | null;
   durationSec: number | null;
+  lang?: Lang;
 }
-
-/** Tên quốc gia tiếng Việt từ mã locale ("ja-JP" → "Nhật Bản"). */
-function localeLabel(locale: string): string {
-  const region = locale.split("-").find((p) => /^[A-Z]{2}$/.test(p));
-  try {
-    const name = region
-      ? new Intl.DisplayNames(["vi"], { type: "region" }).of(region)
-      : null;
-    return name ?? locale;
-  } catch {
-    return locale;
-  }
-}
-
-const LOCALES = [...new Set(EDGE_VOICES.map((v) => v.locale))]
-  .map((l) => ({ id: l, label: localeLabel(l) }))
-  .sort((a, b) =>
-    a.id === "vi-VN" ? -1 : b.id === "vi-VN" ? 1 : a.label.localeCompare(b.label, "vi"),
-  );
 
 /** Lồng tiếng AI: giọng thường (322, miễn phí) + giọng cao cấp Gemini, có nghe thử. */
-export function DubPanel({ videoId, translatedTrackId, durationSec }: DubPanelProps) {
+export function DubPanel({ videoId, translatedTrackId, durationSec, lang = "vi" }: DubPanelProps) {
+  const t = T[lang];
   const [open, setOpen] = useState(false);
-  const [provider, setProvider] = useState<"edge" | "gemini">("edge");
-  const [locale, setLocale] = useState("vi-VN");
-  const [gender, setGender] = useState<"all" | "F" | "M">("all");
-  const [voice, setVoice] = useState<string>(DUB_VOICES[0].id);
+  const [selection, setSelection] = useState<VoiceSelection>(DEFAULT_VOICE_SELECTION);
   const [speed, setSpeed] = useState(1);
-  const [previewing, setPreviewing] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [aiVolume, setAiVolume] = useState(100);
   const [bgVolume, setBgVolume] = useState(20);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const job = useJobStream(jobId);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (job?.status === "done") router.refresh();
-  }, [job?.status, router]);
-
-  const voiceOptions = useMemo(() => {
-    if (provider === "gemini") {
-      return GEMINI_VOICES.filter((v) => gender === "all" || v.gender === gender).map(
-        (v) => ({ id: v.id, name: v.name, gender: v.gender }),
-      );
-    }
-    return EDGE_VOICES.filter(
-      (v) => v.locale === locale && (gender === "all" || v.gender === gender),
-    ).map((v) => ({ id: v.id, name: v.name, gender: v.gender }));
-  }, [provider, locale, gender]);
-
-  // đổi bộ lọc → tự chọn giọng đầu tiên còn khớp
-  useEffect(() => {
-    if (voiceOptions.length > 0 && !voiceOptions.some((v) => v.id === voice)) {
-      setVoice(voiceOptions[0].id);
-    }
-  }, [voiceOptions, voice]);
-
-  async function playPreview() {
-    if (previewing) return;
-    setPreviewing(true);
-    setError(null);
-    try {
-      audioRef.current?.pause();
-      const audio = new Audio(`/api/tts-preview?voice=${encodeURIComponent(voice)}`);
-      audioRef.current = audio;
-      audio.onended = () => setPreviewing(false);
-      audio.onerror = () => {
-        setPreviewing(false);
-        setError("Không phát được mẫu giọng — thử lại");
-      };
-      await audio.play();
-    } catch {
-      setPreviewing(false);
-      setError("Không phát được mẫu giọng — thử lại");
-    }
-  }
+  const { job, jobId, running, error, setError, resultKey, start } = useJobRunner();
 
   if (!translatedTrackId) return null;
-
-  const running = job !== null && (job.status === "queued" || job.status === "active");
-  const doneKey = (job?.result as { r2Key?: string } | null)?.r2Key;
-
-  async function start() {
-    setError(null);
-    const res = await fetch(`/api/videos/${videoId}/dub`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        trackId: translatedTrackId,
-        voice,
-        speed,
-        aiVolume,
-        bgVolume,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Không bắt đầu được lồng tiếng");
-      return;
-    }
-    setJobId(data.jobId);
-  }
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Mic className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          Lồng tiếng Việt AI
+          <Mic className="h-4 w-4 text-success-600 dark:text-success-400" />
+          {t.title}
         </h2>
         {!open && !running && (
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+            className="rounded-md bg-success-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-success-700"
           >
-            Thiết lập lồng tiếng
+            {t.setup}
           </button>
         )}
       </div>
 
       {running && (
-        <div className="mt-3">
-          <p className="flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Đang lồng tiếng… {job?.progress ?? 0}%
-          </p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-            <div
-              className="h-full rounded-full bg-emerald-600 transition-all dark:bg-emerald-500"
-              style={{ width: `${job?.progress ?? 0}%` }}
-            />
-          </div>
-        </div>
+        <JobProgress
+          className="mt-3"
+          label={t.running}
+          progress={job?.progress ?? 0}
+          accent="emerald"
+        />
       )}
 
-      {job?.status === "done" && doneKey && (
-        <a
-          href={`/api/jobs/${jobId}/download`}
-          className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          <Download className="h-4 w-4" /> Tải video đã lồng tiếng
-        </a>
+      {job?.status === "done" && resultKey && jobId && (
+        <JobDownloadLink jobId={jobId} label={t.download} />
       )}
 
       {open && !running && (
         <div className="mt-4 space-y-4">
+          <VoicePicker
+            value={selection}
+            onChange={(patch) => setSelection((prev) => ({ ...prev, ...patch }))}
+            onError={setError}
+            lang={lang}
+          />
+
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm sm:col-span-2">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Loại giọng
-              </span>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as typeof provider)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-              >
-                <option value="edge">Giọng thường — miễn phí (322 giọng, mọi quốc gia)</option>
-                <option value="gemini">
-                  Giọng cao cấp AI — tiếng Việt diễn cảm ({GEMINI_VOICES.length} giọng, tính phí API)
-                </option>
-              </select>
-            </label>
-            {provider === "edge" && (
-              <label className="text-sm">
-                <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                  Quốc gia / ngôn ngữ ({LOCALES.length})
-                </span>
-                <select
-                  value={locale}
-                  onChange={(e) => setLocale(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-                >
-                  {LOCALES.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label} ({l.id})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <label className="text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Giới tính
-              </span>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value as typeof gender)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-              >
-                <option value="all">Tất cả</option>
-                <option value="F">Nữ</option>
-                <option value="M">Nam</option>
-              </select>
-            </label>
-            <label className="text-sm sm:col-span-2">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Giọng đọc ({voiceOptions.length} giọng)
-              </span>
-              <span className="mt-1 flex gap-2">
-                <select
-                  value={voice}
-                  onChange={(e) => setVoice(e.target.value)}
-                  className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-                >
-                  {voiceOptions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                      {provider === "edge" ? ` — ${v.gender === "F" ? "Nữ" : "Nam"}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => void playPreview()}
-                  disabled={previewing}
-                  title="Nghe thử giọng này"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-                >
-                  {previewing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                  Nghe thử
-                </button>
-              </span>
-            </label>
-            <label className="text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Tốc độ đọc: {speed.toFixed(2)}x
+              <span className={cn(fieldLabelClass, "font-medium")}>
+                {t.speed} {speed.toFixed(2)}x
               </span>
               <input
                 type="range"
@@ -261,8 +121,8 @@ export function DubPanel({ videoId, translatedTrackId, durationSec }: DubPanelPr
               />
             </label>
             <label className="text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Âm lượng giọng AI: {aiVolume}%
+              <span className={cn(fieldLabelClass, "font-medium")}>
+                {t.aiVol} {aiVolume}%
               </span>
               <input
                 type="range"
@@ -274,9 +134,9 @@ export function DubPanel({ videoId, translatedTrackId, durationSec }: DubPanelPr
               />
             </label>
             <label className="text-sm">
-              <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                Âm thanh gốc giữ lại (nhạc nền): {bgVolume}%
-                {bgVolume === 0 ? " — tắt hẳn tiếng gốc" : ""}
+              <span className={cn(fieldLabelClass, "font-medium")}>
+                {t.bgVol} {bgVolume}%
+                {bgVolume === 0 ? t.bgVolOff : ""}
               </span>
               <input
                 type="range"
@@ -290,31 +150,38 @@ export function DubPanel({ videoId, translatedTrackId, durationSec }: DubPanelPr
           </div>
 
           <p className="rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-800/60 dark:text-neutral-400">
-            Câu nào dài hơn khoảng trống trên video sẽ tự tăng tốc đọc để khớp thời gian.
-            Hình ảnh giữ nguyên chất lượng (không render lại hình).
+            {t.note}
           </p>
 
           <button
             type="button"
-            onClick={() => void start()}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+            onClick={() =>
+              void start(
+                `/api/videos/${videoId}/dub`,
+                {
+                  trackId: translatedTrackId,
+                  voice: resolveVoice(selection),
+                  speed,
+                  aiVolume,
+                  bgVolume,
+                },
+                t.startFail,
+              )
+            }
+            className="rounded-md bg-success-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-success-700"
           >
-            Bắt đầu lồng tiếng
+            {t.start}
             {durationSec
               ? ` — ${estimateJobCredits("dub", {
                   durationSec,
-                  premiumVoice: provider === "gemini",
+                  premiumVoice: selection.provider === "gemini",
                 }).toLocaleString("vi-VN")} credits`
               : ""}
           </button>
         </div>
       )}
 
-      {(error || job?.status === "failed") && (
-        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error ?? job?.error ?? "Lồng tiếng thất bại"}
-        </p>
-      )}
+      <JobError className="mt-3" error={error} job={job} fallback={t.failed} />
     </section>
   );
 }

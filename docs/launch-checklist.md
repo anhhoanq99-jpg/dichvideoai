@@ -37,7 +37,7 @@ Ghi chú kỹ thuật: webhook đối chiếu mã `DV<8 ký tự đầu userId>`
 ### 3b. Worker → VPS Linux (~30 phút, khuyến nghị 2 vCPU/4GB, Ubuntu 22+)
 ```bash
 # cài nền
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt install -y nodejs ffmpeg
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt install -y nodejs ffmpeg yt-dlp
 corepack enable && corepack prepare pnpm@latest --activate
 # lấy code + cài deps
 git clone <repo> && cd web_dichvideo && pnpm install
