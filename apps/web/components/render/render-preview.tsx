@@ -460,10 +460,13 @@ export function RenderPreview({
 
   return (
     <div>
+      {/* w-fit + video giới hạn chiều cao: video dọc 9:16 không chiếm cả màn hình,
+          overlay % vẫn khớp video vì container ôm sát; touch-none để kéo vùng che /
+          phụ đề / logo trên điện thoại không bị cuộn trang giật */}
       <div
         ref={boxRef}
         className={cn(
-          "relative select-none overflow-hidden rounded-lg bg-black",
+          "relative mx-auto w-fit max-w-full touch-none select-none overflow-hidden rounded-lg bg-black",
           covering && regions.length < MAX_COVER_REGIONS
             ? "cursor-crosshair"
             : "cursor-default",
@@ -492,7 +495,7 @@ export function RenderPreview({
           }}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-          className="w-full"
+          className="max-h-[42dvh] w-auto max-w-full lg:max-h-[60dvh]"
         />
 
         {/* vùng che — mô phỏng đúng chế độ đã chọn */}

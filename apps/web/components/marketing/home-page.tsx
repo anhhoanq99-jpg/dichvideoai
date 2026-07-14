@@ -1,6 +1,7 @@
 import type { Lang } from "@/lib/i18n";
 import { SiteHeader } from "./site-header";
 import { HeroSection } from "./hero-section";
+import { ResultsSection } from "./results-section";
 import { FeaturesSection } from "./features-section";
 import { HowItWorksSection } from "./how-it-works-section";
 import { VideoSourcesSection } from "./video-sources-section";
@@ -34,6 +35,7 @@ export function MarketingHome({ lang }: { lang: Lang }) {
       <SiteHeader lang={lang} />
       <main>
         <HeroSection lang={lang} />
+        <ResultsSection lang={lang} />
         <VideoSourcesSection lang={lang} />
         <FeaturesSection lang={lang} />
         <HowItWorksSection lang={lang} />

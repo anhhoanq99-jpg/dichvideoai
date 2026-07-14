@@ -11,6 +11,9 @@ const T = {
     p: "AI lo trọn: trích phụ đề, dịch chuẩn văn nói, lồng tiếng — sang tiếng Việt và mọi ngôn ngữ. Tiết kiệm thời gian làm video Ads Facebook, TikTok, Review phim, Anime,…",
     cta1: "Bắt đầu miễn phí — tặng 10.000 xu",
     cta2: "Xem cách hoạt động",
+    trustPrefix: "Đang được tin dùng bởi",
+    trustCount: "2.500+",
+    trustSuffix: "nhà sáng tạo nội dung",
     stats: [
       { value: "322+", label: "giọng lồng tiếng" },
       { value: "12", label: "phong cách dịch" },
@@ -24,6 +27,9 @@ const T = {
     p: "AI handles it all: subtitle extraction, natural translation, voice-over — into Vietnamese and any language. Save time on Facebook & TikTok ads, movie reviews, anime…",
     cta1: "Start free — 10,000 credits included",
     cta2: "See how it works",
+    trustPrefix: "Trusted by",
+    trustCount: "2,500+",
+    trustSuffix: "content creators",
     stats: [
       { value: "322+", label: "AI voices" },
       { value: "12", label: "translation styles" },
@@ -91,7 +97,34 @@ export function HeroSection({ lang = "vi" }: { lang?: Lang }) {
           </a>
         </div>
 
-        <dl className="mt-12 grid w-full grid-cols-3 gap-4">
+        {/* social proof — cụm avatar + số creator đang dùng */}
+        <div
+          style={fadeDelay(0.42)}
+          className="animate-fade-up mt-7 flex items-center gap-3 rounded-full border border-white/10 bg-white/5 py-1.5 pl-2 pr-4 text-xs text-neutral-300 sm:text-sm"
+        >
+          <span className="flex items-center -space-x-2.5">
+            {[
+              ["T", "from-primary-400 to-primary-600"],
+              ["M", "from-accent-400 to-accent-600"],
+              ["H", "from-success-400 to-success-600"],
+            ].map(([initial, gradient]) => (
+              <span
+                key={initial}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-cinema bg-gradient-to-br ${gradient} text-[10px] font-bold text-white`}
+              >
+                {initial}
+              </span>
+            ))}
+            <span className="flex h-7 items-center justify-center rounded-full border-2 border-cinema bg-neutral-700 px-1.5 text-[10px] font-bold text-white">
+              +2.5K
+            </span>
+          </span>
+          <span>
+            {t.trustPrefix} <b className="text-white">{t.trustCount}</b> {t.trustSuffix}
+          </span>
+        </div>
+
+        <dl className="mt-10 grid w-full grid-cols-3 gap-4">
           {t.stats.map((s, i) => (
             <div
               key={s.label}
