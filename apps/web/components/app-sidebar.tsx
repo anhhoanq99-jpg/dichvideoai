@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   CreditCard,
   FileText,
+  FileVideo,
   History,
   Languages,
   Menu,
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
     en: "Manage",
     items: [
       { href: "/videos", vi: "Video của tôi", en: "My videos", icon: Video },
+      { href: "/exports", vi: "Video đã xuất", en: "Exported videos", icon: FileVideo },
       { href: "/history", vi: "Lịch sử xử lý", en: "History", icon: History },
       { href: "/transactions", vi: "Lịch sử giao dịch", en: "Transactions", icon: Receipt },
       { href: "/credits", vi: "Nạp tiền", en: "Top up", icon: CreditCard },
