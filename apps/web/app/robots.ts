@@ -13,6 +13,7 @@ export default function robots(): MetadataRoute.Robots {
           "/dashboard",
           "/videos",
           "/exports",
+          "/chat",
           "/extract",
           "/translate",
           "/history",

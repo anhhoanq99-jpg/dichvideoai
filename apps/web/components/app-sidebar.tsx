@@ -10,6 +10,7 @@ import {
   History,
   Languages,
   Menu,
+  MessagesSquare,
   Mic,
   Receipt,
   Video,
@@ -44,6 +45,18 @@ const NAV_GROUPS = [
       { href: "/history", vi: "Lịch sử xử lý", en: "History", icon: History },
       { href: "/transactions", vi: "Lịch sử giao dịch", en: "Transactions", icon: Receipt },
       { href: "/credits", vi: "Nạp tiền", en: "Top up", icon: CreditCard },
+    ],
+  },
+  {
+    vi: "Cộng đồng",
+    en: "Community",
+    items: [
+      {
+        href: "/chat",
+        vi: "Trò chuyện & hỗ trợ",
+        en: "Chat & support",
+        icon: MessagesSquare,
+      },
     ],
   },
 ] as const;

@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -159,4 +160,24 @@ export const creditLedger = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
+);
+
+/**
+ * Tin nhắn chat trong app.
+ * room: "community" (phòng chung mọi user) hoặc "support:<userId>" (kênh riêng user ↔ admin).
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    room: text("room").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    /** người gửi là admin (xét theo ADMIN_EMAILS lúc gửi) — hiện badge trong UI */
+    isAdmin: boolean("is_admin").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("chat_messages_room_idx").on(t.room, t.createdAt)],
 );
