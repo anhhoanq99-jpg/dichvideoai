@@ -14,7 +14,7 @@ const SECTIONS: LegalSection[] = [
     body: [
       "Thông tin tài khoản Google khi đăng nhập: tên, email, ảnh đại diện.",
       "Nội dung bạn tải lên: video, phụ đề, từ điển thuật ngữ — chỉ dùng để thực hiện đúng yêu cầu xử lý của bạn.",
-      "Dữ liệu vận hành: lịch sử job, số credits, nhật ký lỗi và địa chỉ IP khi tải lên (phục vụ chống lạm dụng).",
+      "Dữ liệu vận hành: lịch sử job, số xu, nhật ký lỗi và địa chỉ IP khi tải lên (phục vụ chống lạm dụng).",
     ],
   },
   {
@@ -35,7 +35,7 @@ const SECTIONS: LegalSection[] = [
     title: "4. Thời gian lưu trữ",
     body: [
       "Video kết quả tự xóa sau 7 ngày. Video nguồn và phụ đề bị xóa khi bạn xóa video khỏi tài khoản.",
-      "Lịch sử giao dịch credits được lưu để phục vụ đối soát và theo quy định kế toán.",
+      "Lịch sử giao dịch xu được lưu để phục vụ đối soát và theo quy định kế toán.",
     ],
   },
   {

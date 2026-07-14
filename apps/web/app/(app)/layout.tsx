@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppSidebar, MobileNav } from "@/components/app-sidebar";
 import { BackButton } from "@/components/back-button";
 import { BrandLogo } from "@/components/brand-logo";
+import { CreditBalanceChip } from "@/components/credit-balance-chip";
 import { LangSwitcher } from "@/components/lang-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -27,6 +28,7 @@ export default async function AppLayout({
             <BrandLogo textClassName="hidden sm:inline" />
           </span>
           <span className="ml-auto flex items-center gap-2.5">
+            <CreditBalanceChip lang={lang} />
             <LangSwitcher lang={lang} />
             <ThemeToggle />
             <UserMenu

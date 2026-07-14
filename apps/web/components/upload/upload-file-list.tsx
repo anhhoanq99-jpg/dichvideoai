@@ -7,7 +7,7 @@ import type { Lang } from "@/lib/i18n";
 const T = {
   vi: {
     listTitle: (n: number) => `Danh sách video (${n})`,
-    estimate: (credits: string) => `~${credits} credits + dịch 5/dòng`,
+    estimate: (credits: string) => `~${credits} xu + dịch 5/dòng`,
   },
   en: {
     listTitle: (n: number) => `Video queue (${n})`,

@@ -64,7 +64,7 @@ export function SiteHeader({ lang = "vi" }: { lang?: Lang }) {
             {btn.login}
           </Link>
           <Link
-            href="/dashboard"
+            href="/videos/upload"
             className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.03] hover:bg-primary-500 active:scale-95"
           >
             {btn.cta}
@@ -111,7 +111,7 @@ export function SiteHeader({ lang = "vi" }: { lang?: Lang }) {
                 {btn.login}
               </Link>
               <Link
-                href="/dashboard"
+                href="/videos/upload"
                 className="flex-1 rounded-lg bg-primary-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition-transform active:scale-95"
               >
                 {btn.cta}

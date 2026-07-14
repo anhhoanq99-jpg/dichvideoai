@@ -19,7 +19,7 @@ const T = {
       admin_adjust: "Điều chỉnh",
     } as Record<CreditReason, string>,
     title: "Lịch sử giao dịch",
-    balance: (n: string) => `Số dư: ${n} credits`,
+    balance: (n: string) => `Số dư: ${n} xu`,
     empty: "Chưa có giao dịch nào.",
     thTime: "Thời gian",
     thType: "Loại",

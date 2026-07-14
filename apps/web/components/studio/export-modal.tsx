@@ -26,7 +26,7 @@ const T = {
     missingRegions:
       "Đang chọn chế độ che chữ nhưng chưa khoanh vùng nào — video sẽ xuất KHÔNG che. Nếu cần che, đóng hộp này và kéo chuột khoanh vùng trên video.",
     wysiwyg:
-      "Video xuất đúng như những gì bạn thấy trong khung xem trước. Job lỗi được hoàn credits tự động.",
+      "Video xuất đúng như những gì bạn thấy trong khung xem trước. Job lỗi được hoàn xu tự động.",
     exportNow: "Xuất video ngay",
     rendering: "Đang render video…",
     dubbing: "Đang lồng tiếng lên bản đã render…",
@@ -254,16 +254,16 @@ export function ExportModal({
             <li>
               • {t.lineRender} {covering ? `${t.lineRenderCover} ` : ""}
               {settings.logoOn && settings.logoText.trim() ? `${t.lineRenderLogo} ` : ""}—{" "}
-              <b>{renderCredits.toLocaleString("vi-VN")} credits</b>
+              <b>{renderCredits.toLocaleString("vi-VN")} xu</b>
             </li>
             {dub.enabled && (
               <li>
                 • {t.lineDub} —{" "}
-                <b>{dubCredits.toLocaleString("vi-VN")} credits</b>
+                <b>{dubCredits.toLocaleString("vi-VN")} xu</b>
               </li>
             )}
             <li className="border-t border-neutral-200 pt-1.5 font-semibold dark:border-neutral-700">
-              {t.total} {(renderCredits + dubCredits).toLocaleString("vi-VN")} credits
+              {t.total} {(renderCredits + dubCredits).toLocaleString("vi-VN")} xu
             </li>
           </ul>
           {missingRegions && (

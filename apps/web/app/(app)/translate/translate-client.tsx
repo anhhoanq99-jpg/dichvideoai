@@ -22,7 +22,7 @@ const T = {
     errStart: "Không bắt đầu được",
     dropTitle: "Kéo thả file phụ đề hoặc bấm để chọn (.srt, .vtt)",
     fileInfo: (lines: number, estimate: string) =>
-      `${lines} dòng · ước tính ${estimate} credits`,
+      `${lines} dòng · ước tính ${estimate} xu`,
     targetLang: "Dịch sang",
     style: "Phong cách dịch",
     customPh: "Mô tả phong cách dịch bạn muốn…",
@@ -31,8 +31,8 @@ const T = {
     downloadSrt: "Bản dịch (.SRT)",
     downloadTxt: "Văn bản (.TXT)",
     translateNow: "Dịch ngay",
-    creditsSuffix: (estimate: string) => ` — ${estimate} credits`,
-    failed: "Dịch thất bại — credits đã được hoàn",
+    creditsSuffix: (estimate: string) => ` — ${estimate} xu`,
+    failed: "Dịch thất bại — xu đã được hoàn",
   },
   en: {
     title: "AI subtitle translation",

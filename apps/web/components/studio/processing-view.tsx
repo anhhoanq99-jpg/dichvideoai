@@ -23,7 +23,7 @@ const T = {
       stt: "AI đang nghe và gỡ băng lời thoại",
       translate: "Dịch theo ngữ cảnh toàn video rồi biên tập lại theo văn nói",
     } as Partial<Record<JobType, string>>,
-    failedFallback: "Xử lý thất bại — credits đã được hoàn.",
+    failedFallback: "Xử lý thất bại — xu đã được hoàn.",
     preparing: "Đang chuẩn bị xử lý…",
     failedTitle: "Xử lý thất bại",
     tryAnother: "Thử lại với video khác",

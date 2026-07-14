@@ -54,20 +54,20 @@ const CARD_STYLES = [
 const T = {
   vi: {
     title: "Nạp tiền",
-    balance: (n: string) => `Số dư: ${n} credits`,
+    balance: (n: string) => `Số dư: ${n} xu`,
     priceTitle: "📒 Chi phí thao tác (Tham khảo)",
     cards: [
-      { label: "Tách phụ đề cứng (Video OCR)", unit: "credits / phút video" },
-      { label: "Tách phụ đề từ âm thanh (STT)", unit: "credits / phút âm thanh" },
-      { label: "Dịch AI (mọi ngôn ngữ, mọi model)", unit: "credits / dòng" },
-      { label: "Render video (phụ đề + che chữ + logo)", unit: "credits / phút" },
+      { label: "Tách phụ đề cứng (Video OCR)", unit: "xu / phút video" },
+      { label: "Tách phụ đề từ âm thanh (STT)", unit: "xu / phút âm thanh" },
+      { label: "Dịch AI (mọi ngôn ngữ, mọi model)", unit: "xu / dòng" },
+      { label: "Render video (phụ đề + che chữ + logo)", unit: "xu / phút" },
       {
         label: "Lồng tiếng AI — giọng thường / Google / ElevenLabs",
-        unit: "credits / phút",
+        unit: "xu / phút",
       },
-      { label: "Lồng tiếng AI — giọng cao cấp Gemini", unit: "credits / phút" },
+      { label: "Lồng tiếng AI — giọng cao cấp Gemini", unit: "xu / phút" },
     ],
-    footnote1: "Credits không hết hạn · job lỗi hoàn 100% tự động · xem chi tiết trừ/hoàn trong",
+    footnote1: "Xu không hết hạn · job lỗi hoàn 100% tự động · xem chi tiết trừ/hoàn trong",
     footnoteLink: "Lịch sử giao dịch",
   },
   en: {

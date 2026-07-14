@@ -16,3 +16,5 @@ coverage/
 # deploy
 .vercel/
 *.pem
+.vercel
+.env*

@@ -23,14 +23,14 @@ const T = {
   vi: {
     packNames: ["STARTER", "CƠ BẢN", "TIÊU CHUẨN", "CHUYÊN NGHIỆP", "STUDIO", "DOANH NGHIỆP"],
     features: {
-      noExpiry: "Credits KHÔNG hết hạn — dùng lúc nào cũng được",
+      noExpiry: "Xu KHÔNG hết hạn — dùng lúc nào cũng được",
       translate: (n: string) => `Dịch AI: ~${n} dòng phụ đề`,
       stt: (n: string) => `Tách phụ đề từ âm thanh: ~${n} phút`,
       ocr: (n: string) => `Tách phụ đề cứng (OCR): ~${n} phút`,
       dub: (n: string) => `Lồng tiếng video AI: ~${n} phút`,
       full: (n: string) => `Việt hóa trọn gói: ~${n} phút video`,
     },
-    toastTopup: (n: string) => `Nạp thành công! +${n} credits đã vào tài khoản 🎉`,
+    toastTopup: (n: string) => `Nạp thành công! +${n} xu đã vào tài khoản 🎉`,
     methodTitle: "Phương thức thanh toán",
     comingSoon: "Sắp ra mắt",
     qrAlt: "QR chuyển khoản VietQR",
@@ -42,13 +42,13 @@ const T = {
     accountNo: "Số tài khoản",
     accountHolder: "Chủ tài khoản",
     amount: "Số tiền",
-    receiveCredits: "Nhận Credits",
+    receiveCredits: "Nhận Xu",
     transferContent: "Nội dung chuyển khoản (Bắt buộc):",
     copy: "Sao chép",
     transferNote:
       "* Lưu ý: nhập chính xác nội dung để hệ thống tự động cộng tiền (~1 phút sau khi tiền vào).",
     bonusPacks: "Gói Thưởng",
-    neverExpire: "Credits không bao giờ hết hạn",
+    neverExpire: "Xu không bao giờ hết hạn",
     popular: "Popular",
     bonusExtra: (pct: number) => `+${pct}% Tặng thêm`,
     selected: "✓ Đang chọn — quét QR phía trên để nạp",
@@ -334,7 +334,7 @@ export function TopupPanel({
                 {fmt(p.vnd)} <span className="text-xs font-semibold">VND</span>
               </p>
               <p className="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                {fmt(p.credits)} Credits
+                {fmt(p.credits)} Xu
               </p>
               <ul className="mt-3 space-y-1.5 rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-600 dark:bg-neutral-800/60 dark:text-neutral-300">
                 {packFeatures(p.credits, lang).map((f) => (

@@ -38,7 +38,7 @@ const T = {
     targetLang: "Dịch sang",
     style: "Phong cách dịch",
     previewNote:
-      "Dịch xong sẽ mở trình chỉnh sửa: xem trước video với phụ đề, chỉnh vùng che / kiểu chữ / lồng tiếng theo ý rồi mới xuất — credits chỉ trừ khi xuất.",
+      "Dịch xong sẽ mở trình chỉnh sửa: xem trước video với phụ đề, chỉnh vùng che / kiểu chữ / lồng tiếng theo ý rồi mới xuất — xu chỉ trừ khi xuất.",
     glossarySummary: "Từ điển & nhân vật (tùy chọn)",
     glossaryPh:
       "Mỗi dòng một quy tắc, ví dụ:\n咪 = Mi (tên mèo, xưng hô: hoàng thượng)\n主人 = con sen",

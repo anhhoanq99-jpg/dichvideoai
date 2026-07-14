@@ -23,12 +23,12 @@ export const FAQ_T = {
         a: "Hơn 322 giọng thường của đủ mọi quốc gia (đã gồm trong giá lồng tiếng thường) và bộ giọng Việt cao cấp diễn cảm hơn. Giọng nào cũng nghe thử được trước khi chạy.",
       },
       {
-        q: "Nạp credits bằng cách nào? Credits có hết hạn không?",
-        a: "Chuyển khoản ngân hàng kèm mã cá nhân của bạn — credits tự cộng trong khoảng một phút, nạp nhiều được tặng thêm tới 80%. Credits không hết hạn.",
+        q: "Nạp xu bằng cách nào? Xu có hết hạn không?",
+        a: "Chuyển khoản ngân hàng kèm mã cá nhân của bạn — xu tự cộng trong khoảng một phút, nạp nhiều được tặng thêm tới 80%. Xu không hết hạn.",
       },
       {
-        q: "Nếu xử lý lỗi thì có mất credits không?",
-        a: "Không. Job lỗi được hoàn lại toàn bộ credits tự động, xem được trong lịch sử giao dịch.",
+        q: "Nếu xử lý lỗi thì có mất xu không?",
+        a: "Không. Job lỗi được hoàn lại toàn bộ xu tự động, xem được trong lịch sử giao dịch.",
       },
       {
         q: "Tôi có được dùng video của người khác không?",

@@ -24,10 +24,10 @@ const T = {
     thVideo: "Video",
     thType: "Xử lý",
     thStatus: "Trạng thái",
-    thCredits: "Credits",
+    thCredits: "Xu",
     thTime: "Thời gian",
     thResult: "Kết quả",
-    refunded: "Đã hoàn credits",
+    refunded: "Đã hoàn xu",
     refundedShort: "(hoàn)",
     download: "Tải về",
     footnote: "Hiển thị 100 job gần nhất. File kết quả tự xóa sau 7 ngày — hãy tải về máy.",
@@ -138,7 +138,7 @@ export default async function HistoryPage() {
                       <>
                         <span>·</span>
                         <span className="font-mono">
-                          {job.creditsCharged.toLocaleString("vi-VN")} credits
+                          {job.creditsCharged.toLocaleString("vi-VN")} xu
                           {job.status === "failed" && (
                             <span className="ml-1 text-success-500">{t.refundedShort}</span>
                           )}

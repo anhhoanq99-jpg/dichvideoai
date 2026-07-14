@@ -29,7 +29,7 @@ const T = {
     register: "Đăng ký",
     login: "Đăng nhập",
     googleBtn: "Đăng nhập với Google",
-    bonus: `*Đăng ký lần đầu tặng ${SIGNUP_TRIAL_CREDITS.toLocaleString("vi-VN")} credits!`,
+    bonus: `*Đăng ký lần đầu tặng ${SIGNUP_TRIAL_CREDITS.toLocaleString("vi-VN")} xu!`,
     errLogin: "Email hoặc mật khẩu không đúng",
     errSignup: "Không tạo được tài khoản — email có thể đã dùng",
   },
@@ -83,7 +83,7 @@ export function LoginCard({ lang }: { lang: Lang }) {
         );
         return;
       }
-      router.push("/dashboard");
+      router.push("/videos/upload");
       router.refresh();
     } catch {
       setError(mode === "login" ? t.errLogin : t.errSignup);
@@ -141,7 +141,7 @@ export function LoginCard({ lang }: { lang: Lang }) {
             <button
               type="button"
               onClick={() =>
-                signIn.social({ provider: "google", callbackURL: "/dashboard" })
+                signIn.social({ provider: "google", callbackURL: "/videos/upload" })
               }
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
             >

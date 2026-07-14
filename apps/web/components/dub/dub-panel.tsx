@@ -175,7 +175,7 @@ export function DubPanel({ videoId, translatedTrackId, durationSec, lang = "vi" 
               ? ` — ${estimateJobCredits("dub", {
                   durationSec,
                   premiumVoice: selection.provider === "gemini",
-                }).toLocaleString("vi-VN")} credits`
+                }).toLocaleString("vi-VN")} xu`
               : ""}
           </button>
         </div>

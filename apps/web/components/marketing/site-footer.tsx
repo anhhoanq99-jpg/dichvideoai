@@ -49,7 +49,7 @@ export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
             {t.ctaP}
           </p>
           <Link
-            href="/dashboard"
+            href="/videos/upload"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3 text-sm font-semibold text-primary-700 transition-all duration-200 hover:scale-[1.04] hover:shadow-lg hover:shadow-black/20 active:scale-95"
           >
             {t.ctaBtn} <ArrowRight className="h-4 w-4" />

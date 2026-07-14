@@ -398,7 +398,7 @@ export function RenderPanel({ videoId, translatedTrackId, durationSec, lang = "v
           >
             {t.startRender}
             {durationSec
-              ? ` — ${estimateJobCredits("render", { durationSec }).toLocaleString("vi-VN")} credits`
+              ? ` — ${estimateJobCredits("render", { durationSec }).toLocaleString("vi-VN")} xu`
               : ""}
           </button>
         </div>

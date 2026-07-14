@@ -9,7 +9,7 @@ const T = {
     h1Before: "VIDEO",
     h1Gradient: "NÓI VÀ HIỂN THỊ MỌI THỨ TIẾNG",
     p: "AI lo trọn: trích phụ đề, dịch chuẩn văn nói, lồng tiếng — sang tiếng Việt và mọi ngôn ngữ. Tiết kiệm thời gian làm video Ads Facebook, TikTok, Review phim, Anime,…",
-    cta1: "Bắt đầu miễn phí — tặng 10.000 credits",
+    cta1: "Bắt đầu miễn phí — tặng 10.000 xu",
     cta2: "Xem cách hoạt động",
     stats: [
       { value: "322+", label: "giọng lồng tiếng" },
@@ -78,7 +78,7 @@ export function HeroSection({ lang = "vi" }: { lang?: Lang }) {
           className="animate-fade-up mt-7 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
         >
           <Link
-            href="/dashboard"
+            href="/videos/upload"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 transition-all duration-200 hover:scale-[1.03] hover:bg-primary-500 hover:shadow-primary-500/40 active:scale-95"
           >
             {t.cta1} <ArrowRight className="h-4 w-4" />

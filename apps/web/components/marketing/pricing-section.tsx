@@ -8,22 +8,22 @@ import { SectionHeading } from "./section-heading";
 const T = {
   vi: {
     h2: "Trả theo đúng cái bạn dùng",
-    p: "1.000đ = 1.000 credits. Không gói tháng, không phí ẩn — job lỗi hoàn credits 100%. Đăng ký được tặng ngay 10.000 credits dùng thử.",
+    p: "1.000đ = 1.000 xu. Không gói tháng, không phí ẩn — job lỗi hoàn xu 100%. Đăng ký được tặng ngay 10.000 xu dùng thử.",
     serviceHeading: "Đơn giá dịch vụ",
     serviceRows: [
-      { label: "Tách phụ đề từ giọng nói", price: `${CREDIT_PRICING.sttPerMin} credits/phút` },
-      { label: "Tách phụ đề cứng trên hình", price: `${CREDIT_PRICING.ocrPerMin} credits/phút` },
-      { label: "Dịch AI sang tiếng Việt", price: `${CREDIT_PRICING.translatePerLine} credits/dòng` },
-      { label: "Render phụ đề + che chữ gốc", price: `${CREDIT_PRICING.renderPerMin} credits/phút` },
-      { label: "Lồng tiếng — giọng thường", price: `${CREDIT_PRICING.dubEdgePerMin} credits/phút` },
-      { label: "Lồng tiếng — giọng cao cấp", price: `${CREDIT_PRICING.dubGeminiPerMin} credits/phút` },
+      { label: "Tách phụ đề từ giọng nói", price: `${CREDIT_PRICING.sttPerMin} xu/phút` },
+      { label: "Tách phụ đề cứng trên hình", price: `${CREDIT_PRICING.ocrPerMin} xu/phút` },
+      { label: "Dịch AI sang tiếng Việt", price: `${CREDIT_PRICING.translatePerLine} xu/dòng` },
+      { label: "Render phụ đề + che chữ gốc", price: `${CREDIT_PRICING.renderPerMin} xu/phút` },
+      { label: "Lồng tiếng — giọng thường", price: `${CREDIT_PRICING.dubEdgePerMin} xu/phút` },
+      { label: "Lồng tiếng — giọng cao cấp", price: `${CREDIT_PRICING.dubGeminiPerMin} xu/phút` },
     ],
     examplePrefix:
       "Ví dụ: video 5 phút, 60 câu — tách chữ trên hình + dịch + render + lồng tiếng thường ≈",
     popular: "Phổ biến nhất",
     receive: "Nhận",
     bonusSuffix: "tặng thêm",
-    bullets: ["Credits không hết hạn", "Dùng cho mọi dịch vụ", "Cộng tự động sau ~1 phút"],
+    bullets: ["Xu không hết hạn", "Dùng cho mọi dịch vụ", "Cộng tự động sau ~1 phút"],
     cta: "Nạp ngay",
   },
   en: {
@@ -87,7 +87,7 @@ export function PricingSection({ lang = "vi" }: { lang?: Lang }) {
           </tbody>
         </table>
         <p className="mt-2 text-xs text-neutral-500">
-          {t.examplePrefix} {formatNumber(EXAMPLE_COST_CREDITS)} credits (~
+          {t.examplePrefix} {formatNumber(EXAMPLE_COST_CREDITS)} xu (~
           {formatNumber(EXAMPLE_COST_CREDITS)}đ).
         </p>
       </Reveal>
@@ -111,7 +111,7 @@ export function PricingSection({ lang = "vi" }: { lang?: Lang }) {
             )}
             <p className="text-2xl font-bold text-white">{formatNumber(p.vnd)}đ</p>
             <p className="mt-1 text-sm font-medium text-amber-400">
-              {t.receive} {formatNumber(p.credits)} credits
+              {t.receive} {formatNumber(p.credits)} xu
               {p.bonus > 0 && (
                 <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-xs">
                   +{p.bonus}% {t.bonusSuffix}

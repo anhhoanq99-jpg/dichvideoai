@@ -23,8 +23,8 @@ const T = {
       "Giọng gốc tự hạ xuống đúng lúc AI đọc để không chồng tiếng; giữa các câu vẫn giữ nhạc nền. Nghe thử ngay trên khung video (nút “Lồng tiếng” cạnh thanh tua).",
     estTitle: "Ước tính chi phí lồng tiếng",
     estLine: (min: number, price: string, premium: boolean) =>
-      `Thời lượng video: ~${min} phút · Đơn giá: ${price} credits/phút (giọng ${premium ? "cao cấp" : "thường"})`,
-    estTotalSuffix: "credits — chỉ trừ khi bấm Xuất File",
+      `Thời lượng video: ~${min} phút · Đơn giá: ${price} xu/phút (giọng ${premium ? "cao cấp" : "thường"})`,
+    estTotalSuffix: "xu — chỉ trừ khi bấm Xuất File",
     dubDisabledHint:
       "Tích ô trên để lồng tiếng khi xuất — các thiết lập bên dưới vẫn chỉnh và nghe thử được ngay.",
   },

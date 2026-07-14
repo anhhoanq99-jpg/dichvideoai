@@ -31,11 +31,11 @@ const SECTIONS: LegalSection[] = [
     ],
   },
   {
-    title: "4. Credits và thanh toán",
+    title: "4. Xu và thanh toán",
     body: [
-      "Credits là đơn vị trả trước để sử dụng dịch vụ, quy đổi 1.000đ = 1.000 credits, không có giá trị quy đổi ngược thành tiền mặt và không chuyển nhượng giữa các tài khoản.",
-      "Job xử lý lỗi do hệ thống được hoàn credits tự động 100%. Credits đã dùng cho job hoàn tất không được hoàn lại.",
-      "Nạp qua chuyển khoản ngân hàng với nội dung chứa mã cá nhân; tiền vào tài khoản sẽ được cộng credits tự động.",
+      "Xu là đơn vị trả trước để sử dụng dịch vụ, quy đổi 1.000đ = 1.000 xu, không có giá trị quy đổi ngược thành tiền mặt và không chuyển nhượng giữa các tài khoản.",
+      "Job xử lý lỗi do hệ thống được hoàn xu tự động 100%. Xu đã dùng cho job hoàn tất không được hoàn lại.",
+      "Nạp qua chuyển khoản ngân hàng với nội dung chứa mã cá nhân; tiền vào tài khoản sẽ được cộng xu tự động.",
     ],
   },
   {
