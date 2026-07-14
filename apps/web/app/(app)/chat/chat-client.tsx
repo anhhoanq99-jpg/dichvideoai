@@ -106,16 +106,22 @@ export function ChatClient({ isAdmin, lang = "vi" }: ChatClientProps) {
     }
   }, [isAdmin, threadUser]);
 
-  // chỉ kênh hỗ trợ mới poll — feed cộng đồng tự quản lý dữ liệu
+  // chỉ kênh hỗ trợ mới poll — feed cộng đồng tự quản lý dữ liệu.
+  // setTimeout(0) để lần tải đầu chạy sau khi effect kết thúc (rule set-state-in-effect)
   useEffect(() => {
     if (tab !== "support") return;
-    load();
-    loadThreads();
+    const kickoff = setTimeout(() => {
+      load();
+      loadThreads();
+    }, 0);
     const timer = setInterval(() => {
       load();
       loadThreads();
     }, POLL_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(kickoff);
+      clearInterval(timer);
+    };
   }, [load, loadThreads, tab]);
 
   // tự cuộn xuống cuối khi có tin mới (chỉ khi user đang ở đáy)

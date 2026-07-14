@@ -103,8 +103,10 @@ function CommentSection({ postId, me, lang }: { postId: string; me: string; lang
     }
   }, [postId]);
 
+  // trì hoãn lần tải đầu qua setTimeout(0) — rule set-state-in-effect
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 0);
+    return () => clearTimeout(t);
   }, [load]);
 
   async function send() {
@@ -209,8 +211,10 @@ export function CommunityFeed({ lang = "vi" }: { lang?: Lang }) {
     }
   }, []);
 
+  // trì hoãn lần tải đầu qua setTimeout(0) — rule set-state-in-effect
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 0);
+    return () => clearTimeout(t);
   }, [load]);
 
   async function publish() {

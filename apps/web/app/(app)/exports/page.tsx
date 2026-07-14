@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Clock, Download, FileVideo } from "lucide-react";
 import { jobs, videos } from "@dichvideo/db";
 import { db } from "@/lib/db";
@@ -86,6 +86,9 @@ export default async function ExportsPage() {
       finishedAt: jobs.finishedAt,
       videoId: jobs.videoId,
       videoName: videos.originalName,
+      // file tự xóa sau 7 ngày — tính số ngày còn lại ngay trong SQL
+      daysLeft: sql<number | null>`case when ${jobs.finishedAt} is null then null
+        else (7 - floor(extract(epoch from (now() - ${jobs.finishedAt})) / 86400))::int end`,
     })
     .from(jobs)
     .innerJoin(videos, eq(jobs.videoId, videos.id))
@@ -103,8 +106,6 @@ export default async function ExportsPage() {
   const exports_ = rows.filter(
     (r) => (r.result as { r2Key?: string } | null)?.r2Key,
   );
-
-  const now = Date.now();
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -130,10 +131,7 @@ export default async function ExportsPage() {
           {exports_.map((job) => {
             const size = (job.result as { sizeBytes?: number } | null)?.sizeBytes;
             const features = exportFeatures(job.type, (job.params ?? {}) as ExportParams, t);
-            // file tự xóa sau 7 ngày kể từ lúc xuất xong
-            const daysLeft = job.finishedAt
-              ? 7 - Math.floor((now - job.finishedAt.getTime()) / 86_400_000)
-              : null;
+            const daysLeft = job.daysLeft;
             return (
               <li
                 key={job.id}

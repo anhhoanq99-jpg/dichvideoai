@@ -97,8 +97,10 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
     }
   }, []);
 
+  // trì hoãn lần tải đầu qua setTimeout(0) — rule set-state-in-effect
   useEffect(() => {
-    loadVoices();
+    const t = setTimeout(loadVoices, 0);
+    return () => clearTimeout(t);
   }, [loadVoices]);
 
   // dọn URL audio cũ khi tạo bản mới / rời trang
@@ -316,7 +318,6 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
 
           {audioUrl && (
             <>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <audio controls src={audioUrl} className="h-10 max-w-full" />
               <a
                 href={audioUrl}
