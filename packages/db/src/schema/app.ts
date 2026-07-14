@@ -162,9 +162,43 @@ export const creditLedger = pgTable(
   (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
 );
 
+/** Bài đăng cộng đồng — hỏi đáp / chia sẻ kinh nghiệm, bình luận trao đổi bên dưới. */
+export const communityPosts = pgTable(
+  "community_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    isAdmin: boolean("is_admin").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("community_posts_created_idx").on(t.createdAt)],
+);
+
+export const communityComments = pgTable(
+  "community_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => communityPosts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    isAdmin: boolean("is_admin").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("community_comments_post_idx").on(t.postId, t.createdAt)],
+);
+
 /**
  * Tin nhắn chat trong app.
- * room: "community" (phòng chung mọi user) hoặc "support:<userId>" (kênh riêng user ↔ admin).
+ * room: "support:<userId>" (kênh riêng user ↔ admin); giá trị "community" cũ không dùng nữa
+ * (cộng đồng chuyển sang dạng bài đăng + bình luận ở communityPosts/communityComments).
  */
 export const chatMessages = pgTable(
   "chat_messages",
