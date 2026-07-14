@@ -162,6 +162,23 @@ export const creditLedger = pgTable(
   (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
 );
 
+/** Giọng nói nhân bản của user (Instant Voice Cloning — hiện qua ElevenLabs). */
+export const clonedVoices = pgTable(
+  "cloned_voices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("elevenlabs"),
+    /** voice_id phía provider — dùng khi gọi TTS/xóa */
+    providerVoiceId: text("provider_voice_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("cloned_voices_user_idx").on(t.userId)],
+);
+
 /** Bài đăng cộng đồng — hỏi đáp / chia sẻ kinh nghiệm, bình luận trao đổi bên dưới. */
 export const communityPosts = pgTable(
   "community_posts",

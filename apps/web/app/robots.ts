@@ -14,6 +14,7 @@ export default function robots(): MetadataRoute.Robots {
           "/videos",
           "/exports",
           "/chat",
+          "/voice-clone",
           "/extract",
           "/translate",
           "/history",

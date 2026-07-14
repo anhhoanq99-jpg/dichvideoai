@@ -4,11 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AudioLines,
   CreditCard,
-  FileText,
   FileVideo,
   History,
-  Languages,
   Menu,
   MessagesSquare,
   Mic,
@@ -32,8 +31,12 @@ const NAV_GROUPS = [
         en: "Translate & dub video",
         icon: Mic,
       },
-      { href: "/extract", vi: "Trích xuất phụ đề", en: "Extract subtitles", icon: FileText },
-      { href: "/translate", vi: "Dịch phụ đề (SRT)", en: "Translate SRT", icon: Languages },
+      {
+        href: "/voice-clone",
+        vi: "Nhân bản giọng nói",
+        en: "Voice cloning",
+        icon: AudioLines,
+      },
     ],
   },
   {
