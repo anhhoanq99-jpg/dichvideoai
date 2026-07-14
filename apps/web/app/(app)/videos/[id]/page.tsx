@@ -11,8 +11,6 @@ import { getOwnVideo } from "@/lib/video-access";
 import { VideoStatusBadge } from "@/components/videos/video-status-badge";
 import { ExtractPanel } from "@/components/videos/extract-panel";
 import { TranslatePanel } from "@/components/videos/translate-panel";
-import { RenderPanel } from "@/components/render/render-panel";
-import { DubPanel } from "@/components/dub/dub-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -108,20 +106,6 @@ export default async function VideoDetailPage({
         hasOriginalTrack={Boolean(original)}
         hasTranslatedTrack={Boolean(translated)}
         initialGlossary={video.glossary}
-        lang={lang}
-      />
-
-      <RenderPanel
-        videoId={video.id}
-        translatedTrackId={translated?.id ?? null}
-        durationSec={video.durationSec}
-        lang={lang}
-      />
-
-      <DubPanel
-        videoId={video.id}
-        translatedTrackId={translated?.id ?? null}
-        durationSec={video.durationSec}
         lang={lang}
       />
 
