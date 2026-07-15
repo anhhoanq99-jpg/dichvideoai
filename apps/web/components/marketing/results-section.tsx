@@ -25,9 +25,10 @@ const T = {
   },
 } as const;
 
+// qua /api/demo để lấy bản admin upload (rơi về file bundled nếu chưa đổi)
 const DEMOS = [
-  { src: "/demo/goc.mp4", key: "original" as const },
-  { src: "/demo/ban-viet.mp4", key: "translated" as const },
+  { src: "/api/demo/goc", key: "original" as const },
+  { src: "/api/demo/ban-viet", key: "translated" as const },
 ];
 
 /** Section so sánh trước/sau: video gốc vs bản Việt hóa hoàn chỉnh — bằng chứng thật. */

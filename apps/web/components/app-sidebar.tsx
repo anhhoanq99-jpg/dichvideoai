@@ -12,6 +12,7 @@ import {
   MessagesSquare,
   Mic,
   Receipt,
+  Shield,
   Video,
   X,
 } from "lucide-react";
@@ -64,11 +65,27 @@ const NAV_GROUPS = [
   },
 ] as const;
 
-function NavLinks({ lang, onNavigate }: { lang: Lang; onNavigate?: () => void }) {
+/** Nhóm chỉ admin thấy (nối vào cuối khi isAdmin). */
+const ADMIN_GROUP = {
+  vi: "Quản trị",
+  en: "Admin",
+  items: [{ href: "/admin", vi: "Quản trị", en: "Admin", icon: Shield }],
+} as const;
+
+function NavLinks({
+  lang,
+  isAdmin,
+  onNavigate,
+}: {
+  lang: Lang;
+  isAdmin?: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+  const groups = isAdmin ? [...NAV_GROUPS, ADMIN_GROUP] : NAV_GROUPS;
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto p-3">
-      {NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.en}>
           <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
             {group[lang]}
@@ -112,13 +129,13 @@ function NavLinks({ lang, onNavigate }: { lang: Lang; onNavigate?: () => void })
 }
 
 /** Sidebar desktop — ẩn trên mobile (mobile dùng MobileNav dạng drawer). */
-export function AppSidebar({ lang = "vi" }: { lang?: Lang }) {
+export function AppSidebar({ lang = "vi", isAdmin }: { lang?: Lang; isAdmin?: boolean }) {
   return (
     <aside className="hidden h-full w-60 flex-col border-r border-neutral-200 bg-white lg:flex dark:border-neutral-800 dark:bg-neutral-950">
       <div className="flex h-14 items-center px-4">
         <BrandLogo />
       </div>
-      <NavLinks lang={lang} />
+      <NavLinks lang={lang} isAdmin={isAdmin} />
       <p className="border-t border-neutral-100 p-3 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600">
         {lang === "vi" ? "Bản dựng Phase 1 — nội bộ" : "Phase 1 build — internal"}
       </p>
@@ -127,7 +144,7 @@ export function AppSidebar({ lang = "vi" }: { lang?: Lang }) {
 }
 
 /** Nút menu + drawer trượt cho điện thoại/tablet — nội dung chiếm full màn. */
-export function MobileNav({ lang = "vi" }: { lang?: Lang }) {
+export function MobileNav({ lang = "vi", isAdmin }: { lang?: Lang; isAdmin?: boolean }) {
   // bấm link nào cũng đóng drawer (onNavigate) — không cần theo dõi pathname
   const [open, setOpen] = useState(false);
 
@@ -161,7 +178,7 @@ export function MobileNav({ lang = "vi" }: { lang?: Lang }) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <NavLinks lang={lang} onNavigate={() => setOpen(false)} />
+            <NavLinks lang={lang} isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
           </aside>
         </div>
       )}

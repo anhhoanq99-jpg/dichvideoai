@@ -97,28 +97,12 @@ export function HeroSection({ lang = "vi" }: { lang?: Lang }) {
           </a>
         </div>
 
-        {/* social proof — cụm avatar + số creator đang dùng */}
+        {/* social proof — số creator đang dùng */}
         <div
           style={fadeDelay(0.42)}
-          className="animate-fade-up mt-7 flex items-center gap-3 rounded-full border border-white/10 bg-white/5 py-1.5 pl-2 pr-4 text-xs text-neutral-300 sm:text-sm"
+          className="animate-fade-up mt-7 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-neutral-300 sm:text-sm"
         >
-          <span className="flex items-center -space-x-2.5">
-            {[
-              ["T", "from-primary-400 to-primary-600"],
-              ["M", "from-accent-400 to-accent-600"],
-              ["H", "from-success-400 to-success-600"],
-            ].map(([initial, gradient]) => (
-              <span
-                key={initial}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-cinema bg-gradient-to-br ${gradient} text-[10px] font-bold text-white`}
-              >
-                {initial}
-              </span>
-            ))}
-            <span className="flex h-7 items-center justify-center rounded-full border-2 border-cinema bg-neutral-700 px-1.5 text-[10px] font-bold text-white">
-              +2.5K
-            </span>
-          </span>
+          <Sparkles className="h-3.5 w-3.5 text-primary-400" />
           <span>
             {t.trustPrefix} <b className="text-white">{t.trustCount}</b> {t.trustSuffix}
           </span>
