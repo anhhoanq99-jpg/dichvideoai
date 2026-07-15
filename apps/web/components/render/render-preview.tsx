@@ -69,13 +69,15 @@ function AccentedWords({
 }) {
   const tokens = tokenizeAccents(text);
   const totalChars = tokens.reduce((sum, t) => sum + t.text.length, 0) || 1;
-  let elapsed = 0;
+  // offset ký tự tích lũy TRƯỚC mỗi từ (n nhỏ nên O(n²) vô hại; không mutate biến)
+  const charOffsets = tokens.map((_, i) =>
+    tokens.slice(0, i).reduce((sum, t) => sum + t.text.length, 0),
+  );
   return (
     <>
       {tokens.map((tok, i) => {
         // delay theo tỉ lệ ký tự — cùng công thức chia thời gian với bản xuất ASS
-        const delayMs = (elapsed / totalChars) * durMs;
-        elapsed += tok.text.length;
+        const delayMs = (charOffsets[i] / totalChars) * durMs;
         return (
           <span
             key={i}

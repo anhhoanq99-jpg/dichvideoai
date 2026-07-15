@@ -65,10 +65,15 @@ export async function POST(req: NextRequest) {
   });
   if (!res.ok) {
     const detail = await res.text();
-    // gói free bị chặn cloning — báo rõ thay vì ném JSON thô
-    if (/can_not_use_instant_voice_cloning|subscription|upgrade/i.test(detail)) {
+    // gói free bị chặn cloning → báo rõ thay vì ném JSON thô. ElevenLabs trả lỗi
+    // dạng "missing the permission create_instant_voice_clone" / "unauthorized".
+    if (
+      /create_instant_voice_clone|instant_voice_cloning|missing.?permis|unauthorized|subscription|upgrade|not.?allowed/i.test(
+        detail,
+      )
+    ) {
       return jsonError(
-        "Tài khoản ElevenLabs hiện tại chưa hỗ trợ nhân bản giọng (cần gói Starter trở lên). Bạn vẫn dùng được 14 giọng có sẵn bên dưới.",
+        "Gói ElevenLabs miễn phí KHÔNG hỗ trợ nhân bản giọng riêng — cần nâng lên gói Starter (~5$/tháng) tại elevenlabs.io. Trong lúc đó bạn vẫn dùng thoải mái hàng trăm giọng có sẵn (Google, Adam, giọng thường…) ở mục Đọc văn bản bên dưới.",
         402,
       );
     }

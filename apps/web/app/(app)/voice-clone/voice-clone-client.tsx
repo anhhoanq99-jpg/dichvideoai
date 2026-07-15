@@ -2,15 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioLines, Download, Loader2, Mic2, Play, Trash2, Upload } from "lucide-react";
-import { ELEVEN_VOICES } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { fieldLabelClass, inputClass, selectClass } from "@/components/ui/form-styles";
+import {
+  DEFAULT_VOICE_SELECTION,
+  VoicePicker,
+  resolveVoice,
+  type VoiceSelection,
+} from "@/components/dub/voice-picker";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 
 const T = {
   vi: {
-    hint: "Chọn giọng có sẵn hoặc nhân bản giọng của chính bạn từ file mẫu, nhập văn bản — AI đọc thành file âm thanh tải về được.",
+    hint: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được. Nhân bản giọng riêng cần gói ElevenLabs trả phí.",
     myVoices: "Giọng của tôi",
     cloneTitle: "Nhân bản giọng mới",
     cloneNamePh: "Đặt tên giọng (vd: Giọng của tôi)…",
@@ -23,9 +28,8 @@ const T = {
     deleteVoice: "Xóa giọng này",
     deleted: "Đã xóa giọng",
     speakTitle: "Đọc văn bản",
-    voiceLabel: "Giọng đọc",
-    groupMine: "— Giọng nhân bản của tôi —",
-    groupPreset: "— Giọng có sẵn —",
+    groupMine: "Giọng nhân bản của tôi",
+    useCatalog: "— Dùng giọng có sẵn bên dưới —",
     textPh: "Nhập văn bản cần đọc (tiếng Việt hoặc ngôn ngữ bất kỳ)…",
     generate: "Tạo giọng nói",
     generating: "Đang tạo…",
@@ -33,7 +37,7 @@ const T = {
     fail: "Không tạo được — thử lại",
   },
   en: {
-    hint: "Pick a preset voice or clone your own from a sample, type text — AI reads it into a downloadable audio file.",
+    hint: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file. Cloning your own voice needs a paid ElevenLabs plan.",
     myVoices: "My voices",
     cloneTitle: "Clone a new voice",
     cloneNamePh: "Voice name (e.g. My voice)…",
@@ -46,9 +50,8 @@ const T = {
     deleteVoice: "Delete this voice",
     deleted: "Voice deleted",
     speakTitle: "Read text aloud",
-    voiceLabel: "Voice",
-    groupMine: "— My cloned voices —",
-    groupPreset: "— Preset voices —",
+    groupMine: "My cloned voices",
+    useCatalog: "— Use a catalog voice below —",
     textPh: "Enter the text to read…",
     generate: "Generate speech",
     generating: "Generating…",
@@ -79,7 +82,10 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
   const [cloning, setCloning] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
 
-  const [voiceId, setVoiceId] = useState<string>(ELEVEN_VOICES[0].id);
+  // giọng đọc: chọn từ catalog đầy đủ (VoicePicker) HOẶC 1 giọng nhân bản của mình
+  const [selection, setSelection] = useState<VoiceSelection>(DEFAULT_VOICE_SELECTION);
+  const [clonedVoiceId, setClonedVoiceId] = useState<string | null>(null);
+  const effectiveVoice = clonedVoiceId ?? resolveVoice(selection);
   const [text, setText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [speakError, setSpeakError] = useState<string | null>(null);
@@ -131,7 +137,7 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
       setConsent(false);
       if (fileRef.current) fileRef.current.value = "";
       await loadVoices();
-      setVoiceId(`mine:${data.voice.id}`);
+      setClonedVoiceId(`mine:${data.voice.id}`);
     } catch {
       setCloneError(t.fail);
     } finally {
@@ -143,7 +149,7 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
     const res = await fetch(`/api/voice-clone/voices/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast(t.deleted, "info");
-      if (voiceId === `mine:${id}`) setVoiceId(ELEVEN_VOICES[0].id);
+      if (clonedVoiceId === `mine:${id}`) setClonedVoiceId(null);
       await loadVoices();
     }
   }
@@ -156,7 +162,7 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
       const res = await fetch("/api/voice-clone/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ voiceId, text: text.trim() }),
+        body: JSON.stringify({ voiceId: effectiveVoice, text: text.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -265,31 +271,38 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
           <Play className="h-4 w-4 text-primary-500" /> {t.speakTitle}
         </p>
 
-        <label className="mt-3 block text-sm">
-          <span className={fieldLabelClass}>{t.voiceLabel}</span>
-          <select
-            value={voiceId}
-            onChange={(e) => setVoiceId(e.target.value)}
-            className={cn(selectClass, "mt-1 w-full sm:w-80")}
-          >
-            {myVoices.length > 0 && (
-              <optgroup label={t.groupMine}>
-                {myVoices.map((v) => (
-                  <option key={v.id} value={`mine:${v.id}`}>
-                    🎙 {v.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label={t.groupPreset}>
-              {ELEVEN_VOICES.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
+        {/* giọng nhân bản của mình (nếu có) — chọn để ưu tiên dùng, bỏ chọn để dùng catalog */}
+        {myVoices.length > 0 && (
+          <label className="mt-3 block text-sm">
+            <span className={fieldLabelClass}>{t.groupMine}</span>
+            <select
+              value={clonedVoiceId ?? ""}
+              onChange={(e) => setClonedVoiceId(e.target.value || null)}
+              className={cn(selectClass, "mt-1 w-full sm:w-80")}
+            >
+              <option value="">{t.useCatalog}</option>
+              {myVoices.map((v) => (
+                <option key={v.id} value={`mine:${v.id}`}>
+                  🎙 {v.name}
                 </option>
               ))}
-            </optgroup>
-          </select>
-        </label>
+            </select>
+          </label>
+        )}
+
+        {/* catalog đầy đủ: 322 giọng thường + 40 giọng Google + Adam… + cao cấp */}
+        <div
+          className={cn("mt-3", clonedVoiceId && "pointer-events-none opacity-50")}
+          onFocusCapture={() => clonedVoiceId && setClonedVoiceId(null)}
+          onClickCapture={() => clonedVoiceId && setClonedVoiceId(null)}
+        >
+          <VoicePicker
+            value={selection}
+            onChange={(patch) => setSelection((s) => ({ ...s, ...patch }))}
+            onError={setSpeakError}
+            lang={lang}
+          />
+        </div>
 
         <textarea
           value={text}
