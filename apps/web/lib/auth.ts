@@ -15,6 +15,17 @@ export const auth = betterAuth({
       verification: schema.verification,
     },
   }),
+  // giữ đăng nhập lâu: phiên 30 ngày, mỗi ngày dùng lại tự gia hạn thêm
+  // (mặc định 7 ngày — user phàn nàn hay phải đăng nhập lại)
+  session: {
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
+    // đọc session từ cookie ký sẵn trong 5 phút — đỡ query DB mỗi request
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 5,
+    },
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
