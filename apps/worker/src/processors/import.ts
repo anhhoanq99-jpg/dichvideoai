@@ -117,7 +117,10 @@ export async function importProcessor(job: Job<JobPayload>) {
       args: [
         url,
         "--format",
-        "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+        // ƯU TIÊN H.264 (avc1): YouTube phục vụ AV1/VP9 cho 1080p+, mà AV1 KHÔNG
+        // phát được trên Safari/iPhone → khung xem trước đen. avc1 phát mọi nơi.
+        // Rơi dần: avc1 mp4 → avc1 bất kỳ → mp4 bất kỳ → tốt nhất.
+        "bv*[vcodec^=avc1][ext=mp4]+ba[ext=m4a]/b[vcodec^=avc1][ext=mp4]/bv*[vcodec^=avc1]+ba/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
         "--merge-output-format",
         "mp4",
         "--max-filesize",

@@ -164,6 +164,9 @@ export async function renderProcessor(job: Job<JobPayload>) {
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "20",
+        // yuv420p 8-bit: phát được mọi thiết bị (nguồn 10-bit/AV1 nếu không ép sẽ ra
+        // H.264 10-bit — nhiều điện thoại/trình duyệt không phát nổi)
+        "-pix_fmt", "yuv420p",
         "-c:a", "copy",
         "-movflags", "+faststart",
         outPath,
