@@ -67,6 +67,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
+body {
+  /* chặn kéo ngang trên điện thoại — clip (không phải hidden) để KHÔNG biến
+     overflow-y thành auto, tránh hỏng header dính (sticky) ở trang marketing */
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

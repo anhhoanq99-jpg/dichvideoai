@@ -18,6 +18,8 @@ const T = {
     hint: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được. Nhân bản giọng riêng cần gói ElevenLabs trả phí.",
     myVoices: "Giọng của tôi",
     cloneTitle: "Nhân bản giọng mới",
+    clonePaidNote:
+      "⚠️ Nhân bản giọng riêng từ file mẫu CẦN gói ElevenLabs trả phí (Starter ~5$/tháng tại elevenlabs.io) — gói miễn phí không mở tính năng này. Nếu chỉ cần đọc văn bản, hàng trăm giọng bên dưới đều miễn phí.",
     cloneNamePh: "Đặt tên giọng (vd: Giọng của tôi)…",
     clonePick: "Chọn file mẫu (MP3/WAV, 30–120 giây, tối đa 10MB)",
     cloneHint: "Mẫu càng rõ, ít tạp âm thì giọng nhân bản càng giống. Đọc tự nhiên ~1 phút là đẹp.",
@@ -40,6 +42,8 @@ const T = {
     hint: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file. Cloning your own voice needs a paid ElevenLabs plan.",
     myVoices: "My voices",
     cloneTitle: "Clone a new voice",
+    clonePaidNote:
+      "⚠️ Cloning your own voice from a sample REQUIRES a paid ElevenLabs plan (Starter ~$5/mo at elevenlabs.io) — the free plan doesn't unlock it. If you just need text-to-speech, the hundreds of voices below are all free.",
     cloneNamePh: "Voice name (e.g. My voice)…",
     clonePick: "Choose a sample file (MP3/WAV, 30–120s, max 10MB)",
     cloneHint: "Clear, noise-free samples clone best. ~1 minute of natural speech is ideal.",
@@ -190,6 +194,11 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
           <span className="ml-auto text-xs font-normal text-neutral-400">
             {myVoices.length}/{maxClones}
           </span>
+        </p>
+
+        {/* báo trước: nhân bản cần gói trả phí — tránh user thử rồi mới thấy lỗi */}
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+          {t.clonePaidNote}
         </p>
 
         {myVoices.length > 0 && (

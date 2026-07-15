@@ -19,17 +19,17 @@ export default async function AppLayout({
   const isAdmin = isAdminEmail(session.user.email);
 
   return (
-    <div className="flex h-dvh bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex h-dvh overflow-x-hidden bg-neutral-50 dark:bg-neutral-950">
       <AppSidebar lang={lang} isAdmin={isAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-2.5 border-b border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-950">
-          {/* mobile: nút menu + logo; desktop: sidebar đã có logo */}
+        <header className="flex h-14 items-center gap-2 overflow-hidden border-b border-neutral-200 bg-white px-3 sm:gap-2.5 sm:px-4 dark:border-neutral-800 dark:bg-neutral-950">
+          {/* mobile: nút menu; logo chỉ hiện từ sm+ (điện thoại nhỏ giấu đi cho đỡ chật) */}
           <MobileNav lang={lang} isAdmin={isAdmin} />
           <BackButton label={lang === "vi" ? "Quay lại trang trước" : "Go back"} />
-          <span className="lg:hidden">
-            <BrandLogo textClassName="hidden sm:inline" />
+          <span className="hidden sm:inline lg:hidden">
+            <BrandLogo textClassName="hidden md:inline" />
           </span>
-          <span className="ml-auto flex items-center gap-2.5">
+          <span className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2.5">
             <CreditBalanceChip lang={lang} />
             <LangSwitcher lang={lang} />
             <ThemeToggle />
