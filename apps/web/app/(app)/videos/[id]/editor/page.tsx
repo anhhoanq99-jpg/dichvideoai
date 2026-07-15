@@ -59,12 +59,14 @@ export default async function EditorPage({
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
+      {/* chỉ nút quay lại gọn — tên video dài (nhất là tên Trung) chiếm 2 dòng
+          màn hình điện thoại; tên vẫn hiện ở header bảng phụ đề */}
       <Link
         href={`/videos/${video.id}`}
         className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
       >
-        <ArrowLeft className="h-4 w-4" /> {video.originalName}
+        <ArrowLeft className="h-4 w-4" /> {lang === "vi" ? "Quay lại" : "Back"}
       </Link>
       <StudioShell
         videoId={video.id}

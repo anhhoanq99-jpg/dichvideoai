@@ -565,7 +565,7 @@ export function RenderPreview({
           }}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-          className="max-h-[55dvh] w-auto max-w-full lg:max-h-[72dvh]"
+          className="max-h-[62dvh] w-auto max-w-full lg:max-h-[76dvh]"
         />
 
         {/* vùng che — mô phỏng đúng chế độ đã chọn */}
