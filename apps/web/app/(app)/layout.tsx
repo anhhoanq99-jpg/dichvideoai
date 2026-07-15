@@ -38,7 +38,11 @@ export default async function AppLayout({
             />
           </span>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        {/* overflow-x-hidden: phần tử nào lỡ rộng hơn màn hình cũng không làm
+            trang bị đẩy ngang khi thao tác trên điện thoại */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

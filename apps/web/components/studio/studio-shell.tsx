@@ -331,8 +331,8 @@ export function StudioShell({
 
       {/* màn nhỏ xếp dọc (preview trên, bảng dưới); từ lg trở lên chia 2 cột */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:overflow-visible">
-        {/* Trái: preview + tìm & thay */}
-        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-2/5 lg:min-w-72 lg:shrink lg:overflow-y-auto">
+        {/* Trái: preview + tìm & thay — 1/2 màn hình để video xem trước đủ lớn khi chỉnh */}
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-1/2 lg:min-w-72 lg:shrink lg:overflow-y-auto">
           {/* xem phụ đề nào trên video */}
           <div className="flex items-center gap-1 self-start rounded-lg border border-neutral-200 p-0.5 text-xs dark:border-neutral-700">
             {t.subtitleViews.map((v) => (
