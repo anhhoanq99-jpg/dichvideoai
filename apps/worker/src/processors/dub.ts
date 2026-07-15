@@ -28,6 +28,44 @@ function clamp(n: number, min: number, max: number) {
 }
 
 /**
+ * Chạy `fn` cho từng phần tử với tối đa `limit` việc song song, giữ nguyên thứ tự
+ * kết quả theo index. `onDone` gọi sau MỖI phần tử xong (để cập nhật tiến độ).
+ * Video dài có hàng chục câu → chạy song song nhanh hơn tuần tự nhiều lần.
+ */
+async function mapPool<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+  onDone?: () => void,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+      onDone?.();
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+/** Số câu tổng hợp song song theo nhà cung cấp giọng (tránh vượt rate-limit). */
+function ttsConcurrency(voice: string): number {
+  switch (voiceProvider(voice)) {
+    case "gemini":
+      return 2; // trả phí, RPM giới hạn — nhẹ tay
+    case "eleven":
+      return 3; // free tier hẹp
+    default:
+      return 6; // edge (miễn phí) + google cloud: thoải mái
+  }
+}
+
+/**
  * Filter âm lượng cho audio gốc: trong khoảng các câu thoại → origVoiceVol,
  * ngoài câu → bgVol. Hai mức bằng nhau (hoặc quá nhiều câu làm biểu thức
  * vượt giới hạn args) → volume phẳng như cũ.
@@ -120,47 +158,59 @@ export async function dubProcessor(job: Job<JobPayload>) {
 
     const videoDurMs = video.durationSec * 1000;
 
-    // 1. TTS từng câu (5→55%)
-    const clips: string[] = [];
-    const usage: UsageRecord[] = [];
-    for (const [k, seg] of segments.entries()) {
-      const clip = await synthesizeClipWithRetry({
-        // bỏ *dấu sao* đánh dấu từ nhấn màu — không để giọng đọc vấp
-        text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
-        voice,
-        speed,
-        dir,
-        name: `clip-${k}`,
-      });
-      clips.push(clip.file);
-      usage.push(...clip.usage);
-      await job.updateProgress(5 + Math.round(((k + 1) / segments.length) * 50));
-    }
+    // 1. TTS từng câu — chạy song song có giới hạn (5→55%)
+    let ttsDone = 0;
+    const synthResults = await mapPool(
+      segments,
+      ttsConcurrency(voice),
+      (seg, k) =>
+        synthesizeClipWithRetry({
+          // bỏ *dấu sao* đánh dấu từ nhấn màu — không để giọng đọc vấp
+          text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
+          voice,
+          speed,
+          dir,
+          name: `clip-${k}`,
+        }),
+      () => {
+        ttsDone++;
+        void job.updateProgress(5 + Math.round((ttsDone / segments.length) * 50));
+      },
+    );
+    const clips = synthResults.map((r) => r.file);
+    const usage = synthResults.flatMap((r) => r.usage);
     const costUsdMicros = await recordUsage(job.data.jobId, usage);
 
-    // 2. Ép mỗi clip khớp khe thời gian của câu (55→70%)
-    const fitted: { file: string; durMs: number }[] = [];
-    for (const [k] of segments.entries()) {
-      const rawMs = await audioDurationMs(clips[k]);
-      const slot = slotMs(segments, k, videoDurMs);
-      const atempoFilter = atempoChain(Math.max(rawMs / slot, speedBaked ? 1 : speed));
-      const out = path.join(dir, `fit-${k}.wav`);
-      // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
-      const expectedMs = Math.min(atempoFilter ? slot : rawMs, slot);
-      const fades = `afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, (expectedMs - 25) / 1000).toFixed(3)}:d=0.025`;
-      await execFileAsync(ffBin("ffmpeg"), [
-        "-y",
-        "-i", clips[k],
-        "-af", atempoFilter ? `${atempoFilter},${fades}` : fades,
-        "-ar", "24000",
-        "-ac", "1",
-        "-c:a", "pcm_s16le",
-        "-t", (slot / 1000).toFixed(3), // chặn cứng: không bao giờ tràn sang câu sau
-        out,
-      ]);
-      fitted.push({ file: out, durMs: await audioDurationMs(out) });
-      await job.updateProgress(55 + Math.round(((k + 1) / segments.length) * 15));
-    }
+    // 2. Ép mỗi clip khớp khe thời gian của câu — song song (máy 12 nhân) (55→70%)
+    let fitDone = 0;
+    const fitted = await mapPool(
+      segments,
+      6,
+      async (_seg, k) => {
+        const rawMs = await audioDurationMs(clips[k]);
+        const slot = slotMs(segments, k, videoDurMs);
+        const atempoFilter = atempoChain(Math.max(rawMs / slot, speedBaked ? 1 : speed));
+        const out = path.join(dir, `fit-${k}.wav`);
+        // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
+        const expectedMs = Math.min(atempoFilter ? slot : rawMs, slot);
+        const fades = `afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, (expectedMs - 25) / 1000).toFixed(3)}:d=0.025`;
+        await execFileAsync(ffBin("ffmpeg"), [
+          "-y",
+          "-i", clips[k],
+          "-af", atempoFilter ? `${atempoFilter},${fades}` : fades,
+          "-ar", "24000",
+          "-ac", "1",
+          "-c:a", "pcm_s16le",
+          "-t", (slot / 1000).toFixed(3), // chặn cứng: không bao giờ tràn sang câu sau
+          out,
+        ]);
+        return { file: out, durMs: await audioDurationMs(out) };
+      },
+      () => {
+        fitDone++;
+        void job.updateProgress(55 + Math.round((fitDone / segments.length) * 15));
+      },
+    );
 
     // 3. Ghép track thuyết minh: [lặng] câu [lặng] câu ... (70→75%)
     const parts: string[] = [];
