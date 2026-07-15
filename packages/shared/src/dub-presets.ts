@@ -80,10 +80,46 @@ export function elevenVoiceId(id: string): string | null {
 }
 
 /**
- * Giọng Google Cloud TTS tiếng Việt — cần GOOGLE_TTS_API_KEY riêng,
- * free 1 triệu ký tự Wavenet + 4 triệu ký tự Standard mỗi tháng.
+ * Giọng Google Cloud TTS tiếng Việt — cần GOOGLE_TTS_API_KEY riêng.
+ * Free hằng tháng: Chirp3-HD/Neural2/Wavenet ~1 triệu ký tự, Standard 4 triệu.
+ * Chirp3-HD là thế hệ mới nhất, tự nhiên nhất (đã verify synth + speakingRate 15/07/2026).
  */
 export const GCLOUD_VOICES = [
+  // ---- Chirp3-HD: tự nhiên nhất ----
+  { id: "gcloud:vi-VN-Chirp3-HD-Aoede", name: "Google HD Aoede — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Achernar", name: "Google HD Achernar — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Autonoe", name: "Google HD Autonoe — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Callirrhoe", name: "Google HD Callirrhoe — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Despina", name: "Google HD Despina — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Erinome", name: "Google HD Erinome — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Gacrux", name: "Google HD Gacrux — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Kore", name: "Google HD Kore — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Laomedeia", name: "Google HD Laomedeia — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Leda", name: "Google HD Leda — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Pulcherrima", name: "Google HD Pulcherrima — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Sulafat", name: "Google HD Sulafat — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Vindemiatrix", name: "Google HD Vindemiatrix — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Zephyr", name: "Google HD Zephyr — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Achird", name: "Google HD Achird — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Algenib", name: "Google HD Algenib — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Algieba", name: "Google HD Algieba — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Alnilam", name: "Google HD Alnilam — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Charon", name: "Google HD Charon — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Enceladus", name: "Google HD Enceladus — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Fenrir", name: "Google HD Fenrir — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Iapetus", name: "Google HD Iapetus — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Orus", name: "Google HD Orus — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Puck", name: "Google HD Puck — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Rasalgethi", name: "Google HD Rasalgethi — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Sadachbia", name: "Google HD Sadachbia — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Sadaltager", name: "Google HD Sadaltager — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Schedar", name: "Google HD Schedar — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Umbriel", name: "Google HD Umbriel — nam", gender: "M" },
+  { id: "gcloud:vi-VN-Chirp3-HD-Zubenelgenubi", name: "Google HD Zubenelgenubi — nam", gender: "M" },
+  // ---- Neural2 ----
+  { id: "gcloud:vi-VN-Neural2-A", name: "Google Neural2 A — nữ", gender: "F" },
+  { id: "gcloud:vi-VN-Neural2-D", name: "Google Neural2 D — nam", gender: "M" },
+  // ---- Wavenet / Standard ----
   { id: "gcloud:vi-VN-Wavenet-A", name: "Google Wavenet A — nữ tự nhiên", gender: "F" },
   { id: "gcloud:vi-VN-Wavenet-B", name: "Google Wavenet B — nam tự nhiên", gender: "M" },
   { id: "gcloud:vi-VN-Wavenet-C", name: "Google Wavenet C — nữ trầm", gender: "F" },

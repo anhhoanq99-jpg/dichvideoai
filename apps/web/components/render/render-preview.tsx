@@ -141,6 +141,7 @@ const LOGO_CORNER: Record<string, React.CSSProperties> = {
 type Gesture =
   | { kind: "draw"; start: { x: number; y: number } }
   | { kind: "move-region"; index: number; grab: { dx: number; dy: number } }
+  | { kind: "resize-region"; index: number }
   | { kind: "move-sub"; grab: { dx: number; dy: number } };
 
 function clamp01(n: number) {
@@ -454,7 +455,19 @@ export function RenderPreview({
   function handlePointerDown(e: React.PointerEvent) {
     const p = toNorm(e);
     e.currentTarget.setPointerCapture(e.pointerId);
-    // ưu tiên: kéo khung phụ đề → kéo vùng che → vẽ vùng mới
+    // ưu tiên cao nhất: chạm gần góc phải-dưới một vùng che → đổi kích thước
+    if (covering) {
+      const rect = boxRef.current!.getBoundingClientRect();
+      for (let i = regions.length - 1; i >= 0; i--) {
+        const cornerX = rect.left + (regions[i].x + regions[i].w) * rect.width;
+        const cornerY = rect.top + (regions[i].y + regions[i].h) * rect.height;
+        if (Math.abs(e.clientX - cornerX) < 18 && Math.abs(e.clientY - cornerY) < 18) {
+          setGesture({ kind: "resize-region", index: i });
+          return;
+        }
+      }
+    }
+    // tiếp theo: kéo khung phụ đề → kéo vùng che → vẽ vùng mới
     if (previewText && insideBox(p, displaySubBox)) {
       setGesture({
         kind: "move-sub",
@@ -497,6 +510,14 @@ export function RenderPreview({
         y: Math.min(Math.max(p.y - gesture.grab.dy, 0), 1 - region.h),
       };
       onRegionsChange(regions.map((r, i) => (i === gesture.index ? moved : r)));
+    } else if (gesture.kind === "resize-region") {
+      const region = regions[gesture.index];
+      const resized = {
+        ...region,
+        w: Math.min(1 - region.x, Math.max(0.03, p.x - region.x)),
+        h: Math.min(1 - region.y, Math.max(0.03, p.y - region.y)),
+      };
+      onRegionsChange(regions.map((r, i) => (i === gesture.index ? resized : r)));
     } else {
       onSubBoxChange({
         ...displaySubBox,
@@ -593,6 +614,10 @@ export function RenderPreview({
               <span className="absolute left-0 top-0 bg-red-500/90 px-1 text-[10px] font-bold text-white">
                 {idx + 1}
               </span>
+              {/* nút góc đổi kích thước — hit-test nằm ở handlePointerDown của khung */}
+              {idx < regions.length && (
+                <span className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-red-500 shadow" />
+              )}
             </div>
           ))}
 
