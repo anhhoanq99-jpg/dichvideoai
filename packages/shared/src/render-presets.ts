@@ -28,7 +28,23 @@ export const RENDER_FONTS = [
   "Montserrat",
   "Noto Sans",
   "Anton",
+  "Oswald",
+  "Baloo 2",
+  "Bungee",
+  "Paytone One",
+  "Lobster",
+  "Patrick Hand",
 ] as const;
+
+/**
+ * Hiệu ứng chữ phụ đề (áp cả preview lẫn bản xuất qua ASS tags):
+ * fade = hiện dần, pop = phóng nhẹ khi vào, karaoke = màu chạy theo giọng đọc.
+ */
+export const SUB_EFFECT_IDS = ["none", "fade", "pop", "karaoke"] as const;
+export type SubEffect = (typeof SUB_EFFECT_IDS)[number];
+
+/** Màu "chưa đọc tới" của chế độ karaoke — chữ đổ dần từ màu này sang màu chính. */
+export const KARAOKE_BASE_COLOR = "#C9C9C9";
 
 export const STYLE_PRESETS: StylePreset[] = [
   {
@@ -115,6 +131,8 @@ export interface StyleOverrides {
   boxed?: boolean;
   /** vertical margin from bottom (PlayRes px) */
   marginV?: number;
+  /** hiệu ứng chữ: fade / pop / karaoke (mặc định none) */
+  effect?: SubEffect;
 }
 
 export const LOGO_POSITIONS = [

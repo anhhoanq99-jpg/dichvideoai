@@ -1,4 +1,4 @@
-import type { SubtitleStyle } from "./render-presets";
+import { KARAOKE_BASE_COLOR, type SubEffect, type SubtitleStyle } from "./render-presets";
 import type { SubtitleSegment } from "./types";
 
 /** "#RRGGBB" or "#RRGGBBAA" → ASS "&HAABBGGRR" (alpha 00 = opaque, FF = transparent) */
@@ -35,6 +35,38 @@ export interface PlayRes {
 }
 
 /**
+ * Text một câu theo hiệu ứng đã chọn (ASS override tags đứng đầu dòng thoại):
+ * - fade: hiện/tắt dần 180ms
+ * - pop: chữ phóng từ 75% lên 100% trong 160ms
+ * - karaoke: chia chữ theo từ, mỗi từ chiếm phần thời gian tỉ lệ độ dài —
+ *   màu đổ dần từ SecondaryColour (xám) sang PrimaryColour đúng nhịp giọng đọc
+ */
+function effectText(seg: SubtitleSegment, effect: SubEffect): string {
+  if (effect === "fade") return `{\\fad(180,180)}${escapeAssText(seg.text)}`;
+  if (effect === "pop")
+    return `{\\fscx75\\fscy75\\t(0,160,\\fscx100\\fscy100)}${escapeAssText(seg.text)}`;
+  if (effect === "karaoke") {
+    const words = seg.text.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return escapeAssText(seg.text);
+    const totalCs = Math.max(10, Math.round((seg.endMs - seg.startMs) / 10));
+    const totalChars = words.reduce((sum, w) => sum + w.length, 0);
+    let usedCs = 0;
+    return words
+      .map((word, i) => {
+        // từ cuối nhận phần dư để tổng đúng bằng thời lượng câu
+        const cs =
+          i === words.length - 1
+            ? Math.max(1, totalCs - usedCs)
+            : Math.max(1, Math.round((word.length / totalChars) * totalCs));
+        usedCs += cs;
+        return `{\\kf${cs}}${escapeAssText(word)}`;
+      })
+      .join(" ");
+  }
+  return escapeAssText(seg.text);
+}
+
+/**
  * Build a complete .ass document for libass burning.
  * Alignment 2 (bottom-center); vertical position via marginV.
  */
@@ -42,10 +74,13 @@ export function buildAss(
   segments: SubtitleSegment[],
   style: SubtitleStyle,
   playRes: PlayRes,
+  effect: SubEffect = "none",
 ): string {
   const primary = hexToAss(style.primary);
   const outline = hexToAss(style.outline);
   const back = hexToAss(style.back ?? "#000000AA");
+  // karaoke: SecondaryColour là màu "chưa đọc tới" — libass tự đổ sang primary theo \kf
+  const secondary = effect === "karaoke" ? hexToAss(KARAOKE_BASE_COLOR) : primary;
 
   const header = [
     "[Script Info]",
@@ -57,7 +92,7 @@ export function buildAss(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Default,${style.font},${style.size},${primary},${primary},${outline},${back},${style.bold ? -1 : 0},0,0,0,100,100,0,0,${style.borderStyle},${style.borderStyle === 3 ? 5 : 2},0,2,${style.marginL ?? 60},${style.marginR ?? 60},${style.marginV},1`,
+    `Style: Default,${style.font},${style.size},${primary},${secondary},${outline},${back},${style.bold ? -1 : 0},0,0,0,100,100,0,0,${style.borderStyle},${style.borderStyle === 3 ? 5 : 2},0,2,${style.marginL ?? 60},${style.marginR ?? 60},${style.marginV},1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -67,7 +102,7 @@ export function buildAss(
     .filter((s) => s.text.trim().length > 0 && s.endMs > s.startMs)
     .map(
       (s) =>
-        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${escapeAssText(s.text)}`,
+        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${effectText(s, effect)}`,
     )
     .join("\n");
 

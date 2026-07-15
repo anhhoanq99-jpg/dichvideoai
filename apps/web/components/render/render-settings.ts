@@ -3,6 +3,7 @@ import {
   type CoverMode,
   type CoverRegion,
   type LogoPosition,
+  type SubEffect,
 } from "@dichvideo/shared";
 
 /** Toàn bộ thiết lập render người dùng chỉnh trong panel — lưu được theo tên. */
@@ -24,6 +25,8 @@ export interface RenderSettings {
   boxColor: string;
   boxOpacity: number;
   marginV: number;
+  /** hiệu ứng chữ: none / fade / pop / karaoke (màu chạy theo giọng đọc) */
+  effect: SubEffect;
   // logo/watermark của user (chữ hoặc hình ảnh)
   logoOn: boolean;
   logoType: "text" | "image";
@@ -78,6 +81,7 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   boxColor: "#000000",
   boxOpacity: 67,
   marginV: STYLE_PRESETS[0].marginV,
+  effect: "none",
   logoOn: false,
   logoType: "text",
   logoText: "",

@@ -162,6 +162,27 @@ body {
 .stagger-group.is-visible > *:nth-child(7) { animation-delay: 480ms; }
 .stagger-group.is-visible > *:nth-child(8) { animation-delay: 560ms; }
 
+/* ---- Hiệu ứng phụ đề trong khung xem trước studio (mô phỏng ASS khi xuất) ---- */
+@keyframes sub-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sub-pop {
+  from {
+    transform: scale(0.75);
+  }
+}
+/* karaoke: dải màu chính quét từ trái sang phải theo thời lượng câu */
+@keyframes sub-karaoke {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
 /* thẻ nâng nhẹ khi rê chuột (chỉ transform — không reflow) */
 .lift {
   transition: transform 0.2s ease-out;

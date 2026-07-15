@@ -49,10 +49,10 @@ const T = {
   },
 } as const;
 
-/** Nạp 4 font render từ Google Fonts để preview đúng mặt chữ (chỉ khi mở preview). */
+/** Nạp các font render từ Google Fonts để preview đúng mặt chữ (chỉ khi mở preview). */
 const FONT_CSS_ID = "render-preview-fonts";
 const FONT_CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&family=Oswald:wght@400;700&family=Baloo+2:wght@400;700&family=Bungee&family=Paytone+One&family=Lobster&family=Patrick+Hand&display=swap";
 
 interface RenderPreviewProps {
   previewUrl: string;
@@ -171,6 +171,18 @@ export function RenderPreview({
   const clipUrlCache = useRef(new Map<string, string>());
   const dubAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenRef = useRef<number | null>(null);
+
+  // iOS chỉ cho phát audio nếu phần tử từng .play() TRONG một cử chỉ chạm.
+  // Tạo 1 phần tử duy nhất + phát file WAV im lặng ngay lúc bấm nút, các câu
+  // lồng tiếng sau chỉ đổi src trên chính phần tử đã "mở khóa" này.
+  const SILENT_WAV =
+    "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  function unlockDubAudio() {
+    if (dubAudioRef.current) return;
+    const audio = new Audio(SILENT_WAV);
+    dubAudioRef.current = audio;
+    void audio.play().catch(() => {});
+  }
 
   // kéo/resize logo trực tiếp trên khung preview
   const logoRef = useRef<HTMLDivElement>(null);
@@ -348,15 +360,18 @@ export function RenderPreview({
     let stale = false;
     void fetchDubClip(dubVoice, seg).then((url) => {
       if (!url || stale) return;
-      dubAudioRef.current?.pause();
-      const audio = new Audio(url);
+      // tái sử dụng phần tử đã mở khóa trong cử chỉ chạm — iOS mới cho phát;
+      // desktop chưa bấm nút nào thì tạo mới (autoplay policy thoáng hơn)
+      const audio = dubAudioRef.current ?? new Audio();
       dubAudioRef.current = audio;
+      audio.pause();
+      audio.src = url;
       audio.volume = Math.min(1, Math.max(0, dubAiVolume / 100));
-      audio.addEventListener("loadedmetadata", () => {
+      audio.onloadedmetadata = () => {
         // câu dài hơn khe → tăng tốc đọc cho khớp (như atempo khi xuất)
         const rawMs = audio.duration * 1000;
         audio.playbackRate = Math.min(4, Math.max(dubSpeed, rawMs / slotMs));
-      });
+      };
       void audio.play().catch(() => {});
       if (next) void fetchDubClip(dubVoice, next);
     });
@@ -449,6 +464,8 @@ export function RenderPreview({
   function togglePlay() {
     const video = videoRef.current;
     if (!video) return;
+    // đang trong cử chỉ chạm — tranh thủ mở khóa audio lồng tiếng cho iOS
+    if (dubSupported) unlockDubAudio();
     if (video.paused) void video.play();
     else video.pause();
   }
@@ -555,16 +572,45 @@ export function RenderPreview({
                 fontFamily: `'${settings.font}', sans-serif`,
                 fontSize: Math.max(9, settings.fontSize * previewScale),
                 fontWeight: settings.bold ? 700 : 400,
-                color: settings.primaryColor,
-                textShadow: settings.boxed
-                  ? "none"
-                  : `-1px -1px 0 ${outline}, 1px -1px 0 ${outline}, -1px 1px 0 ${outline}, 1px 1px 0 ${outline}, 0 0 4px ${outline}`,
                 backgroundColor: settings.boxed
                   ? `${settings.boxColor}${boxAlpha}`
                   : "transparent",
               }}
             >
-              {previewText}
+              {/* span trong mang màu + hiệu ứng — key theo câu để animation chạy lại mỗi câu */}
+              <span
+                key={activeSegment?.i ?? -1}
+                style={{
+                  display: "inline-block",
+                  color: settings.primaryColor,
+                  textShadow: settings.boxed
+                    ? "none"
+                    : `-1px -1px 0 ${outline}, 1px -1px 0 ${outline}, -1px 1px 0 ${outline}, 1px 1px 0 ${outline}, 0 0 4px ${outline}`,
+                  ...(settings.effect === "fade"
+                    ? { animation: "sub-fade 0.18s ease-out both" }
+                    : {}),
+                  ...(settings.effect === "pop"
+                    ? { animation: "sub-pop 0.16s ease-out both" }
+                    : {}),
+                  ...(settings.effect === "karaoke"
+                    ? {
+                        color: "transparent",
+                        textShadow: "none",
+                        backgroundImage: `linear-gradient(90deg, ${settings.primaryColor} 50%, #C9C9C9 50%)`,
+                        backgroundSize: "200% 100%",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextStroke: settings.boxed ? undefined : `1px ${outline}`,
+                        animation: `sub-karaoke ${Math.max(
+                          300,
+                          (activeSegment?.endMs ?? 2000) - (activeSegment?.startMs ?? 0),
+                        )}ms linear both`,
+                      }
+                    : {}),
+                }}
+              >
+                {previewText}
+              </span>
             </span>
           </div>
         )}
@@ -658,7 +704,10 @@ export function RenderPreview({
         {dubVoice && (
           <button
             type="button"
-            onClick={() => setDubMuted((v) => !v)}
+            onClick={() => {
+              unlockDubAudio();
+              setDubMuted((v) => !v);
+            }}
             disabled={!dubSupported}
             title={
               !dubSupported ? t.dubUnsupported : dubActive ? t.dubOff : t.dubOn

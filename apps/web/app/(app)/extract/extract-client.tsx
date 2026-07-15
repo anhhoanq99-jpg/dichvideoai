@@ -10,6 +10,7 @@ import {
 } from "@/hooks/use-multipart-upload";
 import type { Lang } from "@/lib/i18n";
 import { fieldLabelClass, selectClass } from "@/components/ui/form-styles";
+import { sourceLangOptions } from "@/lib/source-langs";
 import { cn } from "@/lib/utils";
 
 const T = {
@@ -25,14 +26,6 @@ const T = {
         label: "Âm thanh — giọng nói",
         hint: "Nghe audio và tạo phụ đề kèm mốc thời gian",
       },
-    ],
-    langOptions: [
-      { value: "", label: "Tự nhận diện" },
-      { value: "zh", label: "中文 (Trung)" },
-      { value: "en", label: "English (Anh)" },
-      { value: "ja", label: "日本語 (Nhật)" },
-      { value: "ko", label: "한국어 (Hàn)" },
-      { value: "th", label: "ไทย (Thái)" },
     ],
     title: "Trích xuất phụ đề",
     subtitle:
@@ -56,14 +49,6 @@ const T = {
         label: "Audio — speech",
         hint: "Listens to the audio and creates timestamped subtitles",
       },
-    ],
-    langOptions: [
-      { value: "", label: "Auto-detect" },
-      { value: "zh", label: "中文 (Chinese)" },
-      { value: "en", label: "English" },
-      { value: "ja", label: "日本語 (Japanese)" },
-      { value: "ko", label: "한국어 (Korean)" },
-      { value: "th", label: "ไทย (Thai)" },
     ],
     title: "Extract subtitles",
     subtitle:
@@ -172,7 +157,7 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
             onChange={(e) => setSourceLang(e.target.value)}
             className={cn(selectClass, "mt-1 w-full")}
           >
-            {t.langOptions.map((l) => (
+            {sourceLangOptions(lang).map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
               </option>

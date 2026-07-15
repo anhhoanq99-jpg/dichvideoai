@@ -6,17 +6,10 @@ import { useJobRunner } from "@/hooks/use-job-runner";
 import { JobError, JobProgress } from "@/components/jobs/job-ui";
 import { optionCardClass, selectClass } from "@/components/ui/form-styles";
 import type { Lang } from "@/lib/i18n";
+import { sourceLangOptions } from "@/lib/source-langs";
 
 const T = {
   vi: {
-    langHints: [
-      { value: "", label: "Tự phát hiện" },
-      { value: "zh", label: "Tiếng Trung" },
-      { value: "en", label: "Tiếng Anh" },
-      { value: "ko", label: "Tiếng Hàn" },
-      { value: "ja", label: "Tiếng Nhật" },
-      { value: "th", label: "Tiếng Thái" },
-    ],
     title: "Trích xuất phụ đề gốc",
     progressStt: "Đang nhận dạng giọng nói…",
     progressOcr: "Đang đọc phụ đề trên hình…",
@@ -30,14 +23,6 @@ const T = {
     errFallback: "Trích xuất thất bại",
   },
   en: {
-    langHints: [
-      { value: "", label: "Auto-detect" },
-      { value: "zh", label: "Chinese" },
-      { value: "en", label: "English" },
-      { value: "ko", label: "Korean" },
-      { value: "ja", label: "Japanese" },
-      { value: "th", label: "Thai" },
-    ],
     title: "Extract original subtitles",
     progressStt: "Recognizing speech…",
     progressOcr: "Reading on-screen subtitles…",
@@ -129,7 +114,7 @@ export function ExtractPanel({
               onChange={(e) => setSourceLang(e.target.value)}
               className={selectClass}
             >
-              {t.langHints.map((l) => (
+              {sourceLangOptions(lang).map((l) => (
                 <option key={l.value} value={l.value}>
                   {l.label}
                 </option>

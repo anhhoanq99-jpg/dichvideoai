@@ -216,6 +216,7 @@ export function ExportModal({
               boxColor: settings.boxColor,
               boxOpacity: settings.boxOpacity,
               marginV: settings.marginV,
+              effect: settings.effect,
             }
           : {}),
         ...(dub.enabled

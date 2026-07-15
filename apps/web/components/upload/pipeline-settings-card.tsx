@@ -10,6 +10,7 @@ import {
 import { fieldLabelClass, optionCardClass, selectClass } from "@/components/ui/form-styles";
 import type { PipelineSettings } from "@/hooks/use-multipart-upload";
 import type { Lang } from "@/lib/i18n";
+import { sourceLangOptions } from "@/lib/source-langs";
 import { cn } from "@/lib/utils";
 
 const T = {
@@ -25,14 +26,6 @@ const T = {
         label: "Âm thanh — video chỉ có tiếng nói",
         hint: "AI nghe giọng nói và tạo phụ đề",
       },
-    ],
-    langOptions: [
-      { value: "", label: "Tự nhận diện" },
-      { value: "zh", label: "中文 (Trung)" },
-      { value: "en", label: "English (Anh)" },
-      { value: "ja", label: "日本語 (Nhật)" },
-      { value: "ko", label: "한국어 (Hàn)" },
-      { value: "th", label: "ไทย (Thái)" },
     ],
     sourceLang: "Ngôn ngữ gốc",
     targetLang: "Dịch sang",
@@ -55,14 +48,6 @@ const T = {
         label: "Audio — speech only",
         hint: "AI listens to the speech and generates subtitles",
       },
-    ],
-    langOptions: [
-      { value: "", label: "Auto-detect" },
-      { value: "zh", label: "中文 (Chinese)" },
-      { value: "en", label: "English" },
-      { value: "ja", label: "日本語 (Japanese)" },
-      { value: "ko", label: "한국어 (Korean)" },
-      { value: "th", label: "ไทย (Thai)" },
     ],
     sourceLang: "Source language",
     targetLang: "Translate to",
@@ -148,7 +133,7 @@ export function PipelineSettingsCard({
             onChange={(e) => onChange({ sourceLang: e.target.value })}
             className={cn(selectClass, "mt-1 w-full py-2")}
           >
-            {t.langOptions.map((l) => (
+            {sourceLangOptions(lang).map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
               </option>

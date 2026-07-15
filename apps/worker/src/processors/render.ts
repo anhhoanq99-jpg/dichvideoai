@@ -7,6 +7,7 @@ import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
   RENDER_FONTS,
   STYLE_PRESETS,
+  SUB_EFFECT_IDS,
   buildAss,
   type JobPayload,
   type RenderParams,
@@ -112,7 +113,10 @@ export async function renderProcessor(job: Job<JobPayload>) {
       aspect: params.aspect,
     });
     const assPath = path.join(dir, "subs.ass");
-    await writeFile(assPath, buildAss(segments, style, playRes), "utf8");
+    const effect = SUB_EFFECT_IDS.includes(params.effect as (typeof SUB_EFFECT_IDS)[number])
+      ? (params.effect as (typeof SUB_EFFECT_IDS)[number])
+      : "none";
+    await writeFile(assPath, buildAss(segments, style, playRes, effect), "utf8");
 
     const logo =
       params.logo?.text?.trim() && HEX_RE.test(params.logo.color)

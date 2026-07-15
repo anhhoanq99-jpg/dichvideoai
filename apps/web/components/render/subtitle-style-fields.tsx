@@ -1,6 +1,6 @@
 "use client";
 
-import { RENDER_FONTS } from "@dichvideo/shared";
+import { RENDER_FONTS, SUB_EFFECT_IDS, type SubEffect } from "@dichvideo/shared";
 import {
   colorInputClass,
   fieldLabelClass,
@@ -22,6 +22,13 @@ const T = {
     boxOpacity: "Độ phủ ô nền",
     boxOpacityFull: "(che kín chữ gốc)",
     marginV: "Vị trí (cách đáy)",
+    effect: "Hiệu ứng chữ",
+    effectNames: {
+      none: "Không",
+      fade: "Hiện dần",
+      pop: "Phóng nhẹ khi vào",
+      karaoke: "Karaoke — màu chạy theo giọng đọc",
+    } as Record<SubEffect, string>,
   },
   en: {
     font: "Font",
@@ -34,6 +41,13 @@ const T = {
     boxColor: "Box color",
     boxOpacityFull: "(fully covers original text)",
     marginV: "Position (from bottom)",
+    effect: "Text effect",
+    effectNames: {
+      none: "None",
+      fade: "Fade in",
+      pop: "Pop in",
+      karaoke: "Karaoke — color follows the voice",
+    } as Record<SubEffect, string>,
   },
 } as const;
 
@@ -79,6 +93,20 @@ export function SubtitleStyleFields({
           onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
           className="mt-2 w-full"
         />
+      </label>
+      <label className="text-sm">
+        <span className={fieldLabelClass}>{t.effect}</span>
+        <select
+          value={settings.effect}
+          onChange={(e) => onChange({ effect: e.target.value as SubEffect })}
+          className={cn(selectClass, "mt-1 w-full")}
+        >
+          {SUB_EFFECT_IDS.map((id) => (
+            <option key={id} value={id}>
+              {t.effectNames[id]}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input

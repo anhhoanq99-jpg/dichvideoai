@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   COVER_MODES,
+  SUB_EFFECT_IDS,
   MAX_COVER_REGIONS,
   RENDER_FONTS,
   STYLE_PRESETS,
@@ -74,6 +75,7 @@ const schema = z.object({
   boxColor: z.string().regex(HEX).optional(),
   boxOpacity: z.number().int().min(0).max(100).optional(),
   marginV: z.number().int().min(0).max(400).optional(),
+  effect: z.enum(SUB_EFFECT_IDS).optional(),
 });
 
 export async function POST(
