@@ -182,6 +182,12 @@ body {
     background-position: 0% 0;
   }
 }
+/* reveal: từng từ bật hiện đúng lúc được đọc (delay đặt inline theo từ) */
+@keyframes sub-reveal {
+  to {
+    opacity: 1;
+  }
+}
 
 /* thẻ nâng nhẹ khi rê chuột (chỉ transform — không reflow) */
 .lift {

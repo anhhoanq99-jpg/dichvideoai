@@ -25,8 +25,10 @@ export interface RenderSettings {
   boxColor: string;
   boxOpacity: number;
   marginV: number;
-  /** hiệu ứng chữ: none / fade / pop / karaoke (màu chạy theo giọng đọc) */
+  /** hiệu ứng chữ: none / fade / pop / reveal / karaoke */
   effect: SubEffect;
+  /** màu nhấn cho từ khóa bọc trong *dấu sao* */
+  accentColor: string;
   // logo/watermark của user (chữ hoặc hình ảnh)
   logoOn: boolean;
   logoType: "text" | "image";
@@ -82,6 +84,7 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   boxOpacity: 67,
   marginV: STYLE_PRESETS[0].marginV,
   effect: "none",
+  accentColor: "#FFD400",
   logoOn: false,
   logoType: "text",
   logoText: "",

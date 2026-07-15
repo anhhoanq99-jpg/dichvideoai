@@ -96,6 +96,9 @@ export async function renderProcessor(job: Job<JobPayload>) {
     ...(params.outlineColor && HEX_RE.test(params.outlineColor)
       ? { outline: params.outlineColor }
       : {}),
+    ...(params.accentColor && HEX_RE.test(params.accentColor)
+      ? { accent: params.accentColor }
+      : {}),
     back: `${boxHex}${alpha}`,
   };
 

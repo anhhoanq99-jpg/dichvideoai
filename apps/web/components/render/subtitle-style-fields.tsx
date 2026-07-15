@@ -27,8 +27,11 @@ const T = {
       none: "Không",
       fade: "Hiện dần",
       pop: "Phóng nhẹ khi vào",
+      reveal: "Nói đến đâu chữ hiện đến đó",
       karaoke: "Karaoke — màu chạy theo giọng đọc",
     } as Record<SubEffect, string>,
+    accentColor: "Màu nhấn từ khóa",
+    accentHint: "Bọc từ trong *dấu sao* ở bản dịch để tô màu nhấn + in đậm, vd: hiệu quả hơn *cotton*",
   },
   en: {
     font: "Font",
@@ -46,8 +49,11 @@ const T = {
       none: "None",
       fade: "Fade in",
       pop: "Pop in",
+      reveal: "Words appear as spoken",
       karaoke: "Karaoke — color follows the voice",
     } as Record<SubEffect, string>,
+    accentColor: "Keyword accent color",
+    accentHint: "Wrap words in *asterisks* in the translation to highlight them, e.g. better than *cotton*",
   },
 } as const;
 
@@ -134,6 +140,18 @@ export function SubtitleStyleFields({
           className={colorInputClass}
         />
       </label>
+      <label className="flex items-center gap-2 text-sm" title={t.accentHint}>
+        <span className={fieldLabelClass}>{t.accentColor}</span>
+        <input
+          type="color"
+          value={settings.accentColor}
+          onChange={(e) => onChange({ accentColor: e.target.value.toUpperCase() })}
+          className={colorInputClass}
+        />
+      </label>
+      <p className="text-xs text-neutral-400 sm:col-span-2 lg:col-span-3">
+        💡 {t.accentHint}
+      </p>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, MicOff, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import {
   MAX_COVER_REGIONS,
+  tokenizeAccents,
   type CoverMode,
   type CoverRegion,
   type SubtitleSegment,
@@ -53,6 +54,49 @@ const T = {
 const FONT_CSS_ID = "render-preview-fonts";
 const FONT_CSS_URL =
   "https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&family=Oswald:wght@400;700&family=Baloo+2:wght@400;700&family=Bungee&family=Paytone+One&family=Lobster&family=Patrick+Hand&display=swap";
+
+/** Vẽ câu theo từng từ: *từ nhấn* tô màu accent + in đậm; reveal = từ hiện đúng nhịp đọc. */
+function AccentedWords({
+  text,
+  accentColor,
+  reveal,
+  durMs,
+}: {
+  text: string;
+  accentColor: string;
+  reveal: boolean;
+  durMs: number;
+}) {
+  const tokens = tokenizeAccents(text);
+  const totalChars = tokens.reduce((sum, t) => sum + t.text.length, 0) || 1;
+  let elapsed = 0;
+  return (
+    <>
+      {tokens.map((tok, i) => {
+        // delay theo tỉ lệ ký tự — cùng công thức chia thời gian với bản xuất ASS
+        const delayMs = (elapsed / totalChars) * durMs;
+        elapsed += tok.text.length;
+        return (
+          <span
+            key={i}
+            style={{
+              ...(tok.accent ? { color: accentColor, fontWeight: 700 } : {}),
+              ...(reveal
+                ? {
+                    opacity: 0,
+                    animation: `sub-reveal 0.06s linear ${Math.round(delayMs)}ms forwards`,
+                  }
+                : {}),
+            }}
+          >
+            {tok.text}
+            {i < tokens.length - 1 ? " " : ""}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 interface RenderPreviewProps {
   previewUrl: string;
@@ -279,17 +323,21 @@ export function RenderPreview({
   const activeSegment = activeSegmentAt(segments, currentMs);
 
   // đồng bộ loa: tắt/bật tiếng gốc. Đang nghe thử lồng tiếng → tiếng gốc hạ
-  // như bản xuất thật: trong câu = "giọng nói gốc", giữa các câu = "nhạc nền"
+  // như bản xuất thật: trong câu = "giọng nói gốc", giữa các câu = "nhạc nền".
+  // iOS BỎ QUA video.volume (chỉ nghe muted) → mức < 15% coi như tắt hẳn,
+  // nếu không trên iPhone tiếng gốc vẫn kêu 100% đè lên giọng AI.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = !soundOn;
-    if (!dubActive) {
-      video.volume = 1;
-      return;
-    }
-    const level = activeSegment ? (dubOrigVoiceVolume ?? dubBgVolume) : dubBgVolume;
+    const level = !soundOn
+      ? 0
+      : !dubActive
+        ? 100
+        : activeSegment
+          ? (dubOrigVoiceVolume ?? dubBgVolume)
+          : dubBgVolume;
     video.volume = Math.min(1, Math.max(0, level / 100));
+    video.muted = level < 15;
   }, [soundOn, dubActive, dubBgVolume, dubOrigVoiceVolume, activeSegment]);
 
   /** Tải (và cache) clip TTS của một câu — trả về object URL. */
@@ -300,7 +348,7 @@ export function RenderPreview({
       if (cached) return cached;
       try {
         const res = await fetch(
-          `/api/tts-preview?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(seg.text.slice(0, 300))}`,
+          `/api/tts-preview?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(seg.text.replace(/\*/g, "").slice(0, 300))}`,
         );
         if (!res.ok) return null;
         const url = URL.createObjectURL(await res.blob());
@@ -335,6 +383,11 @@ export function RenderPreview({
   const previewText =
     activeSegment?.text ??
     (!playing ? (segments[0]?.text ?? t.previewPlaceholder) : null);
+  // thời lượng câu đang phát — nhịp cho hiệu ứng karaoke/reveal trong preview
+  const segDurMs = Math.max(
+    300,
+    (activeSegment?.endMs ?? 2000) - (activeSegment?.startMs ?? 0),
+  );
 
   // nghe thử lồng tiếng: sang câu mới → đọc câu đó bằng giọng đã chọn, ép tốc
   // độ đọc cho vừa khe thoại (khớp thời gian như bản xuất), tải trước câu kế
@@ -601,15 +654,21 @@ export function RenderPreview({
                         WebkitBackgroundClip: "text",
                         backgroundClip: "text",
                         WebkitTextStroke: settings.boxed ? undefined : `1px ${outline}`,
-                        animation: `sub-karaoke ${Math.max(
-                          300,
-                          (activeSegment?.endMs ?? 2000) - (activeSegment?.startMs ?? 0),
-                        )}ms linear both`,
+                        animation: `sub-karaoke ${segDurMs}ms linear both`,
                       }
                     : {}),
                 }}
               >
-                {previewText}
+                {settings.effect === "karaoke" ? (
+                  previewText.replace(/\*/g, "")
+                ) : (
+                  <AccentedWords
+                    text={previewText}
+                    accentColor={settings.accentColor}
+                    reveal={settings.effect === "reveal"}
+                    durMs={segDurMs}
+                  />
+                )}
               </span>
             </span>
           </div>

@@ -125,7 +125,8 @@ export async function dubProcessor(job: Job<JobPayload>) {
     const usage: UsageRecord[] = [];
     for (const [k, seg] of segments.entries()) {
       const clip = await synthesizeClipWithRetry({
-        text: seg.text.replace(/\s+/g, " ").trim(),
+        // bỏ *dấu sao* đánh dấu từ nhấn màu — không để giọng đọc vấp
+        text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
         voice,
         speed,
         dir,

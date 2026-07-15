@@ -76,6 +76,7 @@ const schema = z.object({
   boxOpacity: z.number().int().min(0).max(100).optional(),
   marginV: z.number().int().min(0).max(400).optional(),
   effect: z.enum(SUB_EFFECT_IDS).optional(),
+  accentColor: z.string().regex(HEX).optional(),
 });
 
 export async function POST(

@@ -1,4 +1,9 @@
-import { KARAOKE_BASE_COLOR, type SubEffect, type SubtitleStyle } from "./render-presets";
+import {
+  ACCENT_HIGHLIGHT_COLOR,
+  KARAOKE_BASE_COLOR,
+  type SubEffect,
+  type SubtitleStyle,
+} from "./render-presets";
 import type { SubtitleSegment } from "./types";
 
 /** "#RRGGBB" or "#RRGGBBAA" → ASS "&HAABBGGRR" (alpha 00 = opaque, FF = transparent) */
@@ -34,36 +39,102 @@ export interface PlayRes {
   h: number;
 }
 
+/** "#RRGGBB" → mã màu inline ASS "&HBBGGRR&" (dùng trong \c giữa dòng thoại). */
+function hexToAssInline(hex: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "&HFFFFFF&";
+  const [r, g, b] = [m[1].slice(0, 2), m[1].slice(2, 4), m[1].slice(4, 6)];
+  return `&H${b}${g}${r}&`.toUpperCase();
+}
+
+interface WordToken {
+  text: string;
+  /** từ nằm trong *dấu sao* — tô màu nhấn + in đậm */
+  accent: boolean;
+}
+
+/** Tách câu thành từ, nhận diện cụm *nhấn mạnh* (có thể bọc nhiều từ liền nhau). */
+export function tokenizeAccents(text: string): WordToken[] {
+  const tokens: WordToken[] = [];
+  let inAccent = false;
+  for (const raw of text.split(/\s+/).filter(Boolean)) {
+    let word = raw;
+    let accent = inAccent;
+    if (word.startsWith("*") && word.length > 1) {
+      accent = true;
+      inAccent = true;
+      word = word.slice(1);
+    }
+    if (word.endsWith("*") && word.length > 1) {
+      inAccent = false;
+      word = word.slice(0, -1);
+    }
+    tokens.push({ text: word, accent });
+  }
+  return tokens;
+}
+
+/** Chia thời lượng câu (centi-giây) cho từng từ theo tỉ lệ số ký tự. */
+function wordDurationsCs(tokens: WordToken[], seg: SubtitleSegment): number[] {
+  const totalCs = Math.max(10, Math.round((seg.endMs - seg.startMs) / 10));
+  const totalChars = tokens.reduce((sum, t) => sum + t.text.length, 0) || 1;
+  let used = 0;
+  return tokens.map((t, i) => {
+    const cs =
+      i === tokens.length - 1
+        ? Math.max(1, totalCs - used)
+        : Math.max(1, Math.round((t.text.length / totalChars) * totalCs));
+    used += cs;
+    return cs;
+  });
+}
+
 /**
- * Text một câu theo hiệu ứng đã chọn (ASS override tags đứng đầu dòng thoại):
+ * Text một câu theo hiệu ứng đã chọn (ASS override tags trong dòng thoại):
  * - fade: hiện/tắt dần 180ms
  * - pop: chữ phóng từ 75% lên 100% trong 160ms
- * - karaoke: chia chữ theo từ, mỗi từ chiếm phần thời gian tỉ lệ độ dài —
- *   màu đổ dần từ SecondaryColour (xám) sang PrimaryColour đúng nhịp giọng đọc
+ * - reveal: nói đến đâu chữ hiện đến đó (mỗi từ bật alpha đúng thời điểm đọc)
+ * - karaoke: màu đổ dần từ xám sang màu chính đúng nhịp giọng đọc (\kf)
+ * Mọi hiệu ứng đều hỗ trợ *từ nhấn* → màu accent + in đậm.
  */
-function effectText(seg: SubtitleSegment, effect: SubEffect): string {
-  if (effect === "fade") return `{\\fad(180,180)}${escapeAssText(seg.text)}`;
-  if (effect === "pop")
-    return `{\\fscx75\\fscy75\\t(0,160,\\fscx100\\fscy100)}${escapeAssText(seg.text)}`;
+function effectText(seg: SubtitleSegment, style: SubtitleStyle, effect: SubEffect): string {
+  const tokens = tokenizeAccents(seg.text);
+  if (tokens.length === 0) return escapeAssText(seg.text);
+  const primary = hexToAssInline(style.primary);
+  const accent = hexToAssInline(style.accent ?? ACCENT_HIGHLIGHT_COLOR);
+  const baseBold = style.bold ? 1 : 0;
+  /** mở/đóng màu nhấn quanh một từ (khôi phục tường minh, không dùng \r) */
+  const paint = (t: WordToken, inner: string) =>
+    t.accent ? `{\\c${accent}\\b1}${inner}{\\c${primary}\\b${baseBold}}` : inner;
+
   if (effect === "karaoke") {
-    const words = seg.text.split(/\s+/).filter(Boolean);
-    if (words.length === 0) return escapeAssText(seg.text);
-    const totalCs = Math.max(10, Math.round((seg.endMs - seg.startMs) / 10));
-    const totalChars = words.reduce((sum, w) => sum + w.length, 0);
-    let usedCs = 0;
-    return words
-      .map((word, i) => {
-        // từ cuối nhận phần dư để tổng đúng bằng thời lượng câu
-        const cs =
-          i === words.length - 1
-            ? Math.max(1, totalCs - usedCs)
-            : Math.max(1, Math.round((word.length / totalChars) * totalCs));
-        usedCs += cs;
-        return `{\\kf${cs}}${escapeAssText(word)}`;
+    const durations = wordDurationsCs(tokens, seg);
+    return tokens
+      .map(
+        (t, i) =>
+          `{\\kf${durations[i]}\\c${t.accent ? accent : primary}${t.accent ? "\\b1" : `\\b${baseBold}`}}${escapeAssText(t.text)}`,
+      )
+      .join(" ");
+  }
+
+  if (effect === "reveal") {
+    const durations = wordDurationsCs(tokens, seg);
+    let elapsedMs = 0;
+    return tokens
+      .map((t, i) => {
+        const startMs = elapsedMs;
+        elapsedMs += durations[i] * 10;
+        const color = t.accent ? `\\c${accent}\\b1` : `\\c${primary}\\b${baseBold}`;
+        // từ ẩn (alpha FF) → bật hiện trong 60ms đúng lúc được đọc tới
+        return `{\\alpha&HFF&${color}\\t(${startMs},${startMs + 60},\\alpha&H00&)}${escapeAssText(t.text)}`;
       })
       .join(" ");
   }
-  return escapeAssText(seg.text);
+
+  const body = tokens.map((t) => paint(t, escapeAssText(t.text))).join(" ");
+  if (effect === "fade") return `{\\fad(180,180)}${body}`;
+  if (effect === "pop") return `{\\fscx75\\fscy75\\t(0,160,\\fscx100\\fscy100)}${body}`;
+  return body;
 }
 
 /**
@@ -102,7 +173,7 @@ export function buildAss(
     .filter((s) => s.text.trim().length > 0 && s.endMs > s.startMs)
     .map(
       (s) =>
-        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${effectText(s, effect)}`,
+        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${effectText(s, style, effect)}`,
     )
     .join("\n");
 

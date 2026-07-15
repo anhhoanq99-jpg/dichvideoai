@@ -1,6 +1,8 @@
 export interface SubtitleStyle {
   /** must exist in worker fonts/ bundle — see RENDER_FONTS */
   font: string;
+  /** #RRGGBB — màu nhấn từ khóa *dấu sao* (mặc định ACCENT_HIGHLIGHT_COLOR) */
+  accent?: string;
   size: number;
   bold: boolean;
   /** #RRGGBB */
@@ -38,13 +40,17 @@ export const RENDER_FONTS = [
 
 /**
  * Hiệu ứng chữ phụ đề (áp cả preview lẫn bản xuất qua ASS tags):
- * fade = hiện dần, pop = phóng nhẹ khi vào, karaoke = màu chạy theo giọng đọc.
+ * fade = hiện dần, pop = phóng nhẹ khi vào, karaoke = màu chạy theo giọng đọc,
+ * reveal = nói đến đâu chữ hiện đến đó (kiểu video TikTok).
  */
-export const SUB_EFFECT_IDS = ["none", "fade", "pop", "karaoke"] as const;
+export const SUB_EFFECT_IDS = ["none", "fade", "pop", "reveal", "karaoke"] as const;
 export type SubEffect = (typeof SUB_EFFECT_IDS)[number];
 
 /** Màu "chưa đọc tới" của chế độ karaoke — chữ đổ dần từ màu này sang màu chính. */
 export const KARAOKE_BASE_COLOR = "#C9C9C9";
+
+/** Màu nhấn mặc định cho từ khóa quan trọng (bọc trong *dấu sao* ở bản dịch). */
+export const ACCENT_HIGHLIGHT_COLOR = "#FFD400";
 
 export const STYLE_PRESETS: StylePreset[] = [
   {
@@ -131,8 +137,10 @@ export interface StyleOverrides {
   boxed?: boolean;
   /** vertical margin from bottom (PlayRes px) */
   marginV?: number;
-  /** hiệu ứng chữ: fade / pop / karaoke (mặc định none) */
+  /** hiệu ứng chữ: fade / pop / reveal / karaoke (mặc định none) */
   effect?: SubEffect;
+  /** #RRGGBB — màu nhấn cho từ bọc trong *dấu sao* */
+  accentColor?: string;
 }
 
 export const LOGO_POSITIONS = [
