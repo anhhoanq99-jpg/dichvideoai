@@ -75,7 +75,8 @@ export function LoginCard({ lang }: { lang: Lang }) {
     try {
       const res =
         mode === "login"
-          ? await signIn.email({ email, password })
+          ? // rememberMe: cookie 30 ngày (không có thì thành cookie phiên — đóng trình duyệt là mất)
+            await signIn.email({ email, password, rememberMe: true })
           : await signUp.email({ email, password, name: name.trim() || email.split("@")[0] });
       if (res.error) {
         setError(
@@ -177,6 +178,7 @@ export function LoginCard({ lang }: { lang: Lang }) {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t.emailPh}
@@ -192,6 +194,7 @@ export function LoginCard({ lang }: { lang: Lang }) {
                   type="password"
                   required
                   minLength={6}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t.passwordPh}
