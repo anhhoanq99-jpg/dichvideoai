@@ -55,8 +55,15 @@
 }
 
 .dark {
-  --background: #0f0d0b;
-  --foreground: #efedeb;
+  /* nền tối "xám than" mềm mại thay vì đen tuyền — dễ nhìn, sang hơn.
+     Override sắc neutral tối CHỈ trong dark mode (light mode giữ nguyên);
+     mọi surface dùng dark:bg-neutral-950/900/800 tự đổi theo. */
+  --background: #16171c;
+  --foreground: #e7e7ea;
+  --color-neutral-950: #16171c; /* nền app / sidebar / header */
+  --color-neutral-900: #1f2027; /* thẻ, modal, ô nhập — nổi nhẹ trên nền */
+  --color-neutral-800: #30323b; /* viền, hover — rõ mà không chói */
+  --color-neutral-700: #3c3e48;
   color-scheme: dark;
 }
 
