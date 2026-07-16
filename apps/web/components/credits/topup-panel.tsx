@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
+  CheckCircle2,
   Copy,
   CreditCard,
   Gift,
@@ -31,6 +32,10 @@ const T = {
       full: (n: string) => `Việt hóa trọn gói: ~${n} phút video`,
     },
     toastTopup: (n: string) => `Nạp thành công! +${n} xu đã vào tài khoản 🎉`,
+    paidTitle: "Nạp thành công! 🎉",
+    paidAmount: (n: string) => `+${n} xu đã vào tài khoản của bạn`,
+    paidThanks: "Cảm ơn bạn đã ủng hộ Dịch Video AI ❤️ Chúc bạn làm video thật vui!",
+    topupMore: "Nạp thêm",
     methodTitle: "Phương thức thanh toán",
     comingSoon: "Sắp ra mắt",
     qrAlt: "QR chuyển khoản VietQR",
@@ -64,6 +69,10 @@ const T = {
       full: (n: string) => `Full localization: ~${n} minutes of video`,
     },
     toastTopup: (n: string) => `Top-up successful! +${n} credits added to your account 🎉`,
+    paidTitle: "Top-up successful! 🎉",
+    paidAmount: (n: string) => `+${n} credits added to your account`,
+    paidThanks: "Thank you for supporting Dịch Video AI ❤️ Happy video-making!",
+    topupMore: "Top up more",
     methodTitle: "Payment method",
     comingSoon: "Coming soon",
     qrAlt: "VietQR bank transfer QR code",
@@ -135,6 +144,8 @@ export function TopupPanel({
   const [method, setMethod] = useState<"vietqr" | "paypal">("vietqr");
   const [selected, setSelected] = useState(PACKS[0].vnd);
   const [copied, setCopied] = useState<string | null>(null);
+  // số xu vừa nhận (khác null → hiện màn cảm ơn thay cho khung QR chờ)
+  const [paid, setPaid] = useState<number | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const balanceRef = useRef(initialBalance);
@@ -159,6 +170,7 @@ export function TopupPanel({
           if (typeof data.balance === "number" && data.balance > balanceRef.current) {
             const added = data.balance - balanceRef.current;
             balanceRef.current = data.balance;
+            setPaid(added); // hiện màn cảm ơn ở khung QR
             toast(t.toastTopup(fmt(added)));
             router.refresh();
           }
@@ -225,7 +237,28 @@ export function TopupPanel({
             className="mt-4 grid gap-6 rounded-xl border border-dashed border-neutral-300 p-5 sm:grid-cols-2 dark:border-neutral-700"
           >
             <div className="flex flex-col items-center justify-center gap-3">
-              {qrUrl ? (
+              {paid !== null ? (
+                // đã nhận tiền → màn cảm ơn thay cho QR chờ
+                <div className="flex flex-col items-center gap-2 rounded-2xl bg-success-50 px-4 py-8 text-center dark:bg-success-950/30">
+                  <CheckCircle2 className="h-14 w-14 text-success-500" />
+                  <p className="text-lg font-bold text-success-700 dark:text-success-300">
+                    {t.paidTitle}
+                  </p>
+                  <p className="text-sm font-semibold text-success-600 dark:text-success-400">
+                    {t.paidAmount(fmt(paid))}
+                  </p>
+                  <p className="mt-1 max-w-xs text-xs text-neutral-500 dark:text-neutral-400">
+                    {t.paidThanks}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPaid(null)}
+                    className="mt-2 rounded-full border border-success-300 px-4 py-1.5 text-xs font-semibold text-success-700 hover:bg-success-100 dark:border-success-800 dark:text-success-300 dark:hover:bg-success-950/50"
+                  >
+                    {t.topupMore}
+                  </button>
+                </div>
+              ) : qrUrl ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
