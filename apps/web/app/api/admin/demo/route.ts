@@ -11,6 +11,7 @@ const MAX_DEMO_BYTES = 50 * 1024 * 1024; // clip demo ngắn
 const SLOT_FILES: Record<string, string> = {
   goc: "goc.mp4",
   "ban-viet": "ban-viet.mp4",
+  "huong-dan": "huong-dan.mp4",
 };
 
 /**

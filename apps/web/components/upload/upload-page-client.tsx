@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloudUpload, Loader2, Play, X } from "lucide-react";
+import { CloudUpload, GraduationCap, Loader2, Mic, Play, X } from "lucide-react";
 import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
 import {
   useMultipartUpload,
@@ -26,8 +26,7 @@ import { cn } from "@/lib/utils";
 const T = {
   vi: {
     title: "Dịch & lồng tiếng video",
-    subtitle:
-      "Tải video lên để tự trích xuất phụ đề, dịch và lồng tiếng AI — sang tiếng Việt hay mọi ngôn ngữ khác. Thả nhiều video cùng lúc, mọi thứ tích hợp sẵn.",
+    tutorialTitle: "Video hướng dẫn sử dụng",
     errFormat: (name: string) =>
       `"${name}": định dạng không hỗ trợ (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": vượt giới hạn 2GB.`,
@@ -41,8 +40,7 @@ const T = {
   },
   en: {
     title: "Translate & dub videos",
-    subtitle:
-      "Upload videos to auto-extract subtitles, translate, and AI-dub — into Vietnamese or any other language. Drop multiple videos at once, everything is built in.",
+    tutorialTitle: "How-to video",
     errFormat: (name: string) =>
       `"${name}": unsupported format (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": exceeds the 2GB limit.`,
@@ -55,6 +53,41 @@ const T = {
       "After upload, each video runs automatically: read metadata → extract original subtitles → translate. Track progress in your video list.",
   },
 } as const;
+
+/**
+ * Video hướng dẫn sử dụng — nội dung do admin upload ở trang Quản trị.
+ * Hỏi trước /api/demo/huong-dan?check=1 để chỉ hiện khi đã có video (đỡ player rỗng).
+ */
+function TutorialVideo({ title }: { title: string }) {
+  const [exists, setExists] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/demo/huong-dan?check=1")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setExists(Boolean(d?.exists));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (!exists) return null;
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+      <p className="flex items-center gap-2 text-sm font-semibold">
+        <GraduationCap className="h-4 w-4 text-primary-500" /> {title}
+      </p>
+      <video
+        src="/api/demo/huong-dan"
+        controls
+        playsInline
+        preload="metadata"
+        className="mt-3 max-h-[70vh] w-full rounded-lg bg-black"
+      />
+    </div>
+  );
+}
 
 /** Đọc thời lượng video (giây) ngay trên trình duyệt để ước tính credits. */
 function readDuration(file: File): Promise<number | null> {
@@ -160,13 +193,16 @@ export function UploadPageClient({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="flex items-center justify-center gap-2.5 text-2xl font-semibold tracking-tight">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/50">
+            <Mic className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          </span>
           {t.title}
         </h1>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          {t.subtitle}
-        </p>
       </div>
+
+      {/* video hướng dẫn — admin thêm ở trang Quản trị; chỉ hiện khi đã có */}
+      <TutorialVideo title={t.tutorialTitle} />
 
       <PipelineSettingsCard
         values={pipeline}

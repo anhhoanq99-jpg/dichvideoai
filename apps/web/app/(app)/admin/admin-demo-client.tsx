@@ -10,6 +10,7 @@ const T = {
   vi: {
     slotGoc: "Video gốc (bên trái)",
     slotBanViet: "Bản tiếng Việt (bên phải)",
+    slotHuongDan: "Video hướng dẫn sử dụng (trang Dịch & lồng tiếng)",
     pick: "Chọn video MP4 (tối đa 50MB)…",
     upload: "Cập nhật video này",
     uploading: "Đang tải lên…",
@@ -21,6 +22,7 @@ const T = {
   en: {
     slotGoc: "Original video (left)",
     slotBanViet: "Vietnamese version (right)",
+    slotHuongDan: "Tutorial video (Translate & dub page)",
     pick: "Choose an MP4 video (max 50MB)…",
     upload: "Update this video",
     uploading: "Uploading…",
@@ -36,7 +38,7 @@ function DemoSlot({
   label,
   lang,
 }: {
-  slot: "goc" | "ban-viet";
+  slot: "goc" | "ban-viet" | "huong-dan";
   label: string;
   lang: Lang;
 }) {
@@ -128,6 +130,7 @@ export function AdminDemoClient({ lang = "vi" }: { lang?: Lang }) {
       <p className="text-xs text-neutral-400">{t.hint}</p>
       <DemoSlot slot="goc" label={t.slotGoc} lang={lang} />
       <DemoSlot slot="ban-viet" label={t.slotBanViet} lang={lang} />
+      <DemoSlot slot="huong-dan" label={t.slotHuongDan} lang={lang} />
     </div>
   );
 }
