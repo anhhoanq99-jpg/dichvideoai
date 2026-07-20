@@ -91,6 +91,7 @@ const T = {
     lines: "dòng",
     avgTitle: "Tốc độ đọc trung bình của bản dịch — nên dưới 20 ký tự/giây",
     avgLabel: "TB:",
+    lineLayoutToast: "Dòng này đã tách riêng — kéo chữ trên video để đổi chỗ, kéo ô góc để đổi cỡ",
     lineCoverToast: "Đã thêm ô che cho dòng này — kéo/co ô cam trên video cho trùng chữ gốc",
     addLineToast: "Đã thêm dòng phụ đề vào đúng khoảng thời gian bạn chọn",
     addLineTitle: "Thêm dòng phụ đề vào khoảng thời gian bạn tự chọn",
@@ -130,6 +131,7 @@ const T = {
     lines: "lines",
     avgTitle: "Average reading speed of the translation — should stay under 20 chars/second",
     avgLabel: "Avg:",
+    lineLayoutToast: "This line is now independent — drag the text to move it, drag the corner to resize",
     lineCoverToast: "Cover box added for this line — drag the orange box over the original text",
     addLineToast: "Subtitle line added at the time range you picked",
     addLineTitle: "Add a subtitle line at a time range you choose",
@@ -189,6 +191,7 @@ export function StudioShell({
     updateSegmentText,
     updateSegmentTime,
     insertSegment,
+    setSegmentLayout,
     setSegmentBox,
     deleteSegment,
     replaceAll,
@@ -229,6 +232,28 @@ export function StudioShell({
 
   const patch = (p: Partial<RenderSettings>) =>
     setSettings((prev) => ({ ...prev, ...p }));
+
+  /**
+   * Bật/tắt vị trí + cỡ chữ RIÊNG cho một dòng. Bật lên thì dòng đó tách khỏi
+   * vị trí chung, kéo thả và co giãn trực tiếp trên khung xem trước.
+   */
+  function toggleLineLayout(i: number) {
+    const seg = segments.find((s) => s.i === i);
+    if (!seg) return;
+    if (seg.pos) {
+      setSegmentLayout(i, { pos: null, size: null });
+      return;
+    }
+    // đặt ngay chỗ phụ đề đang hiện (neo giữa-dưới) để không bị nhảy vị trí
+    setSegmentLayout(i, {
+      pos: {
+        x: effectiveSubBox ? effectiveSubBox.x + effectiveSubBox.w / 2 : 0.5,
+        y: effectiveSubBox ? effectiveSubBox.y + effectiveSubBox.h : 0.9,
+      },
+    });
+    if (videoElRef.current) videoElRef.current.currentTime = seg.startMs / 1000;
+    toast(t.lineLayoutToast, "info");
+  }
 
   /**
    * Bật/tắt che chữ gốc cho MỘT dòng phụ đề. Ô che chỉ hiện đúng lúc dòng đó
@@ -405,6 +430,7 @@ export function StudioShell({
               dubSpeed={dub.speed}
               onSettingsChange={patch}
               onActiveLineBoxChange={setSegmentBox}
+              onActiveLineLayoutChange={setSegmentLayout}
               lang={lang}
             />
           ) : (
@@ -505,6 +531,7 @@ export function StudioShell({
               autoScroll={autoScroll}
               onEdit={updateSegmentText}
               onEditTime={updateSegmentTime}
+              onToggleLayout={toggleLineLayout}
               onToggleCover={toggleLineCover}
               onDelete={deleteSegment}
               onRowClick={(startMs) => {

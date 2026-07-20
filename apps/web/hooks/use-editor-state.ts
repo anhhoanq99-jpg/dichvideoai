@@ -127,6 +127,38 @@ export function useEditorState(
   );
 
   /**
+   * Đặt/bỏ vị trí RIÊNG và cỡ chữ RIÊNG cho một dòng (ghi đè thiết lập chung).
+   * Truyền null để trả dòng đó về dùng vị trí/cỡ chung.
+   */
+  const setSegmentLayout = useCallback(
+    (
+      i: number,
+      layout: { pos?: SubtitleSegment["pos"] | null; size?: number | null },
+    ) => {
+      setSegments((prev) => {
+        const next = prev.map((s) => {
+          if (s.i !== i) return s;
+          const out = { ...s };
+          if (layout.pos !== undefined) {
+            if (layout.pos === null) delete out.pos;
+            else out.pos = layout.pos;
+          }
+          if (layout.size !== undefined) {
+            if (layout.size === null) delete out.size;
+            else out.size = layout.size;
+          }
+          return out;
+        });
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  /**
    * Gắn/gỡ vùng che chữ gốc cho MỘT dòng phụ đề (`box`, toạ độ 0..1 hệ video nguồn).
    * Vùng này chỉ che trong đúng khoảng thời gian dòng đó chạy — dùng cho video có
    * chữ nước ngoài xuất hiện rải rác ở nhiều chỗ/nhiều lúc khác nhau.
@@ -183,6 +215,7 @@ export function useEditorState(
     updateSegmentText,
     updateSegmentTime,
     insertSegment,
+    setSegmentLayout,
     setSegmentBox,
     deleteSegment,
     replaceAll,

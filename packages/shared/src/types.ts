@@ -28,6 +28,14 @@ export interface SubtitleSegment {
    * and replace-placement rendering.
    */
   box?: { x: number; y: number; w: number; h: number };
+  /**
+   * Vị trí RIÊNG của dòng này (0..1 theo khung xuất), ghi đè vị trí chung.
+   * Điểm neo = GIỮA-DƯỚI của khối chữ (khớp alignment 2 của ASS).
+   * Dùng khi cần đặt chữ đè lên đúng chỗ chữ nước ngoài trong hình.
+   */
+  pos?: { x: number; y: number };
+  /** Cỡ chữ RIÊNG của dòng này (px theo PlayRes), ghi đè cỡ chung. */
+  size?: number;
 }
 
 // ---- Upload constraints (MVP caps — Phase 2) ----

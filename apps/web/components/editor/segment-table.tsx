@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { SquareDashed, X } from "lucide-react";
+import { Move, SquareDashed, X } from "lucide-react";
 import { labelToMs, msToLabel, type SubtitleSegment } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,8 @@ const T = {
     deleteRow: "Xóa dòng này",
     coverOn: "Đang che chữ gốc ở dòng này — bấm để bỏ che",
     coverOff: "Che chữ gốc ở đúng lúc dòng này chạy (kéo ô trên video để chỉnh)",
+    layoutOn: "Dòng này đang đặt chỗ riêng — bấm để trả về vị trí/cỡ chung",
+    layoutOff: "Cho dòng này vị trí và cỡ chữ riêng (kéo chữ trên video để chỉnh)",
     seekRow: "Tua video tới dòng này",
     editStart: "Lúc bắt đầu — sửa được (vd 1:23.5 hoặc 83.5). Enter để lưu, Esc để hủy",
     editEnd: "Lúc kết thúc — sửa được (vd 1:23.5 hoặc 83.5). Enter để lưu, Esc để hủy",
@@ -28,6 +30,8 @@ const T = {
     deleteRow: "Delete this line",
     coverOn: "Covering the original text on this line — click to remove",
     coverOff: "Cover the original text while this line plays (drag the box on the video)",
+    layoutOn: "This line has its own placement — click to use the shared one",
+    layoutOff: "Give this line its own position and size (drag the text on the video)",
     seekRow: "Jump the video to this line",
     editStart: "Start time — editable (e.g. 1:23.5 or 83.5). Enter to save, Esc to cancel",
     editEnd: "End time — editable (e.g. 1:23.5 or 83.5). Enter to save, Esc to cancel",
@@ -110,6 +114,8 @@ interface SegmentTableProps {
   onToggleCover?: (i: number) => void;
   /** có truyền → mốc thời gian mỗi dòng sửa được ngay tại bảng */
   onEditTime?: (i: number, startMs: number, endMs: number) => void;
+  /** có truyền → hiện nút bật/tắt tự chỉnh vị trí + cỡ chữ cho từng dòng */
+  onToggleLayout?: (i: number) => void;
   lang?: Lang;
 }
 
@@ -123,6 +129,7 @@ export function SegmentTable({
   onDelete,
   onToggleCover,
   onEditTime,
+  onToggleLayout,
   lang = "vi",
 }: SegmentTableProps) {
   const t = T[lang];
@@ -231,6 +238,22 @@ export function SegmentTable({
                     </span>
                   );
                 })()}
+                {onToggleLayout && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleLayout(seg.i)}
+                    title={seg.pos ? t.layoutOn : t.layoutOff}
+                    aria-pressed={Boolean(seg.pos)}
+                    className={cn(
+                      "shrink-0 rounded p-0.5",
+                      seg.pos
+                        ? "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300"
+                        : "text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:text-neutral-600 dark:hover:bg-primary-950/40",
+                    )}
+                  >
+                    <Move className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {onToggleCover && (
                   <button
                     type="button"

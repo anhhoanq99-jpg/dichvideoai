@@ -138,6 +138,23 @@ function effectText(seg: SubtitleSegment, style: SubtitleStyle, effect: SubEffec
 }
 
 /**
+ * Thẻ ghi đè RIÊNG cho một dòng: vị trí (\pos) và cỡ chữ (\fs).
+ * `\an2` khai báo tường minh để điểm neo luôn là GIỮA-DƯỚI khối chữ, không phụ
+ * thuộc alignment của Style — nhờ vậy toạ độ khớp đúng với khung xem trước.
+ * Trả về chuỗi rỗng khi dòng không có ghi đè (đại đa số dòng).
+ */
+function lineOverrides(seg: SubtitleSegment, playRes: PlayRes): string {
+  const tags: string[] = [];
+  if (seg.pos) {
+    const x = Math.round(Math.min(1, Math.max(0, seg.pos.x)) * playRes.w);
+    const y = Math.round(Math.min(1, Math.max(0, seg.pos.y)) * playRes.h);
+    tags.push(`\\an2\\pos(${x},${y})`);
+  }
+  if (seg.size && seg.size > 0) tags.push(`\\fs${Math.round(seg.size)}`);
+  return tags.length ? `{${tags.join("")}}` : "";
+}
+
+/**
  * Build a complete .ass document for libass burning.
  * Alignment 2 (bottom-center); vertical position via marginV.
  */
@@ -173,7 +190,7 @@ export function buildAss(
     .filter((s) => s.text.trim().length > 0 && s.endMs > s.startMs)
     .map(
       (s) =>
-        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${effectText(s, style, effect)}`,
+        `Dialogue: 0,${msToAssTime(s.startMs)},${msToAssTime(s.endMs)},Default,,0,0,0,,${lineOverrides(s, playRes)}${effectText(s, style, effect)}`,
     )
     .join("\n");
 

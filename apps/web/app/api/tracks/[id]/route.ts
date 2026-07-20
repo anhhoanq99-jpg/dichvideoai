@@ -18,6 +18,12 @@ const segmentSchema = z.object({
       h: z.number().min(0).max(1),
     })
     .optional(),
+  /** vị trí riêng của dòng (0..1) — điểm neo giữa-dưới khối chữ */
+  pos: z
+    .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
+    .optional(),
+  /** cỡ chữ riêng của dòng (px theo PlayRes) */
+  size: z.number().min(8).max(200).optional(),
 });
 
 const patchSchema = z.object({

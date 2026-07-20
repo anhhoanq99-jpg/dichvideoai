@@ -136,6 +136,14 @@ interface RenderPreviewProps {
    * ô che của dòng hiện ra trên preview và kéo/co giãn được.
    */
   onActiveLineBoxChange?: (i: number, box: CoverRegion) => void;
+  /**
+   * studio: đổi vị trí / cỡ chữ RIÊNG của dòng đang chạy. Có truyền → dòng nào
+   * đã bật tự chỉnh sẽ kéo được đi chỗ khác và co giãn cỡ chữ ngay trên video.
+   */
+  onActiveLineLayoutChange?: (
+    i: number,
+    layout: { pos?: { x: number; y: number }; size?: number },
+  ) => void;
   lang?: Lang;
 }
 
@@ -154,7 +162,10 @@ type Gesture =
   | { kind: "move-sub"; grab: { dx: number; dy: number } }
   // ô che chữ gốc gắn theo dòng phụ đề đang chạy
   | { kind: "move-line-cover"; grab: { dx: number; dy: number } }
-  | { kind: "resize-line-cover" };
+  | { kind: "resize-line-cover" }
+  // dòng phụ đề có vị trí/cỡ chữ riêng
+  | { kind: "move-line-sub"; grab: { dx: number; dy: number } }
+  | { kind: "resize-line-sub"; startX: number; startSize: number };
 
 function clamp01(n: number) {
   return Math.min(1, Math.max(0, n));
@@ -202,11 +213,14 @@ export function RenderPreview({
   originalSegments = null,
   onSettingsChange,
   onActiveLineBoxChange,
+  onActiveLineLayoutChange,
   lang = "vi",
 }: RenderPreviewProps) {
   const t = T[lang];
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** khối chữ của dòng đang chạy — đo vùng thật để bắt đúng chỗ khi kéo */
+  const subLineRef = useRef<HTMLDivElement>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [draft, setDraft] = useState<CoverRegion | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
@@ -391,6 +405,13 @@ export function RenderPreview({
   const activeLineBox = activeSegment?.box ?? null;
   const lineCoverOn = covering && Boolean(activeLineBox) && Boolean(onActiveLineBoxChange);
 
+  // Dòng đang chạy có tự chỉnh vị trí riêng → đặt chữ đúng chỗ đó (neo giữa-dưới,
+  // khớp \an2\pos của ASS) và cho kéo/co giãn ngay trên khung xem trước.
+  const activeLinePos = activeSegment?.pos ?? null;
+  const lineLayoutOn = Boolean(activeLinePos) && Boolean(onActiveLineLayoutChange);
+  /** cỡ chữ hiệu lực của câu đang chạy — riêng của dòng, không có thì lấy cỡ chung */
+  const activeFontSize = activeSegment?.size ?? settings.fontSize;
+
   // khung phụ đề hiển thị: có subBox thì dùng, không thì dải đáy theo marginV
   const displaySubBox: CoverRegion = useMemo(() => {
     if (subBox) return subBox;
@@ -474,6 +495,36 @@ export function RenderPreview({
     const p = toNorm(e);
     e.currentTarget.setPointerCapture(e.pointerId);
 
+    // Dòng phụ đề tự chỉnh nằm TRÊN CÙNG về mặt hình ảnh (chữ đè lên ô che) nên
+    // bắt trước. Đo vùng thật của khối chữ thay vì ước lượng — chữ dài ngắn khác nhau.
+    if (lineLayoutOn && activeSegment && activeLinePos && subLineRef.current) {
+      const sub = subLineRef.current.getBoundingClientRect();
+      // tay cầm co giãn ở góc phải-dưới khối chữ
+      if (
+        Math.abs(e.clientX - sub.right) < 18 &&
+        Math.abs(e.clientY - sub.bottom) < 18
+      ) {
+        setGesture({
+          kind: "resize-line-sub",
+          startX: p.x,
+          startSize: activeSegment.size ?? settings.fontSize,
+        });
+        return;
+      }
+      if (
+        e.clientX >= sub.left &&
+        e.clientX <= sub.right &&
+        e.clientY >= sub.top &&
+        e.clientY <= sub.bottom
+      ) {
+        setGesture({
+          kind: "move-line-sub",
+          grab: { dx: p.x - activeLinePos.x, dy: p.y - activeLinePos.y },
+        });
+        return;
+      }
+    }
+
     // Ô che của dòng đang chạy được ưu tiên trước mọi thứ — nó là thứ user vừa
     // bật lên để chỉnh, và thường nằm đè lên vùng che/khung phụ đề.
     if (lineCoverOn && activeLineBox) {
@@ -556,6 +607,21 @@ export function RenderPreview({
         h: Math.min(1 - region.y, Math.max(0.03, p.y - region.y)),
       };
       onRegionsChange(regions.map((r, i) => (i === gesture.index ? resized : r)));
+    } else if (gesture.kind === "move-line-sub") {
+      if (!activeSegment) return;
+      onActiveLineLayoutChange?.(activeSegment.i, {
+        pos: {
+          x: clamp01(p.x - gesture.grab.dx),
+          y: clamp01(p.y - gesture.grab.dy),
+        },
+      });
+    } else if (gesture.kind === "resize-line-sub") {
+      if (!activeSegment) return;
+      // kéo sang phải = to ra; 10% chiều ngang video ~ 20px cỡ chữ
+      const next = Math.round(gesture.startSize + (p.x - gesture.startX) * 200);
+      onActiveLineLayoutChange?.(activeSegment.i, {
+        size: Math.min(160, Math.max(12, next)),
+      });
     } else if (gesture.kind === "move-line-cover") {
       if (!activeSegment || !activeLineBox) return;
       onActiveLineBoxChange?.(activeSegment.i, {
@@ -701,20 +767,34 @@ export function RenderPreview({
         {/* phụ đề dịch thật — đúng font/cỡ/màu, kéo để đổi chỗ */}
         {previewText && (
           <div
-            className="absolute flex cursor-move flex-col items-center justify-end"
-            style={{
-              left: `${displaySubBox.x * 100}%`,
-              top: `${displaySubBox.y * 100}%`,
-              width: `${displaySubBox.w * 100}%`,
-              height: `${displaySubBox.h * 100}%`,
-            }}
+            ref={subLineRef}
+            className={cn(
+              "absolute flex cursor-move flex-col items-center",
+              lineLayoutOn ? "justify-start" : "justify-end",
+            )}
+            style={
+              lineLayoutOn && activeLinePos
+                ? {
+                    // neo GIỮA-DƯỚI đúng như \an2\pos khi render ra video
+                    left: `${activeLinePos.x * 100}%`,
+                    top: `${activeLinePos.y * 100}%`,
+                    transform: "translate(-50%, -100%)",
+                    maxWidth: "94%",
+                  }
+                : {
+                    left: `${displaySubBox.x * 100}%`,
+                    top: `${displaySubBox.y * 100}%`,
+                    width: `${displaySubBox.w * 100}%`,
+                    height: `${displaySubBox.h * 100}%`,
+                  }
+            }
           >
             {/* chế độ "Cả hai": dòng bản gốc nhỏ phía trên */}
             {originalSegments && (
               <span
                 className="mb-0.5 max-w-full px-1 text-center leading-tight text-white/85"
                 style={{
-                  fontSize: Math.max(8, settings.fontSize * previewScale * 0.65),
+                  fontSize: Math.max(8, activeFontSize * previewScale * 0.65),
                   textShadow: "0 0 3px #000, 0 0 3px #000",
                 }}
               >
@@ -725,7 +805,7 @@ export function RenderPreview({
               className="max-w-full px-1.5 py-0.5 text-center leading-tight"
               style={{
                 fontFamily: `'${settings.font}', sans-serif`,
-                fontSize: Math.max(9, settings.fontSize * previewScale),
+                fontSize: Math.max(9, activeFontSize * previewScale),
                 fontWeight: settings.bold ? 700 : 400,
                 backgroundColor: settings.boxed
                   ? `${settings.boxColor}${boxAlpha}`
@@ -773,6 +853,13 @@ export function RenderPreview({
                 )}
               </span>
             </span>
+            {/* dòng đang tự chỉnh: viền cam + tay cầm co giãn cỡ chữ ở góc phải-dưới */}
+            {lineLayoutOn && (
+              <>
+                <span className="pointer-events-none absolute inset-0 rounded border border-dashed border-primary-400" />
+                <span className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-primary-600 shadow" />
+              </>
+            )}
           </div>
         )}
 
