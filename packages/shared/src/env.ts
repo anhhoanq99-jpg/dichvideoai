@@ -9,6 +9,8 @@ export const workerEnvSchema = z.object({
   REDIS_URL: z.string().min(1),
   GROQ_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  /** Nhiều key Gemini phân tách bằng dấu phẩy — hết hạn mức key này tự sang key kế */
+  GEMINI_API_KEYS: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
   GOOGLE_TTS_API_KEY: z.string().optional(),
   R2_ACCOUNT_ID: z.string().optional(),

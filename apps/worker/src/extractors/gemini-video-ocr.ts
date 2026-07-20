@@ -1,5 +1,6 @@
 import { GoogleGenAI, MediaResolution, createPartFromUri } from "@google/genai";
 import { withGeminiRetry } from "../lib/gemini-limits";
+import { withGeminiKeys } from "../lib/gemini-keys";
 import { PRICING } from "../lib/usage";
 import {
   normalizeSegments,
@@ -44,8 +45,18 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
     input: ExtractInput,
     onProgress: (pct: number) => void,
   ): Promise<ExtractResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình");
+    // Xoay vòng nhiều key: key nào hết hạn mức ngày thì tự sang key kế tiếp.
+    // Bọc TOÀN BỘ (kể cả upload) vì file đã tải lên gắn với đúng key/project đó.
+    return withGeminiKeys("gemini-ocr", (apiKey) =>
+      this.extractWithKey(apiKey, input, onProgress),
+    );
+  }
+
+  private async extractWithKey(
+    apiKey: string,
+    input: ExtractInput,
+    onProgress: (pct: number) => void,
+  ): Promise<ExtractResult> {
     const ai = new GoogleGenAI({ apiKey });
 
     // 1. upload to Files API (handles up to ~2GB) and wait until ACTIVE
