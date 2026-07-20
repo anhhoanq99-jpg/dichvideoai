@@ -33,6 +33,96 @@ test("no cover, keep aspect → single ass step", () => {
   assert.match(g, /^\[0:v\]ass=filename='C\\:\/tmp\/subs\.ass':fontsdir='C\\:\/repo\/fonts'\[v\]$/);
 });
 
+// ---- Vùng che gắn theo từng dòng phụ đề (che chữ nước ngoài xuất hiện rải rác) ----
+
+const COVERS = [
+  { box: { x: 0.1, y: 0.8, w: 0.8, h: 0.1 }, startMs: 1500, endMs: 3200 },
+  { box: { x: 0.4, y: 0.2, w: 0.2, h: 0.08 }, startMs: 5000, endMs: 6000 },
+];
+
+test("lineCovers box mode: 1 drawbox/dòng, bật đúng khoảng thời gian", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "box",
+    lineCovers: COVERS,
+    aspect: "keep",
+  });
+  assert.equal((g.match(/drawbox=/g) ?? []).length, 2);
+  // giây, không phải ms — sai đơn vị là bug im lặng (che cả video)
+  assert.match(g, /enable='between\(t,1\.500,3\.200\)'/);
+  assert.match(g, /enable='between\(t,5\.000,6\.000\)'/);
+  assert.match(g, /\[lc1\]ass=/); // chuỗi che nối vào bước burn phụ đề
+});
+
+test("lineCovers blur mode: CHỈ blur 1 lần cho cả khung rồi dán lại từng ô", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "blur",
+    lineCovers: COVERS,
+    aspect: "keep",
+  });
+  // mấu chốt hiệu năng: blur 1 lượt duy nhất dù có bao nhiêu dòng
+  assert.equal((g.match(/boxblur=luma_radius/g) ?? []).length, 1);
+  assert.match(g, /split=2\[lb0\]\[lb1\]/);
+  assert.equal((g.match(/overlay=\d+:\d+:enable=/g) ?? []).length, 2);
+  assert.match(g, /\[lcov1\]ass=/);
+});
+
+test("lineCovers blur mode với 1 dòng: không dùng split=1", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "blur",
+    lineCovers: [COVERS[0]],
+    aspect: "keep",
+  });
+  assert.doesNotMatch(g, /split=1/);
+  assert.match(g, /\[lblursrc\]boxblur=luma_radius=\d+:luma_power=2\[lb0\]/);
+  assert.match(g, /\[lcov0\]ass=/);
+});
+
+test("lineCovers: coverMode none → bỏ qua hoàn toàn", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "none",
+    lineCovers: COVERS,
+    aspect: "keep",
+  });
+  assert.doesNotMatch(g, /drawbox|lcov|boxblur/);
+});
+
+test("lineCovers: bỏ ô có thời gian không hợp lệ (end <= start)", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "box",
+    lineCovers: [COVERS[0], { box: COVERS[1].box, startMs: 9000, endMs: 9000 }],
+    aspect: "keep",
+  });
+  assert.equal((g.match(/drawbox=/g) ?? []).length, 1);
+});
+
+test("lineCovers dùng CHUNG với vùng che toàn thời lượng — nối tiếp nhau", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "box",
+    regions: [{ x: 0, y: 0.9, w: 1, h: 0.1 }],
+    lineCovers: [COVERS[0]],
+    aspect: "keep",
+  });
+  // vùng toàn thời lượng KHÔNG có enable, vùng theo dòng thì CÓ
+  assert.match(g, /\[0:v\]drawbox=[^;]*t=fill\[cov0\]/);
+  assert.match(g, /\[cov0\]drawbox=[^;]*enable='between\(t,1\.500,3\.200\)'\[lc0\]/);
+});
+
+test("lineCovers nằm TRƯỚC bước đổi khung hình (toạ độ hệ video nguồn)", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "box",
+    lineCovers: [COVERS[0]],
+    aspect: "9:16",
+  });
+  assert.ok(g.indexOf("drawbox=") < g.indexOf("[bgsrc]"));
+});
+
 test("multi-region blur: one chain per region, chained sequentially", () => {
   const g = buildFiltergraph({
     ...BASE,

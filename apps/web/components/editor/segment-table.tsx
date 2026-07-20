@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { X } from "lucide-react";
+import { SquareDashed, X } from "lucide-react";
 import type { SubtitleSegment } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ const T = {
       `Quá ${limit} ký tự/giây — người xem khó đọc kịp, nên rút gọn câu`,
     chars: "ký tự",
     deleteRow: "Xóa dòng này",
+    coverOn: "Đang che chữ gốc ở dòng này — bấm để bỏ che",
+    coverOff: "Che chữ gốc ở đúng lúc dòng này chạy (kéo ô trên video để chỉnh)",
   },
   en: {
     cpsOk: "Reading speed OK",
@@ -21,6 +23,8 @@ const T = {
       `Over ${limit} chars/second — viewers can't keep up, consider shortening`,
     chars: "chars",
     deleteRow: "Delete this line",
+    coverOn: "Covering the original text on this line — click to remove",
+    coverOff: "Cover the original text while this line plays (drag the box on the video)",
   },
 } as const;
 
@@ -49,6 +53,8 @@ interface SegmentTableProps {
   onRowClick: (startMs: number) => void;
   /** có truyền → hiện nút xóa từng dòng */
   onDelete?: (i: number) => void;
+  /** có truyền → hiện nút bật/tắt che chữ gốc cho từng dòng */
+  onToggleCover?: (i: number) => void;
   lang?: Lang;
 }
 
@@ -60,6 +66,7 @@ export function SegmentTable({
   onEdit,
   onRowClick,
   onDelete,
+  onToggleCover,
   lang = "vi",
 }: SegmentTableProps) {
   const t = T[lang];
@@ -137,6 +144,22 @@ export function SegmentTable({
                     </span>
                   );
                 })()}
+                {onToggleCover && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleCover(seg.i)}
+                    title={seg.box ? t.coverOn : t.coverOff}
+                    aria-pressed={Boolean(seg.box)}
+                    className={cn(
+                      "shrink-0 rounded p-0.5",
+                      seg.box
+                        ? "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300"
+                        : "text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:text-neutral-600 dark:hover:bg-primary-950/40",
+                    )}
+                  >
+                    <SquareDashed className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {onDelete && (
                   <button
                     type="button"

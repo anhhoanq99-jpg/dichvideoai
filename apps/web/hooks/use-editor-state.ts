@@ -86,15 +86,44 @@ export function useEditorState(
     [persist],
   );
 
-  /** Thêm 1 dòng phụ đề mới tại mốc thời gian (giữ i duy nhất, sắp theo startMs). */
+  /**
+   * Thêm 1 dòng phụ đề mới vào khoảng thời gian chỉ định
+   * (giữ `i` duy nhất, danh sách luôn sắp theo startMs).
+   */
   const insertSegment = useCallback(
-    (startMs: number) => {
+    (startMs: number, endMs: number, text = "") => {
       setSegments((prev) => {
         const maxI = prev.reduce((max, s) => Math.max(max, s.i), -1);
-        const next = [
-          ...prev,
-          { i: maxI + 1, startMs, endMs: startMs + 2000, text: "" },
-        ].sort((a, b) => a.startMs - b.startMs);
+        const next = [...prev, { i: maxI + 1, startMs, endMs, text }].sort(
+          (a, b) => a.startMs - b.startMs,
+        );
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  /**
+   * Gắn/gỡ vùng che chữ gốc cho MỘT dòng phụ đề (`box`, toạ độ 0..1 hệ video nguồn).
+   * Vùng này chỉ che trong đúng khoảng thời gian dòng đó chạy — dùng cho video có
+   * chữ nước ngoài xuất hiện rải rác ở nhiều chỗ/nhiều lúc khác nhau.
+   */
+  const setSegmentBox = useCallback(
+    (i: number, box: SubtitleSegment["box"] | null) => {
+      setSegments((prev) => {
+        const next = prev.map((s) => {
+          if (s.i !== i) return s;
+          if (!box) {
+            // bỏ hẳn khoá `box` thay vì để undefined — JSON gửi lên API sạch hơn
+            const rest = { ...s };
+            delete rest.box;
+            return rest;
+          }
+          return { ...s, box };
+        });
         setSaveState("dirty");
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => void persist(next), 1500);
@@ -133,6 +162,7 @@ export function useEditorState(
     saveState,
     updateSegmentText,
     insertSegment,
+    setSegmentBox,
     deleteSegment,
     replaceAll,
     saveNow,

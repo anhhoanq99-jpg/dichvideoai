@@ -30,6 +30,7 @@ const T = {
       `; kéo trên nền trống để khoanh vùng che mới (tối đa ${max}).`,
     region: "Vùng",
     clearAll: "Xóa hết",
+    lineCoverTag: "Che dòng này",
   },
   en: {
     previewPlaceholder: "Subtitle preview",
@@ -47,6 +48,7 @@ const T = {
       `; drag on empty space to draw a new cover region (max ${max}).`,
     region: "Region",
     clearAll: "Clear all",
+    lineCoverTag: "Covers this line",
   },
 } as const;
 
@@ -129,6 +131,11 @@ interface RenderPreviewProps {
   originalSegments?: SubtitleSegment[] | null;
   /** studio: nhận thay đổi settings khi kéo/resize logo trực tiếp trên video */
   onSettingsChange?: (patch: Partial<RenderSettings>) => void;
+  /**
+   * studio: đổi vùng che chữ gốc CỦA DÒNG đang chạy (segment.box). Có truyền →
+   * ô che của dòng hiện ra trên preview và kéo/co giãn được.
+   */
+  onActiveLineBoxChange?: (i: number, box: CoverRegion) => void;
   lang?: Lang;
 }
 
@@ -144,7 +151,10 @@ type Gesture =
   | { kind: "draw"; start: { x: number; y: number } }
   | { kind: "move-region"; index: number; grab: { dx: number; dy: number } }
   | { kind: "resize-region"; index: number }
-  | { kind: "move-sub"; grab: { dx: number; dy: number } };
+  | { kind: "move-sub"; grab: { dx: number; dy: number } }
+  // ô che chữ gốc gắn theo dòng phụ đề đang chạy
+  | { kind: "move-line-cover"; grab: { dx: number; dy: number } }
+  | { kind: "resize-line-cover" };
 
 function clamp01(n: number) {
   return Math.min(1, Math.max(0, n));
@@ -191,6 +201,7 @@ export function RenderPreview({
   dubSpeed = 1,
   originalSegments = null,
   onSettingsChange,
+  onActiveLineBoxChange,
   lang = "vi",
 }: RenderPreviewProps) {
   const t = T[lang];
@@ -375,6 +386,11 @@ export function RenderPreview({
 
   const covering = coverMode !== "none";
 
+  // Ô che chữ gốc của DÒNG đang chạy — chỉ hiện khi đúng câu đó đang phát,
+  // đúng như lúc render (ffmpeg bật/tắt theo enable='between(t,…)').
+  const activeLineBox = activeSegment?.box ?? null;
+  const lineCoverOn = covering && Boolean(activeLineBox) && Boolean(onActiveLineBoxChange);
+
   // khung phụ đề hiển thị: có subBox thì dùng, không thì dải đáy theo marginV
   const displaySubBox: CoverRegion = useMemo(() => {
     if (subBox) return subBox;
@@ -457,6 +473,26 @@ export function RenderPreview({
   function handlePointerDown(e: React.PointerEvent) {
     const p = toNorm(e);
     e.currentTarget.setPointerCapture(e.pointerId);
+
+    // Ô che của dòng đang chạy được ưu tiên trước mọi thứ — nó là thứ user vừa
+    // bật lên để chỉnh, và thường nằm đè lên vùng che/khung phụ đề.
+    if (lineCoverOn && activeLineBox) {
+      const rect = boxRef.current!.getBoundingClientRect();
+      const cornerX = rect.left + (activeLineBox.x + activeLineBox.w) * rect.width;
+      const cornerY = rect.top + (activeLineBox.y + activeLineBox.h) * rect.height;
+      if (Math.abs(e.clientX - cornerX) < 18 && Math.abs(e.clientY - cornerY) < 18) {
+        setGesture({ kind: "resize-line-cover" });
+        return;
+      }
+      if (insideBox(p, activeLineBox)) {
+        setGesture({
+          kind: "move-line-cover",
+          grab: { dx: p.x - activeLineBox.x, dy: p.y - activeLineBox.y },
+        });
+        return;
+      }
+    }
+
     // ưu tiên cao nhất: chạm gần góc phải-dưới một vùng che → đổi kích thước
     if (covering) {
       const rect = boxRef.current!.getBoundingClientRect();
@@ -520,6 +556,20 @@ export function RenderPreview({
         h: Math.min(1 - region.y, Math.max(0.03, p.y - region.y)),
       };
       onRegionsChange(regions.map((r, i) => (i === gesture.index ? resized : r)));
+    } else if (gesture.kind === "move-line-cover") {
+      if (!activeSegment || !activeLineBox) return;
+      onActiveLineBoxChange?.(activeSegment.i, {
+        ...activeLineBox,
+        x: Math.min(Math.max(p.x - gesture.grab.dx, 0), 1 - activeLineBox.w),
+        y: Math.min(Math.max(p.y - gesture.grab.dy, 0), 1 - activeLineBox.h),
+      });
+    } else if (gesture.kind === "resize-line-cover") {
+      if (!activeSegment || !activeLineBox) return;
+      onActiveLineBoxChange?.(activeSegment.i, {
+        ...activeLineBox,
+        w: Math.min(1 - activeLineBox.x, Math.max(0.03, p.x - activeLineBox.x)),
+        h: Math.min(1 - activeLineBox.y, Math.max(0.03, p.y - activeLineBox.y)),
+      });
     } else {
       onSubBoxChange({
         ...displaySubBox,
@@ -622,6 +672,31 @@ export function RenderPreview({
               )}
             </div>
           ))}
+
+        {/* ô che chữ gốc GẮN THEO DÒNG đang chạy — viền cam để phân biệt với
+            vùng che đỏ (áp cả video). Mô phỏng đúng chế độ che đã chọn. */}
+        {lineCoverOn && activeLineBox && (
+          <div
+            className="absolute cursor-move border-2 border-dashed border-primary-400"
+            style={{
+              left: `${activeLineBox.x * 100}%`,
+              top: `${activeLineBox.y * 100}%`,
+              width: `${activeLineBox.w * 100}%`,
+              height: `${activeLineBox.h * 100}%`,
+              ...(coverMode === "blur"
+                ? {
+                    backdropFilter: `blur(${Math.round(settings.blurStrength * 1.8)}px)`,
+                    background: "rgba(255,255,255,0.02)",
+                  }
+                : { background: "rgba(12,12,12,0.92)" }),
+            }}
+          >
+            <span className="absolute left-0 top-0 bg-primary-600 px-1 text-[10px] font-bold text-white">
+              {t.lineCoverTag}
+            </span>
+            <span className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-primary-600 shadow" />
+          </div>
+        )}
 
         {/* phụ đề dịch thật — đúng font/cỡ/màu, kéo để đổi chỗ */}
         {previewText && (

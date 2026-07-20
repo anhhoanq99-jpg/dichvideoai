@@ -47,6 +47,7 @@ import { CoverModal, DEFAULT_BAND } from "./cover-modal";
 import { StyleModal } from "./style-modal";
 import { DubModal } from "./dub-modal";
 import { PresetsModal } from "./presets-modal";
+import { AddSegmentModal } from "./add-segment-modal";
 
 const SAVE_ICONS = {
   saved: Check,
@@ -90,9 +91,10 @@ const T = {
     lines: "dòng",
     avgTitle: "Tốc độ đọc trung bình của bản dịch — nên dưới 20 ký tự/giây",
     avgLabel: "TB:",
-    addLineToast: "Đã thêm dòng mới tại vị trí video — gõ nội dung vào ô trống",
-    addLineTitle: "Thêm dòng phụ đề mới tại vị trí video đang dừng",
-    addLine: "Thêm dòng",
+    lineCoverToast: "Đã thêm ô che cho dòng này — kéo/co ô cam trên video cho trùng chữ gốc",
+    addLineToast: "Đã thêm dòng phụ đề vào đúng khoảng thời gian bạn chọn",
+    addLineTitle: "Thêm dòng phụ đề vào khoảng thời gian bạn tự chọn",
+    addLine: "Thêm phụ đề",
     logoTitle: "Logo / tên kênh",
   },
   en: {
@@ -128,9 +130,10 @@ const T = {
     lines: "lines",
     avgTitle: "Average reading speed of the translation — should stay under 20 chars/second",
     avgLabel: "Avg:",
-    addLineToast: "New line added at the current video position — type into the empty box",
-    addLineTitle: "Add a new subtitle line at the paused video position",
-    addLine: "Add line",
+    lineCoverToast: "Cover box added for this line — drag the orange box over the original text",
+    addLineToast: "Subtitle line added at the time range you picked",
+    addLineTitle: "Add a subtitle line at a time range you choose",
+    addLine: "Add subtitle",
     logoTitle: "Logo / channel name",
   },
 } as const;
@@ -142,6 +145,7 @@ type StudioModal =
   | "logo"
   | "dub"
   | "presets"
+  | "addSegment"
   | "export"
   | null;
 
@@ -184,10 +188,14 @@ export function StudioShell({
     saveState,
     updateSegmentText,
     insertSegment,
+    setSegmentBox,
     deleteSegment,
     replaceAll,
     saveNow,
   } = useEditorState(trackId, translated, trackVersion);
+
+  /** ô che mặc định khi bật che cho 1 dòng — dải đáy, nơi chữ gốc hay nằm */
+  const DEFAULT_LINE_BOX = { x: 0.06, y: 0.72, w: 0.88, h: 0.14 };
 
   const [modal, setModal] = useState<StudioModal>(null);
   const [settings, setSettings] = useState<RenderSettings>({
@@ -220,6 +228,26 @@ export function StudioShell({
 
   const patch = (p: Partial<RenderSettings>) =>
     setSettings((prev) => ({ ...prev, ...p }));
+
+  /**
+   * Bật/tắt che chữ gốc cho MỘT dòng phụ đề. Ô che chỉ hiện đúng lúc dòng đó
+   * chạy — hợp với video có chữ nước ngoài rải rác nhiều chỗ, nhiều thời điểm.
+   */
+  function toggleLineCover(i: number) {
+    const seg = segments.find((s) => s.i === i);
+    if (!seg) return;
+    if (seg.box) {
+      setSegmentBox(i, null);
+      return;
+    }
+    // Chế độ che đang TẮT thì ô che sẽ bị bỏ qua cả ở preview lẫn lúc render
+    // → bật lại, nếu không người dùng bấm mà chẳng thấy gì xảy ra.
+    if (settings.coverMode === "none") patch({ coverMode: "blur" });
+    setSegmentBox(i, DEFAULT_LINE_BOX);
+    // nhảy tới đúng câu để thấy ngay ô che mà kéo/chỉnh
+    if (videoElRef.current) videoElRef.current.currentTime = seg.startMs / 1000;
+    toast(t.lineCoverToast, "info");
+  }
 
   /** Áp một preset đã lưu (giữ coverMode theo loại video hiện tại). */
   function applyPreset(name: string, preset: StudioPreset) {
@@ -375,6 +403,7 @@ export function StudioShell({
               dubAiVolume={dub.aiVolume}
               dubSpeed={dub.speed}
               onSettingsChange={patch}
+              onActiveLineBoxChange={setSegmentBox}
               lang={lang}
             />
           ) : (
@@ -460,10 +489,7 @@ export function StudioShell({
             })()}
             <button
               type="button"
-              onClick={() => {
-                insertSegment(currentMs);
-                toast(t.addLineToast, "info");
-              }}
+              onClick={() => setModal("addSegment")}
               title={t.addLineTitle}
               className="flex shrink-0 items-center gap-1 rounded-md border border-primary-300 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:border-primary-700 dark:text-primary-300 dark:hover:bg-primary-950/40"
             >
@@ -477,6 +503,7 @@ export function StudioShell({
               activeIndex={activeIndex}
               autoScroll={autoScroll}
               onEdit={updateSegmentText}
+              onToggleCover={toggleLineCover}
               onDelete={deleteSegment}
               onRowClick={(startMs) => {
                 if (videoElRef.current) videoElRef.current.currentTime = startMs / 1000;
@@ -488,6 +515,19 @@ export function StudioShell({
       </div>
 
       {/* ---- Modals ---- */}
+      {modal === "addSegment" && (
+        <AddSegmentModal
+          currentMs={currentMs}
+          durationSec={durationSec}
+          onAdd={(startMs, endMs, text) => {
+            insertSegment(startMs, endMs, text);
+            toast(t.addLineToast, "info");
+          }}
+          onClose={() => setModal(null)}
+          lang={lang}
+        />
+      )}
+
       {modal === "retranslate" && (
         <RetranslateModal
           videoId={videoId}

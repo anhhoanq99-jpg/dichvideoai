@@ -6,12 +6,28 @@ import type {
   LogoParams,
 } from "@dichvideo/shared";
 
+/** Vùng che gắn theo MỘT dòng phụ đề — chỉ bật đúng khoảng thời gian của dòng đó. */
+export interface LineCover {
+  /** vùng chữ gốc cần che (0..1, hệ tọa độ video NGUỒN) */
+  box: CoverRegion;
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * Trần số vùng che theo dòng đưa vào filtergraph. Mỗi vùng thêm 1-2 filter node;
+ * quá nhiều thì lệnh ffmpeg phình và render chậm. Vượt trần → render.ts cắt bớt VÀ ghi log.
+ */
+export const MAX_LINE_COVERS = 120;
+
 export interface FiltergraphInput {
   srcWidth: number;
   srcHeight: number;
   coverMode: CoverMode;
   /** manual cover regions — each blurred/boxed for the whole duration */
   regions?: CoverRegion[];
+  /** vùng che theo từng dòng phụ đề — mỗi vùng chỉ hiện trong thời gian dòng đó chạy */
+  lineCovers?: LineCover[];
   /** 1..10 — mức làm mờ (mặc định 5) */
   blurStrength?: number;
   aspect: AspectId;
@@ -50,6 +66,16 @@ const LOGO_XY: Record<string, string> = {
   bl: `x=${LOGO_MARGIN}:y=h-th-${LOGO_MARGIN}`,
   br: `x=w-tw-${LOGO_MARGIN}:y=h-th-${LOGO_MARGIN}`,
 };
+
+/**
+ * Bật filter theo khoảng thời gian. Bọc nháy đơn để dấu phẩy bên trong
+ * `between(t,…)` không bị ffmpeg hiểu là dấu ngăn tham số.
+ */
+function enableBetween(c: { startMs: number; endMs: number }): string {
+  const s = (Math.max(0, c.startMs) / 1000).toFixed(3);
+  const e = (Math.max(0, c.endMs) / 1000).toFixed(3);
+  return `enable='between(t,${s},${e})'`;
+}
 
 /** Denormalize region → even-numbered pixel rect clamped to frame. */
 export function regionToPixels(
@@ -163,6 +189,48 @@ export function buildFiltergraph(input: FiltergraphInput): string {
       }
       current = `[cov${idx}]`;
     });
+  }
+
+  // 1b. che chữ gốc THEO TỪNG DÒNG phụ đề — mỗi ô chỉ bật trong khoảng thời gian của dòng.
+  // Vẫn ở hệ toạ độ NGUỒN (trước khi đổi khung hình), giống vùng che thủ công ở trên.
+  const lineCovers = (input.lineCovers ?? [])
+    .filter((c) => c.endMs > c.startMs)
+    .slice(0, MAX_LINE_COVERS);
+  if (input.coverMode !== "none" && lineCovers.length > 0) {
+    const strength = Math.min(10, Math.max(1, input.blurStrength ?? 5));
+    const blurRadius = Math.round(strength * 2.4);
+
+    if (input.coverMode === "box") {
+      // ô kín: drawbox rất rẻ, gắn thẳng enable theo thời gian
+      lineCovers.forEach((c, idx) => {
+        const r = regionToPixels(c.box, input.srcWidth, input.srcHeight);
+        steps.push(
+          `${current}drawbox=x=${r.x}:y=${r.y}:w=${r.w}:h=${r.h}:color=0x101010@1:t=fill:${enableBetween(c)}[lc${idx}]`,
+        );
+        current = `[lc${idx}]`;
+      });
+    } else {
+      // làm mờ: blur TOÀN khung ĐÚNG MỘT LẦN rồi dán lại từng ô theo thời gian.
+      // (blur riêng từng ô sẽ thành N lượt boxblur — rất chậm khi nhiều dòng)
+      const n = lineCovers.length;
+      const blurOuts = lineCovers.map((_, i) => `[lb${i}]`).join("");
+      steps.push(
+        `${current}split[lbase][lblursrc]`,
+        n === 1
+          ? `[lblursrc]boxblur=luma_radius=${blurRadius}:luma_power=2[lb0]`
+          : `[lblursrc]boxblur=luma_radius=${blurRadius}:luma_power=2,split=${n}${blurOuts}`,
+      );
+      let base = "[lbase]";
+      lineCovers.forEach((c, idx) => {
+        const r = regionToPixels(c.box, input.srcWidth, input.srcHeight);
+        steps.push(`[lb${idx}]crop=${r.w}:${r.h}:${r.x}:${r.y}[lcrop${idx}]`);
+        steps.push(
+          `${base}[lcrop${idx}]overlay=${r.x}:${r.y}:${enableBetween(c)}[lcov${idx}]`,
+        );
+        base = `[lcov${idx}]`;
+      });
+      current = base;
+    }
   }
 
   // 2. aspect reframe — blurred-pad background, source centered
