@@ -6,7 +6,7 @@ import type { Lang } from "@/lib/i18n";
 const T = {
   vi: {
     badge: "Tải video lên — AI tự trích phụ đề, dịch & lồng tiếng",
-    h1Before: "VIDEO CỦA BẠN,",
+    h1Before: "VIDEO CỦA BẠN",
     h1Gradient: "NÓI VÀ HIỂN THỊ MỌI THỨ TIẾNG",
     p: "AI lo trọn: trích phụ đề, dịch chuẩn văn nói, lồng tiếng — sang tiếng Việt và mọi ngôn ngữ. Tiết kiệm thời gian làm video Ads Facebook, TikTok, Review phim, Anime,…",
     cta1: "Bắt đầu miễn phí — tặng 10.000 xu",
@@ -22,7 +22,7 @@ const T = {
   },
   en: {
     badge: "Upload a video — AI extracts subtitles, translates & dubs",
-    h1Before: "YOUR VIDEO,",
+    h1Before: "YOUR VIDEO",
     h1Gradient: "SPEAKS EVERY LANGUAGE",
     p: "AI handles it all: subtitle extraction, natural translation, voice-over — into Vietnamese and any language. Save time on Facebook & TikTok ads, movie reviews, anime…",
     cta1: "Start free — 10,000 credits included",

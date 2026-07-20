@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 const T = {
   vi: {
-    title: "VIDEO CỦA BẠN NÓI VÀ HIỂN THỊ MỌI THỨ TIẾNG",
+    title: "Dịch & lồng tiếng video",
     tutorialTitle: "Video hướng dẫn sử dụng",
     errFormat: (name: string) =>
       `"${name}": định dạng không hỗ trợ (MP4, MOV, MKV, WebM).`,
@@ -40,7 +40,7 @@ const T = {
       "Sau khi tải lên, từng video sẽ tự chạy: đọc thông số → trích phụ đề gốc → dịch sang tiếng Việt. Theo dõi tiến trình trong danh sách video.",
   },
   en: {
-    title: "YOUR VIDEO SPEAKS EVERY LANGUAGE",
+    title: "Translate & dub videos",
     tutorialTitle: "How-to video",
     errFormat: (name: string) =>
       `"${name}": unsupported format (MP4, MOV, MKV, WebM).`,
@@ -194,11 +194,9 @@ export function UploadPageClient({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="text-center">
-        {/* tiêu đề dài hơn hẳn nên: cỡ chữ nhỏ lại ở điện thoại + cho xuống dòng
-            cân đối; logo giữ shrink-0 để không bị bóp méo khi chữ chiếm chỗ */}
-        <h1 className="flex items-center justify-center gap-2.5 text-xl font-semibold tracking-tight sm:text-2xl">
+        <h1 className="flex items-center justify-center gap-2.5 text-2xl font-semibold tracking-tight">
           <BrandMark className="h-9 w-9 shrink-0" />
-          <span className="text-balance">{t.title}</span>
+          {t.title}
         </h1>
       </div>
 
