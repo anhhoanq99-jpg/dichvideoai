@@ -77,6 +77,35 @@ function enableBetween(c: { startMs: number; endMs: number }): string {
   return `enable='between(t,${s},${e})'`;
 }
 
+/**
+ * Chuỗi boxblur AN TOÀN cho một vùng `w`×`h`.
+ *
+ * ffmpeg bắt bán kính boxblur phải NHỎ HƠN nửa cạnh ngắn của MẶT PHẲNG được làm
+ * mờ. Video yuv420p có mặt phẳng màu chỉ bằng nửa kích thước, nên giới hạn của
+ * nó chặt gấp đôi mặt phẳng sáng. Nếu không kẹp, một vùng che nhỏ (vd 150×30 →
+ * mặt màu 75×15) gặp bán kính 12 sẽ khiến ffmpeg bỏ CẢ filtergraph:
+ *   "Invalid chroma_param radius value 12, must be >= 0 and < 7"
+ * → không sinh khung hình nào → encoder không mở được → job render fail sạch.
+ * Đây là lỗi ngầm: vùng che to thì chạy, user vẽ vùng nhỏ là hỏng cả bản xuất.
+ */
+export function safeBoxblur(w: number, h: number, radius: number): string {
+  const short = Math.max(2, Math.min(w, h));
+  // trừ 1 vì ffmpeg yêu cầu "<" chứ không phải "<="
+  const maxLuma = Math.max(0, Math.floor(short / 2) - 1);
+  const maxChroma = Math.max(0, Math.floor(short / 4) - 1);
+  const luma = Math.min(radius, maxLuma);
+  const chroma = Math.min(radius, maxChroma);
+  // vùng quá bé để làm mờ → bỏ hẳn filter, cứ để nguyên ảnh còn hơn fail cả job
+  if (luma <= 0) return "";
+  return `boxblur=luma_radius=${luma}:luma_power=2:chroma_radius=${chroma}:chroma_power=2`;
+}
+
+/** Như trên nhưng nối sau một filter khác (tự thêm dấu phẩy; rỗng nếu bỏ mờ). */
+function blurStep(w: number, h: number, radius: number): string {
+  const f = safeBoxblur(w, h, radius);
+  return f ? `,${f}` : "";
+}
+
 /** Denormalize region → even-numbered pixel rect clamped to frame. */
 export function regionToPixels(
   region: CoverRegion,
@@ -179,7 +208,7 @@ export function buildFiltergraph(input: FiltergraphInput): string {
       if (input.coverMode === "blur") {
         steps.push(
           `${current}split[m${idx}][fb${idx}]`,
-          `[fb${idx}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=luma_radius=${blurRadius}:luma_power=2[bl${idx}]`,
+          `[fb${idx}]crop=${r.w}:${r.h}:${r.x}:${r.y}${blurStep(r.w, r.h, blurRadius)}[bl${idx}]`,
           `[m${idx}][bl${idx}]overlay=${r.x}:${r.y}[cov${idx}]`,
         );
       } else {
@@ -214,11 +243,13 @@ export function buildFiltergraph(input: FiltergraphInput): string {
       // (blur riêng từng ô sẽ thành N lượt boxblur — rất chậm khi nhiều dòng)
       const n = lineCovers.length;
       const blurOuts = lineCovers.map((_, i) => `[lb${i}]`).join("");
+      // làm mờ TOÀN khung nên dùng kích thước khung để kẹp bán kính
+      const blur = safeBoxblur(input.srcWidth, input.srcHeight, blurRadius) || "null";
       steps.push(
         `${current}split[lbase][lblursrc]`,
         n === 1
-          ? `[lblursrc]boxblur=luma_radius=${blurRadius}:luma_power=2[lb0]`
-          : `[lblursrc]boxblur=luma_radius=${blurRadius}:luma_power=2,split=${n}${blurOuts}`,
+          ? `[lblursrc]${blur}[lb0]`
+          : `[lblursrc]${blur},split=${n}${blurOuts}`,
       );
       let base = "[lbase]";
       lineCovers.forEach((c, idx) => {
