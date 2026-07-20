@@ -6,6 +6,7 @@ import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { createMultipart } from "@/lib/r2";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const initSchema = z.object({
@@ -18,7 +19,7 @@ const initSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
 
   // chặn tạo hàng loạt video row (mỗi upload là 1 row + 1 multipart R2)
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const rows = await db
     .select()

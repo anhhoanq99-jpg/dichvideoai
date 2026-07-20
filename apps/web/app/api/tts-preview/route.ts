@@ -13,6 +13,7 @@ import {
   pcmToWav,
 } from "@dichvideo/shared";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const VI_SAMPLE = "Xin chào! Đây là giọng đọc thử của mình, rất vui được đồng hành cùng video của bạn.";
@@ -107,7 +108,7 @@ async function synthesizeGCloud(voiceName: string, text: string): Promise<Buffer
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const voice = req.nextUrl.searchParams.get("voice") ?? "";
   if (!isValidVoiceId(voice)) {

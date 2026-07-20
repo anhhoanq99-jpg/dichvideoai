@@ -8,6 +8,7 @@ import {
 } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
 
 export async function GET(
   req: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const { id } = await params;
   const [row] = await db

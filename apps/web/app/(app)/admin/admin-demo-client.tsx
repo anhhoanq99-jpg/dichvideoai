@@ -5,6 +5,7 @@ import { Loader2, Upload } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const T = {
   vi: {
@@ -107,15 +108,10 @@ function DemoSlot({
             className="hidden"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-          <button
-            type="button"
-            disabled={busy || !file}
-            onClick={() => void upload()}
-            className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-50"
-          >
+          <Button pill className="px-4" disabled={busy || !file} onClick={() => void upload()}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {busy ? t.uploading : t.upload}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

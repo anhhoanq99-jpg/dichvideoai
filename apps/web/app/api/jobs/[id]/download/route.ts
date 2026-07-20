@@ -6,6 +6,7 @@ import { jobs } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getR2, r2Bucket } from "@/lib/r2";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
 
 /** Redirect to a presigned GET for a finished render output. */
 export async function GET(
@@ -14,7 +15,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const { id } = await params;
   const [job] = await db
