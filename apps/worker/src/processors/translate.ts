@@ -13,7 +13,7 @@ export async function translateProcessor(job: Job<JobPayload>) {
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video) throw new Error(`Video ${job.data.videoId} không tồn tại`);
+  if (!video) throw new Error("Video không tồn tại hoặc chưa upload xong");
 
   // luôn dịch track gốc mới nhất (video có thể được trích xuất lại nhiều lần)
   const [original] = await db

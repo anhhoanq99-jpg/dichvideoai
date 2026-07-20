@@ -39,7 +39,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload");
+  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload xong");
   if (!video.durationSec || !video.width || !video.height) {
     throw new Error("Video thiếu metadata (chưa probe)");
   }

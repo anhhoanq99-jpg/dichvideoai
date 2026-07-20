@@ -29,7 +29,7 @@ async function runExtraction(job: Job<JobPayload>, extractor: SubtitleExtractor)
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video?.r2Key) throw new Error(`Video ${job.data.videoId} has no r2Key`);
+  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload xong");
   if (!video.durationSec) throw new Error("Video chưa được probe (thiếu duration)");
 
   const dir = await jobTempDir(job.data.jobId);

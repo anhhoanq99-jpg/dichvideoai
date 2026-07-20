@@ -19,7 +19,7 @@ export async function probeProcessor(job: Job<JobPayload>) {
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video?.r2Key) throw new Error(`Video ${job.data.videoId} has no r2Key`);
+  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload xong");
 
   const dir = await jobTempDir(job.data.jobId);
   try {
