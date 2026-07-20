@@ -187,6 +187,7 @@ export function StudioShell({
     segments,
     saveState,
     updateSegmentText,
+    updateSegmentTime,
     insertSegment,
     setSegmentBox,
     deleteSegment,
@@ -503,6 +504,7 @@ export function StudioShell({
               activeIndex={activeIndex}
               autoScroll={autoScroll}
               onEdit={updateSegmentText}
+              onEditTime={updateSegmentTime}
               onToggleCover={toggleLineCover}
               onDelete={deleteSegment}
               onRowClick={(startMs) => {

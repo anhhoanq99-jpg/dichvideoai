@@ -107,6 +107,26 @@ export function useEditorState(
   );
 
   /**
+   * Sửa khoảng thời gian của MỘT dòng phụ đề.
+   * Bắt buộc sắp lại theo startMs: preview và studio-shell dùng tìm kiếm nhị phân
+   * để biết câu nào đang chạy — danh sách lộn xộn sẽ làm phụ đề hiện sai lúc.
+   */
+  const updateSegmentTime = useCallback(
+    (i: number, startMs: number, endMs: number) => {
+      setSegments((prev) => {
+        const next = prev
+          .map((s) => (s.i === i ? { ...s, startMs, endMs } : s))
+          .sort((a, b) => a.startMs - b.startMs);
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  /**
    * Gắn/gỡ vùng che chữ gốc cho MỘT dòng phụ đề (`box`, toạ độ 0..1 hệ video nguồn).
    * Vùng này chỉ che trong đúng khoảng thời gian dòng đó chạy — dùng cho video có
    * chữ nước ngoài xuất hiện rải rác ở nhiều chỗ/nhiều lúc khác nhau.
@@ -161,6 +181,7 @@ export function useEditorState(
     segments,
     saveState,
     updateSegmentText,
+    updateSegmentTime,
     insertSegment,
     setSegmentBox,
     deleteSegment,
