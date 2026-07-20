@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { synthEleven, synthesizeVoice } from "@/lib/tts-web";
 import { jsonError } from "@/lib/api-helpers";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -20,6 +21,9 @@ const Body = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return jsonError("Chưa đăng nhập", 401);
+
+  const rl = await rateLimit("voice-speak", callerId(req, session.user.id), 15, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

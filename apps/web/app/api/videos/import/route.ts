@@ -13,6 +13,7 @@ import {
 import { db } from "@/lib/db";
 import { createPipelineJob, jsonError, parseJsonBody } from "@/lib/api-helpers";
 import { getSession } from "@/lib/session";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const schema = z.object({
   url: z.string().min(8).max(2000),
@@ -44,6 +45,9 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return jsonError("Chưa đăng nhập", 401);
+
+  const rl = await rateLimit("video-import", callerId(req, session.user.id), 10, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
 
   const body = await parseJsonBody(req, schema);
   if (body.response) return body.response;
