@@ -19,7 +19,11 @@ export function AppHeaderShell({ children }: { children: React.ReactNode }) {
   return (
     <header
       className={cn(
-        "h-14 items-center gap-2 overflow-hidden border-b border-neutral-200 bg-white px-3 sm:gap-2.5 sm:px-4 dark:border-neutral-800 dark:bg-neutral-950",
+        // overflow-x-clip (KHÔNG phải overflow-hidden): vẫn chặn tràn ngang trên
+        // điện thoại, nhưng overflow-y giữ nguyên visible nên menu tài khoản thả
+        // xuống không bị cắt cụt. overflow-hidden cắt cả 2 chiều — menu nằm ở
+        // top-11 trong header cao 56px sẽ bị xén gần hết, bấm như không có gì.
+        "h-14 items-center gap-2 overflow-x-clip border-b border-neutral-200 bg-white px-3 sm:gap-2.5 sm:px-4 dark:border-neutral-800 dark:bg-neutral-950",
         hideOnMobile ? "hidden lg:flex" : "flex",
       )}
     >
