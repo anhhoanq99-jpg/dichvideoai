@@ -61,7 +61,7 @@ export function styleFieldsFromPreset(styleId: string): Partial<RenderSettings> 
     outlineColor: preset.outline,
     boxed: preset.borderStyle === 3,
     boxColor: preset.back ?? "#000000",
-    boxOpacity: preset.id === "solid-box" ? 100 : 67,
+    boxOpacity: preset.backOpacity ?? 67,
     marginV: preset.marginV,
   };
 }
