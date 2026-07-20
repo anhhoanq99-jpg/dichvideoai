@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePoll } from "@/hooks/use-poll";
 import {
   Check,
   CheckCircle2,
@@ -157,35 +158,27 @@ export function TopupPanel({
       ? `https://qr.sepay.vn/img?acc=${encodeURIComponent(account)}&bank=${encodeURIComponent(bank)}&des=${encodeURIComponent(code)}&amount=${selected}`
       : null;
 
-  // chờ nhận tiền: poll số dư — tăng là báo thành công ngay
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/credits/balance");
-        if (res.ok) {
-          const data = await res.json();
-          if (cancelled) return;
-          if (typeof data.balance === "number" && data.balance > balanceRef.current) {
-            const added = data.balance - balanceRef.current;
-            balanceRef.current = data.balance;
-            setPaid(added); // hiện màn cảm ơn ở khung QR
-            toast(t.toastTopup(fmt(added)));
-            router.refresh();
-          }
-        }
-      } catch {
-        // mạng chập chờn → vòng sau
+  /**
+   * Chờ nhận tiền: hỏi số dư, tăng lên là báo thành công ngay.
+   * CHỈ chạy khi đã hiện mã QR và chưa nhận được tiền — trước đây poll vô điều
+   * kiện nên kể cả lúc người dùng chưa chọn gói vẫn gọi API 12 lần/phút.
+   * usePoll tự tạm dừng khi tab bị ẩn (đỡ pin + 4G cho điện thoại).
+   */
+  usePoll(
+    async () => {
+      const res = await fetch("/api/credits/balance");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.balance === "number" && data.balance > balanceRef.current) {
+        const added = data.balance - balanceRef.current;
+        balanceRef.current = data.balance;
+        setPaid(added); // hiện màn cảm ơn ở khung QR
+        toast(t.toastTopup(fmt(added)));
+        router.refresh();
       }
-      timer = setTimeout(poll, 5000);
-    };
-    timer = setTimeout(poll, 5000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [toast, router, t]);
+    },
+    { intervalMs: 5000, enabled: Boolean(qrUrl) && paid === null },
+  );
 
   function copy(text: string, key: string) {
     void navigator.clipboard.writeText(text).then(() => {

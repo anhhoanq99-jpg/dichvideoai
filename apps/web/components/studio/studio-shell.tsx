@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Check,
@@ -17,6 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import {
+  segmentIndexAtOrBefore,
   type CoverMode,
   type CoverRegion,
   type SubtitleSegment,
@@ -237,7 +238,17 @@ export function StudioShell({
   );
 
   const { toast } = useToast();
-  const [currentMs, setCurrentMs] = useState(0);
+  /**
+   * Video bắn mốc thời gian ~4 lần/giây. Trước đây mỗi lần đều setState ở đây →
+   * render lại TOÀN BỘ cây studio (khung xem trước, bảng phụ đề, các panel) →
+   * giật rõ trên điện thoại. Nay mốc thời gian giữ trong ref (không gây render),
+   * chỉ `activeIndex` mới là state — và nó chỉ đổi khi sang câu KHÁC, tức vài
+   * giây một lần thay vì 4 lần/giây.
+   */
+  const currentMsRef = useRef(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  /** mốc thời gian chụp lại lúc mở hộp thoại "Thêm phụ đề" (đọc ref trong render là vi phạm lint) */
+  const [addSegmentAtMs, setAddSegmentAtMs] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
   const [find, setFind] = useState("");
   const [replace, setReplace] = useState("");
@@ -318,21 +329,25 @@ export function StudioShell({
     : null;
   const effectiveSubBox = manualSubBox ?? autoSubBox;
 
-  // dòng phụ đề đang phát (binary search theo currentMs)
-  const activeIndex = useMemo(() => {
-    let lo = 0,
-      hi = segments.length - 1,
-      lastBefore = -1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (segments[mid].startMs <= currentMs) {
-        if (currentMs < segments[mid].endMs) return mid;
-        lastBefore = mid;
-        lo = mid + 1;
-      } else hi = mid - 1;
-    }
-    return lastBefore;
-  }, [segments, currentMs]);
+  /**
+   * Nhận mốc thời gian từ khung xem trước. Ghi vào ref (không render) rồi chỉ
+   * setState khi chỉ số dòng đang phát ĐỔI — gọi setState với đúng giá trị cũ
+   * thì React tự bỏ qua, nên 4 lần/giây gần như không tốn gì.
+   */
+  const handleTimeChange = useCallback(
+    (ms: number) => {
+      currentMsRef.current = ms;
+      const idx = segmentIndexAtOrBefore(segments, ms);
+      setActiveIndex((prev) => (prev === idx ? prev : idx));
+    },
+    [segments],
+  );
+
+  // danh sách câu đổi (sửa/thêm/xóa) → tính lại chỉ số dòng đang phát cho khớp
+  useEffect(() => {
+    const idx = segmentIndexAtOrBefore(segments, currentMsRef.current);
+    setActiveIndex((prev) => (prev === idx ? prev : idx));
+  }, [segments]);
 
   const SaveIcon = SAVE_ICONS[saveState];
 
@@ -430,7 +445,7 @@ export function StudioShell({
               settings={settings}
               subBox={effectiveSubBox}
               onSubBoxChange={setManualSubBox}
-              onTimeChange={setCurrentMs}
+              onTimeChange={handleTimeChange}
               videoElRef={videoElRef}
               dubVoice={
                 dub.enabled && subtitleView !== "original"
@@ -529,7 +544,12 @@ export function StudioShell({
             })()}
             <button
               type="button"
-              onClick={() => setModal("addSegment")}
+              onClick={() => {
+                // chụp mốc đang xem NGAY lúc bấm — mốc này giữ trong ref nên
+                // không đọc được trong lúc render
+                setAddSegmentAtMs(currentMsRef.current);
+                setModal("addSegment");
+              }}
               title={t.addLineTitle}
               className="flex shrink-0 items-center gap-1 rounded-md border border-primary-300 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:border-primary-700 dark:text-primary-300 dark:hover:bg-primary-950/40"
             >
@@ -559,7 +579,7 @@ export function StudioShell({
       {/* ---- Modals ---- */}
       {modal === "addSegment" && (
         <AddSegmentModal
-          currentMs={currentMs}
+          currentMs={addSegmentAtMs}
           durationSec={durationSec}
           onAdd={(startMs, endMs, text) => {
             insertSegment(startMs, endMs, text);

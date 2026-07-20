@@ -3,6 +3,48 @@
  * Khác `subtitle-io.ts` — chỗ đó dùng định dạng SRT nghiêm ngặt "HH:MM:SS,mmm".
  */
 
+import type { SubtitleSegment } from "./types";
+
+/**
+ * Chỉ số câu ĐANG hiển thị tại mốc `ms`; -1 nếu đang ở khoảng lặng.
+ * Dùng cho khung xem trước: khoảng lặng thì KHÔNG hiện chữ nào.
+ * Yêu cầu `segments` đã sắp theo startMs (tìm kiếm nhị phân).
+ */
+export function segmentIndexAt(segments: SubtitleSegment[], ms: number): number {
+  let lo = 0,
+    hi = segments.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (segments[mid].startMs > ms) hi = mid - 1;
+    else if (segments[mid].endMs <= ms) lo = mid + 1;
+    else return mid;
+  }
+  return -1;
+}
+
+/**
+ * Như trên nhưng ở khoảng lặng thì trả về câu GẦN NHẤT PHÍA TRƯỚC (-1 nếu chưa
+ * tới câu nào). Dùng cho bảng phụ đề: giữa hai câu vẫn sáng dòng vừa đọc xong,
+ * nếu không con trỏ sẽ nhấp nháy tắt/bật liên tục khi video chạy.
+ */
+export function segmentIndexAtOrBefore(
+  segments: SubtitleSegment[],
+  ms: number,
+): number {
+  let lo = 0,
+    hi = segments.length - 1,
+    lastBefore = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (segments[mid].startMs <= ms) {
+      if (ms < segments[mid].endMs) return mid;
+      lastBefore = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  return lastBefore;
+}
+
 /** ms → "m:ss.d" (vd 83500 → "1:23.5"). Số âm bị kẹp về 0. */
 export function msToLabel(ms: number): string {
   const total = Math.max(0, ms) / 1000;

@@ -5,6 +5,7 @@ import { Mic, MicOff, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import {
   MAX_COVER_REGIONS,
   opacityToHexAlpha,
+  segmentIndexAt,
   tokenizeAccents,
   type CoverMode,
   type CoverRegion,
@@ -178,16 +179,10 @@ function insideBox(p: { x: number; y: number }, b: CoverRegion) {
 }
 
 /** tìm câu đang hiển thị tại thời điểm ms (segments đã sắp theo startMs) */
+/** Câu đang hiển thị tại mốc ms — null khi đang ở khoảng lặng. */
 function activeSegmentAt(segments: SubtitleSegment[], ms: number) {
-  let lo = 0,
-    hi = segments.length - 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (segments[mid].startMs > ms) hi = mid - 1;
-    else if (segments[mid].endMs <= ms) lo = mid + 1;
-    else return segments[mid];
-  }
-  return null;
+  const idx = segmentIndexAt(segments, ms);
+  return idx >= 0 ? segments[idx] : null;
 }
 
 /**
