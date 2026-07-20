@@ -130,7 +130,10 @@ export async function dubProcessor(job: Job<JobPayload>) {
   const voice = isValidVoiceId(params.voice) ? params.voice : DUB_VOICES[0].id;
   // edge & gcloud bake tốc độ ngay khi tổng hợp; gemini & eleven không có
   // tham số rate → phải áp tốc độ bằng atempo lúc ép khớp khe thoại
-  const speedBaked = ["edge", "gcloud"].includes(voiceProvider(voice));
+  // các provider nhận sẵn tham số tốc độ → khỏi ép lại bằng atempo (đỡ méo tiếng)
+  const speedBaked = ["edge", "gcloud", "viettel", "fpt"].includes(
+    voiceProvider(voice),
+  );
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
   const bgVol = clamp(params.bgVolume ?? 20, 0, 100) / 100;

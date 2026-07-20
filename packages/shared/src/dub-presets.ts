@@ -137,13 +137,62 @@ export function gcloudVoiceName(id: string): string | null {
   return id.startsWith("gcloud:") ? id.slice("gcloud:".length) : null;
 }
 
-export type VoiceProvider = "edge" | "gemini" | "eleven" | "gcloud";
+/**
+ * Giọng FPT.AI — tiếng Việt BẢN ĐỊA, đủ 3 miền. Đây là nhóm giọng quen tai
+ * khán giả Việt trong video review/thuyết minh. Cần FPT_TTS_API_KEY.
+ * API trả LINK mp3 chưa sẵn sàng ngay (chờ 5s–2 phút) nên worker phải poll.
+ */
+export const FPT_VOICES = [
+  { id: "fpt:banmai", name: "Ban Mai — nữ Bắc (thuyết minh)", gender: "F" as const },
+  { id: "fpt:thuminh", name: "Thu Minh — nữ Bắc", gender: "F" as const },
+  { id: "fpt:leminh", name: "Lê Minh — nam Bắc (review)", gender: "M" as const },
+  { id: "fpt:giahuy", name: "Gia Huy — nam Trung", gender: "M" as const },
+  { id: "fpt:myan", name: "Mỹ An — nữ Trung", gender: "F" as const },
+  { id: "fpt:lannhi", name: "Lan Nhi — nữ Nam", gender: "F" as const },
+  { id: "fpt:linhsan", name: "Linh San — nữ Nam", gender: "F" as const },
+] as const;
+
+export const FPT_VOICE_IDS = new Set<string>(FPT_VOICES.map((v) => v.id));
+
+export function fptVoiceName(id: string): string | null {
+  return id.startsWith("fpt:") ? id.slice("fpt:".length) : null;
+}
+
+/**
+ * Giọng Viettel AI — tiếng Việt bản địa, hạn mức miễn phí rất rộng
+ * (~500.000 ký tự/ngày). Cần VIETTEL_TTS_TOKEN.
+ * API trả THẲNG file wav nên hợp pipeline đọc từng câu hơn FPT.
+ *
+ * CHỈ liệt kê id đã XÁC NHẬN trong tài liệu Viettel. Danh sách đầy đủ phải lấy
+ * từ chính API của họ (cần token) — chạy `npx tsx scripts/list-tts-voices.ts`
+ * rồi dán kết quả vào đây. KHÔNG đoán id: đoán sai thì khách chọn giọng xong
+ * job lồng tiếng fail, mà lỗi chỉ lộ ra lúc đã trừ xu.
+ */
+export const VIETTEL_VOICES = [
+  { id: "viettel:doanngocle", name: "Đoàn Ngọc Lê — nam", gender: "M" as const },
+] as const;
+
+export const VIETTEL_VOICE_IDS = new Set<string>(VIETTEL_VOICES.map((v) => v.id));
+
+export function viettelVoiceName(id: string): string | null {
+  return id.startsWith("viettel:") ? id.slice("viettel:".length) : null;
+}
+
+export type VoiceProvider =
+  | "edge"
+  | "gemini"
+  | "eleven"
+  | "gcloud"
+  | "fpt"
+  | "viettel";
 
 /** Provider của một id giọng (theo tiền tố) — mặc định edge (không tiền tố). */
 export function voiceProvider(id: string): VoiceProvider {
   if (id.startsWith("gemini:")) return "gemini";
   if (id.startsWith("eleven:")) return "eleven";
   if (id.startsWith("gcloud:")) return "gcloud";
+  if (id.startsWith("fpt:")) return "fpt";
+  if (id.startsWith("viettel:")) return "viettel";
   return "edge";
 }
 
@@ -153,7 +202,9 @@ export function isValidVoiceId(id: string): boolean {
     EDGE_VOICE_IDS.has(id) ||
     GEMINI_VOICE_IDS.has(id) ||
     ELEVEN_VOICE_IDS.has(id) ||
-    GCLOUD_VOICE_IDS.has(id)
+    GCLOUD_VOICE_IDS.has(id) ||
+    FPT_VOICE_IDS.has(id) ||
+    VIETTEL_VOICE_IDS.has(id)
   );
 }
 
