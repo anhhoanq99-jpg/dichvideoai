@@ -3,7 +3,13 @@ import Groq from "groq-sdk";
 import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
-import { isDailyQuotaError, rateLimitDelayMs, withGeminiRetry } from "./gemini-limits";
+import {
+  isDailyQuotaError,
+  isKeyExhaustedError,
+  rateLimitDelayMs,
+  withGeminiRetry,
+} from "./gemini-limits";
+import { geminiKeys } from "./gemini-keys";
 import {
   POLISH_STYLES,
   STYLE_BRIEF_HINTS,
@@ -38,7 +44,10 @@ export interface TranslateResult {
 interface TranslateContext {
   gemini: GoogleGenAI | null;
   groq: Groq | null;
-  /** provider đang dùng — tự hạ từ gemini xuống groq khi hết hạn mức ngày */
+  /** danh sách key Gemini (GEMINI_API_KEYS + GEMINI_API_KEY) — hết key này sang key kế */
+  keys: string[];
+  keyIdx: number;
+  /** provider đang dùng — tự hạ từ gemini xuống groq khi hết sạch key */
   provider: "gemini" | "groq";
   geminiModel: string;
   groqModel: string;
@@ -165,15 +174,27 @@ function isGeminiUnavailable(err: unknown) {
  * (Llama, miễn phí) cho phần còn lại của job thay vì fail.
  */
 async function generate(ctx: TranslateContext, opts: GenerateOptions) {
-  if (ctx.provider === "gemini") {
+  while (ctx.provider === "gemini") {
     try {
       return await generateGemini(ctx, opts);
     } catch (err) {
+      // Key này hết hạn mức/hết tiền mà còn key khác → đổi key rồi thử lại.
+      // Nhờ vậy cắm vài key MIỄN PHÍ là dịch vẫn chạy bằng Gemini (chất lượng
+      // tiếng Việt hơn hẳn Groq/Llama) thay vì rơi xuống dự phòng ngay từ key đầu.
+      if (isKeyExhaustedError(err) && ctx.keyIdx < ctx.keys.length - 1) {
+        ctx.keyIdx++;
+        ctx.gemini = new GoogleGenAI({ apiKey: ctx.keys[ctx.keyIdx] });
+        logger.warn(
+          { key: `${ctx.keyIdx + 1}/${ctx.keys.length}` },
+          "key Gemini hết hạn mức — chuyển sang key tiếp theo",
+        );
+        continue;
+      }
       if (!ctx.groq) throw err;
       ctx.provider = "groq";
       logger.warn(
         { groqModel: ctx.groqModel, err: String(err).slice(0, 200) },
-        "Gemini không dùng được — tự chuyển sang Groq (miễn phí) cho job này",
+        "Hết sạch key Gemini — tự chuyển sang Groq (miễn phí) cho job này",
       );
     }
   }
@@ -261,16 +282,18 @@ export async function translateSegments(
   },
   onProgress: (pct: number) => void,
 ): Promise<TranslateResult> {
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const keys = geminiKeys();
   const groqKey = process.env.GROQ_API_KEY;
-  if (!geminiKey && !groqKey) {
-    throw new Error("Chưa cấu hình GEMINI_API_KEY hoặc GROQ_API_KEY");
+  if (keys.length === 0 && !groqKey) {
+    throw new Error("Chưa cấu hình GEMINI_API_KEY / GEMINI_API_KEYS hoặc GROQ_API_KEY");
   }
   const ctx: TranslateContext = {
-    gemini: geminiKey ? new GoogleGenAI({ apiKey: geminiKey }) : null,
+    gemini: keys.length > 0 ? new GoogleGenAI({ apiKey: keys[0] }) : null,
     groq: groqKey ? new Groq({ apiKey: groqKey }) : null,
-    // ưu tiên Gemini (chất lượng dịch tốt hơn); thiếu key → chạy thẳng Groq
-    provider: geminiKey ? "gemini" : "groq",
+    keys,
+    keyIdx: 0,
+    // ưu tiên Gemini (chất lượng dịch tốt hơn); không có key → chạy thẳng Groq
+    provider: keys.length > 0 ? "gemini" : "groq",
     geminiModel:
       input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-2.5-flash",
     groqModel: process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile",
