@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloudUpload, GraduationCap, Loader2, Mic, Play, X } from "lucide-react";
+import { CloudUpload, GraduationCap, Loader2, Play, X } from "lucide-react";
+import { BrandMark } from "@/components/brand-logo";
 import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
 import {
   useMultipartUpload,
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 const T = {
   vi: {
-    title: "Dịch & lồng tiếng video",
+    title: "VIDEO CỦA BẠN NÓI VÀ HIỂN THỊ MỌI THỨ TIẾNG",
     tutorialTitle: "Video hướng dẫn sử dụng",
     errFormat: (name: string) =>
       `"${name}": định dạng không hỗ trợ (MP4, MOV, MKV, WebM).`,
@@ -39,7 +40,7 @@ const T = {
       "Sau khi tải lên, từng video sẽ tự chạy: đọc thông số → trích phụ đề gốc → dịch sang tiếng Việt. Theo dõi tiến trình trong danh sách video.",
   },
   en: {
-    title: "Translate & dub videos",
+    title: "YOUR VIDEO SPEAKS EVERY LANGUAGE",
     tutorialTitle: "How-to video",
     errFormat: (name: string) =>
       `"${name}": unsupported format (MP4, MOV, MKV, WebM).`,
@@ -193,11 +194,11 @@ export function UploadPageClient({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="text-center">
-        <h1 className="flex items-center justify-center gap-2.5 text-2xl font-semibold tracking-tight">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/50">
-            <Mic className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-          </span>
-          {t.title}
+        {/* tiêu đề dài hơn hẳn nên: cỡ chữ nhỏ lại ở điện thoại + cho xuống dòng
+            cân đối; logo giữ shrink-0 để không bị bóp méo khi chữ chiếm chỗ */}
+        <h1 className="flex items-center justify-center gap-2.5 text-xl font-semibold tracking-tight sm:text-2xl">
+          <BrandMark className="h-9 w-9 shrink-0" />
+          <span className="text-balance">{t.title}</span>
         </h1>
       </div>
 
