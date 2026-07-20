@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Loader2, MessageCircle, PencilLine, RefreshCw, 
 import type { Lang } from "@/lib/i18n";
 import { inputClass } from "@/components/ui/form-styles";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const T = {
   vi: {
@@ -278,15 +279,14 @@ export function CommunityFeed({ lang = "vi" }: { lang?: Lang }) {
           >
             <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /> {t.refresh}
           </button>
-          <button
-            type="button"
+          <Button
+            pill
             disabled={posting || title.trim().length < 3}
             onClick={() => void publish()}
-            className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-50"
           >
             {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {t.post}
-          </button>
+          </Button>
         </div>
       </div>
 

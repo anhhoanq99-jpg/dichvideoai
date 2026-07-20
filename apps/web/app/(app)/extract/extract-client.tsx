@@ -10,6 +10,8 @@ import {
 } from "@/hooks/use-multipart-upload";
 import type { Lang } from "@/lib/i18n";
 import { fieldLabelClass, selectClass } from "@/components/ui/form-styles";
+import { Dropzone } from "@/components/ui/dropzone";
+import { Button } from "@/components/ui/button";
 import { sourceLangOptions } from "@/lib/source-langs";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +70,6 @@ type FileStatus = "waiting" | "uploading" | "done" | "error";
 export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
   const t = T[lang];
   const { state, upload } = useMultipartUpload();
-  const [dragOver, setDragOver] = useState(false);
   const [method, setMethod] = useState<"ocr" | "stt">("ocr");
   const [sourceLang, setSourceLang] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -166,41 +167,18 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
         </label>
       </div>
 
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          addFiles(e.dataTransfer.files);
-        }}
-        className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 transition-colors",
-          dragOver
-            ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
-            : "border-neutral-300 hover:border-neutral-400 dark:border-neutral-700 dark:hover:border-neutral-600",
-        )}
+      <Dropzone
+        multiple
+        accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
+        disabled={running}
+        onFiles={addFiles}
       >
         <FileText className="h-10 w-10 text-neutral-400" />
         <p className="mt-3 text-sm font-medium">{t.dropTitle}</p>
         <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
           {t.dropHint}
         </p>
-        <input
-          type="file"
-          multiple
-          accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
-          className="hidden"
-          disabled={running}
-          onChange={(e) => {
-            addFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </label>
+      </Dropzone>
 
       {files.length > 0 && (
         <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
@@ -239,11 +217,11 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
         </ul>
       )}
 
-      <button
-        type="button"
+      <Button
+        size="lg"
+        className="w-full"
         disabled={files.length === 0 || running}
         onClick={() => void startAll()}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {running ? (
           <>
@@ -254,7 +232,7 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
             <Play className="h-4 w-4" /> {t.start}
           </>
         )}
-      </button>
+      </Button>
 
       {(error || state.phase === "error") && (
         <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">

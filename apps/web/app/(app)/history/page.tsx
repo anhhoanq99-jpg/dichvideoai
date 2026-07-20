@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
 import { JOB_TYPE_LABELS } from "@/lib/job-labels";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +56,6 @@ const T = {
   },
 } as const;
 
-const STATUS_CLS: Record<string, string> = {
-  done: "bg-success-100 text-success-700 dark:bg-success-950/50 dark:text-success-300",
-  failed: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
-  active: "bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300",
-  queued: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-  cancelled: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
-};
-
 export default async function HistoryPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -108,7 +101,6 @@ export default async function HistoryPage() {
             {rows.map((job) => {
               const statusLabel =
                 t.status[job.status as keyof typeof t.status] ?? t.status.queued;
-              const statusCls = STATUS_CLS[job.status] ?? STATUS_CLS.queued;
               const hasFile =
                 job.status === "done" &&
                 Boolean((job.result as { r2Key?: string } | null)?.r2Key);
@@ -121,12 +113,11 @@ export default async function HistoryPage() {
                     >
                       {job.videoName}
                     </Link>
-                    <span
+                    <StatusBadge
+                      status={job.status}
+                      label={statusLabel}
                       title={job.status === "failed" ? (job.error ?? "") : undefined}
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusCls}`}
-                    >
-                      {statusLabel}
-                    </span>
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
                     <span className="font-medium text-neutral-600 dark:text-neutral-300">
@@ -176,7 +167,6 @@ export default async function HistoryPage() {
                 {rows.map((job) => {
                   const statusLabel =
                     t.status[job.status as keyof typeof t.status] ?? t.status.queued;
-                  const statusCls = STATUS_CLS[job.status] ?? STATUS_CLS.queued;
                   const hasFile =
                     job.status === "done" &&
                     Boolean((job.result as { r2Key?: string } | null)?.r2Key);
@@ -194,12 +184,12 @@ export default async function HistoryPage() {
                         {jobTypeLabel[job.type] ?? job.type}
                       </td>
                       <td className="px-5 py-3">
-                        <span
+                        <StatusBadge
+                          status={job.status}
+                          label={statusLabel}
                           title={job.status === "failed" ? (job.error ?? "") : undefined}
-                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusCls}`}
-                        >
-                          {statusLabel}
-                        </span>
+                          className="inline-block"
+                        />
                       </td>
                       <td className="px-5 py-3 text-right font-mono text-xs">
                         {job.creditsCharged > 0 ? (

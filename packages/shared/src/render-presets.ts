@@ -10,6 +10,8 @@ export interface SubtitleStyle {
   outline: string;
   /** #RRGGBB — combined with backOpacity into #RRGGBBAA */
   back?: string;
+  /** 0..100 — độ đục của hộp nền (chỉ dùng khi borderStyle = 3; mặc định 67) */
+  backOpacity?: number;
   /** 1 = outline+shadow, 3 = opaque/translucent box */
   borderStyle: 1 | 3;
   /** vertical margin from bottom, in PlayRes pixels */
@@ -52,6 +54,21 @@ export const KARAOKE_BASE_COLOR = "#C9C9C9";
 /** Màu nhấn mặc định cho từ khóa quan trọng (bọc trong *dấu sao* ở bản dịch). */
 export const ACCENT_HIGHLIGHT_COLOR = "#FFD400";
 
+/**
+ * Độ đục 0..100 → 2 ký tự hex alpha ("AA" trong #RRGGBBAA).
+ *
+ * Dùng CHUNG cho khung xem trước (web) và bản xuất thật (worker). Trước đây mỗi
+ * bên tự tính một bản: lệch nhau là preview không khớp video xuất ra, mà người
+ * dùng chỉ phát hiện SAU KHI đã trả xu để render.
+ */
+export function opacityToHexAlpha(percent: number): string {
+  const clamped = Math.min(100, Math.max(0, percent));
+  return Math.round((clamped / 100) * 255)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+}
+
 export const STYLE_PRESETS: StylePreset[] = [
   {
     id: "white-outline",
@@ -84,6 +101,7 @@ export const STYLE_PRESETS: StylePreset[] = [
     primary: "#FFFFFF",
     outline: "#000000",
     back: "#000000",
+    backOpacity: 67,
     borderStyle: 3,
     marginV: 40,
   },
@@ -96,8 +114,81 @@ export const STYLE_PRESETS: StylePreset[] = [
     primary: "#FFFFFF",
     outline: "#000000",
     back: "#101010",
+    backOpacity: 100,
     borderStyle: 3,
     marginV: 36,
+  },
+  // ---- Mẫu bổ sung: đều ưu tiên DỄ ĐỌC (chữ sáng + viền/hộp tối tương phản cao) ----
+  {
+    id: "tiktok-bold",
+    name: "TikTok đậm",
+    font: "Anton",
+    size: 54,
+    // Anton vốn đã rất đậm — bật bold nữa sẽ bị bôi nhòe (libass làm đậm giả)
+    bold: false,
+    primary: "#FFFFFF",
+    outline: "#000000",
+    borderStyle: 1,
+    marginV: 44,
+  },
+  {
+    id: "cinema-clean",
+    name: "Điện ảnh sạch",
+    font: "Montserrat",
+    size: 46,
+    bold: true,
+    primary: "#FFFFFF",
+    outline: "#0A0A0A",
+    borderStyle: 1,
+    marginV: 44,
+  },
+  {
+    id: "soft-box",
+    name: "Hộp tối dịu",
+    font: "Noto Sans",
+    size: 46,
+    bold: false,
+    primary: "#FFFFFF",
+    outline: "#000000",
+    back: "#000000",
+    backOpacity: 55,
+    borderStyle: 3,
+    marginV: 40,
+  },
+  {
+    id: "coral-brand",
+    name: "Cam nổi bật",
+    font: "Baloo 2",
+    size: 50,
+    bold: true,
+    primary: "#FFFFFF",
+    outline: "#EE5631",
+    borderStyle: 1,
+    marginV: 42,
+  },
+  {
+    id: "news-oswald",
+    name: "Bản tin",
+    font: "Oswald",
+    size: 48,
+    bold: false,
+    primary: "#FFFFFF",
+    outline: "#000000",
+    back: "#111111",
+    backOpacity: 75,
+    borderStyle: 3,
+    marginV: 38,
+  },
+  {
+    id: "mint-pop",
+    name: "Xanh mint",
+    font: "Paytone One",
+    size: 48,
+    bold: false,
+    primary: "#9BF6C8",
+    outline: "#0B2E1F",
+    borderStyle: 1,
+    marginV: 42,
   },
 ];
 

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AppHeaderShell } from "@/components/app-header-shell";
 import { AppSidebar, MobileNav } from "@/components/app-sidebar";
 import { BackButton } from "@/components/back-button";
 import { BrandLogo } from "@/components/brand-logo";
@@ -22,7 +23,7 @@ export default async function AppLayout({
     <div className="flex h-dvh overflow-x-hidden bg-neutral-50 dark:bg-neutral-950">
       <AppSidebar lang={lang} isAdmin={isAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-2 overflow-hidden border-b border-neutral-200 bg-white px-3 sm:gap-2.5 sm:px-4 dark:border-neutral-800 dark:bg-neutral-950">
+        <AppHeaderShell>
           {/* mobile: nút menu; logo chỉ hiện từ sm+ (điện thoại nhỏ giấu đi cho đỡ chật) */}
           <MobileNav lang={lang} isAdmin={isAdmin} />
           <BackButton label={lang === "vi" ? "Quay lại trang trước" : "Go back"} />
@@ -37,9 +38,10 @@ export default async function AppLayout({
               name={session.user.name}
               email={session.user.email}
               image={session.user.image}
+              lang={lang}
             />
           </span>
-        </header>
+        </AppHeaderShell>
         {/* overflow-x-hidden: phần tử nào lỡ rộng hơn màn hình cũng không làm
             trang bị đẩy ngang khi thao tác trên điện thoại */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">

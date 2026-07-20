@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2, r2Bucket } from "@/lib/r2";
-import { getSession } from "@/lib/session";
-import { isAdminEmail } from "@/lib/admin";
-import { jsonError } from "@/lib/api-helpers";
+import { jsonError, requireAdmin } from "@/lib/api-helpers";
 
 export const maxDuration = 60;
 
@@ -19,9 +17,8 @@ const SLOT_FILES: Record<string, string> = {
  * Ghi đè lên khe cố định trong R2; trang chủ tự lấy bản mới.
  */
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return jsonError("Chưa đăng nhập", 401);
-  if (!isAdminEmail(session.user.email)) return jsonError("Chỉ dành cho admin", 403);
+  const guard = await requireAdmin();
+  if (guard.response) return guard.response;
 
   const form = await req.formData().catch(() => null);
   const slot = String(form?.get("slot") ?? "");

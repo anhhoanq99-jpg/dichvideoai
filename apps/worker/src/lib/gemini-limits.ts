@@ -27,6 +27,17 @@ export function isBillingDepletedError(err: unknown): boolean {
   );
 }
 
+/**
+ * Lỗi thuộc về RIÊNG key đang dùng (hết hạn mức ngày / hết tiền / key hỏng) →
+ * đổi sang key khác thì cứu được. Nhận cả lỗi thô lẫn lỗi đã bị `withGeminiRetry`
+ * bọc thành UnrecoverableError kèm thông báo tiếng Việt.
+ */
+export function isKeyExhaustedError(err: unknown): boolean {
+  if (isDailyQuotaError(err) || isBillingDepletedError(err)) return true;
+  const m = err instanceof Error ? err.message : String(err);
+  return /hết hạn mức trong NGÀY|hết tiền trả trước|API_KEY_INVALID|API key not valid/i.test(m);
+}
+
 export function dailyQuotaMessage(): string {
   return (
     "Key Gemini miễn phí đã hết hạn mức trong NGÀY (dịch/OCR: 20 lượt, giọng cao cấp: 10 lượt mỗi ngày). " +

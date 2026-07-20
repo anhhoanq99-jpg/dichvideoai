@@ -5,10 +5,12 @@ import type { CoverMode, CoverRegion } from "@dichvideo/shared";
 import { Modal } from "@/components/ui/modal";
 import { fieldLabelClass, optionCardClass } from "@/components/ui/form-styles";
 import type { Lang } from "@/lib/i18n";
-import type { RenderSettings } from "@/components/render/render-settings";
+import {
+  DEFAULT_BAND,
+  type RenderSettings,
+} from "@/components/render/render-settings";
 
 /** dải đáy video — vị trí phụ đề gốc thường gặp */
-export const DEFAULT_BAND: CoverRegion = { x: 0.02, y: 0.78, w: 0.96, h: 0.16 };
 
 const T = {
   vi: {

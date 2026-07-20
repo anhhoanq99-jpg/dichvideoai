@@ -13,6 +13,8 @@ import {
   pcmToWav,
 } from "@dichvideo/shared";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const VI_SAMPLE = "Xin chào! Đây là giọng đọc thử của mình, rất vui được đồng hành cùng video của bạn.";
 const EN_SAMPLE = "Hello! This is a short preview of my voice.";
@@ -106,7 +108,7 @@ async function synthesizeGCloud(voiceName: string, text: string): Promise<Buffer
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const voice = req.nextUrl.searchParams.get("voice") ?? "";
   if (!isValidVoiceId(voice)) {
@@ -129,6 +131,10 @@ export async function GET(req: NextRequest) {
       headers: { "content-type": hit.type, "cache-control": "private, max-age=86400" },
     });
   }
+
+  // Chỉ giới hạn khi TRƯỢT cache (tổng hợp thật mới tốn tiền) — cache hit ở trên không tính.
+  const rl = await rateLimit("tts-preview", callerId(req, session.user.id), 30, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
 
   try {
     let body: Buffer;

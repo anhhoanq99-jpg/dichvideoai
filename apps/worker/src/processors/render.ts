@@ -9,6 +9,7 @@ import {
   STYLE_PRESETS,
   SUB_EFFECT_IDS,
   buildAss,
+  opacityToHexAlpha,
   type JobPayload,
   type RenderParams,
   type SubtitleSegment,
@@ -18,6 +19,7 @@ import { chainJob } from "../lib/chain";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import {
   buildFiltergraph,
+  MAX_LINE_COVERS,
   outputResolution,
   subBoxToMargins,
 } from "../lib/filtergraph";
@@ -37,7 +39,7 @@ export async function renderProcessor(job: Job<JobPayload>) {
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload");
+  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload xong");
   if (!video.durationSec || !video.width || !video.height) {
     throw new Error("Video thiếu metadata (chưa probe)");
   }
@@ -62,11 +64,10 @@ export async function renderProcessor(job: Job<JobPayload>) {
     params.boxColor && HEX_RE.test(params.boxColor)
       ? params.boxColor
       : (preset.back ?? "#000000");
-  const opacity = clamp(params.boxOpacity ?? (preset.id === "solid-box" ? 100 : 67), 0, 100);
-  const alpha = Math.round((opacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0")
-    .toUpperCase();
+  // mặc định lấy backOpacity của chính preset (trước đây hard-code theo id
+  // "solid-box" nên các preset mới có hộp nền đều bị ép về 67)
+  const opacity = clamp(params.boxOpacity ?? preset.backOpacity ?? 67, 0, 100);
+  const alpha = opacityToHexAlpha(opacity);
 
   // user-drawn subtitle box → margins (position + wrap width); falls back to marginV
   const boxMargins = params.subBox
@@ -139,11 +140,25 @@ export async function renderProcessor(job: Job<JobPayload>) {
       await downloadFromR2(params.logoImage.r2Key, logoImagePath);
     }
 
+    // Vùng che gắn theo từng dòng phụ đề: dòng nào có `box` thì che đúng chỗ đó,
+    // chỉ trong khoảng thời gian dòng đó chạy (chữ nước ngoài xuất hiện rải rác).
+    const allLineCovers = segments
+      .filter((s) => s.box)
+      .map((s) => ({ box: s.box!, startMs: s.startMs, endMs: s.endMs }));
+    const lineCovers = allLineCovers.slice(0, MAX_LINE_COVERS);
+    if (allLineCovers.length > lineCovers.length) {
+      logger.warn(
+        { jobId: job.data.jobId, total: allLineCovers.length, used: lineCovers.length },
+        "quá nhiều vùng che theo dòng — chỉ áp dụng phần đầu để render không quá chậm",
+      );
+    }
+
     const graph = buildFiltergraph({
       srcWidth: video.width,
       srcHeight: video.height,
       coverMode: params.coverMode,
       regions: params.regions,
+      lineCovers,
       blurStrength: params.blurStrength,
       aspect: params.aspect,
       assPath,

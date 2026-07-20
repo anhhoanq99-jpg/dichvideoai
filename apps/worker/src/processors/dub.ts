@@ -18,7 +18,7 @@ import { audioDurationMs, ffBin, ffprobe, makeSilence } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
 import { synthesizeClipWithRetry } from "../lib/tts";
-import { recordUsage, type UsageRecord } from "../lib/usage";
+import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
 
 const execFileAsync = promisify(execFile);
@@ -113,7 +113,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
     .select()
     .from(videos)
     .where(eq(videos.id, job.data.videoId));
-  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload");
+  if (!video?.r2Key) throw new Error("Video không tồn tại hoặc chưa upload xong");
   if (!video.durationSec) throw new Error("Video thiếu metadata (chưa probe)");
 
   const [track] = await db

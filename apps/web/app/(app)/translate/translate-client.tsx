@@ -12,6 +12,8 @@ import {
 import { useJobStream } from "@/hooks/use-job-stream";
 import type { Lang } from "@/lib/i18n";
 import { fieldLabelClass, selectClass } from "@/components/ui/form-styles";
+import { Dropzone } from "@/components/ui/dropzone";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const T = {
@@ -69,7 +71,6 @@ export function TranslateSrtPageClient({ lang = "vi" }: { lang?: Lang }) {
   const [targetLang, setTargetLang] = useState<TargetLangId>("vi");
   const [style, setStyle] = useState<TranslationStyleId>("natural");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [dragOver, setDragOver] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [done, setDone] = useState<DoneInfo | null>(null);
@@ -147,23 +148,10 @@ export function TranslateSrtPageClient({ lang = "vi" }: { lang?: Lang }) {
       </div>
 
       {/* chọn file */}
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          void onFile(e.dataTransfer.files[0]);
-        }}
-        className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-10 transition-colors",
-          dragOver
-            ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
-            : "border-neutral-300 hover:border-neutral-400 dark:border-neutral-700 dark:hover:border-neutral-600",
-        )}
+      <Dropzone
+        accept=".srt,.vtt,text/plain"
+        onFiles={(files) => void onFile(files?.[0])}
+        className="py-10"
       >
         <Upload className="h-9 w-9 text-neutral-400" />
         <p className="mt-3 text-sm font-medium">
@@ -174,16 +162,7 @@ export function TranslateSrtPageClient({ lang = "vi" }: { lang?: Lang }) {
             {t.fileInfo(lineCount, estimate.toLocaleString("vi-VN"))}
           </p>
         )}
-        <input
-          type="file"
-          accept=".srt,.vtt,text/plain"
-          className="hidden"
-          onChange={(e) => {
-            void onFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      </label>
+      </Dropzone>
 
       {/* thiết lập dịch */}
       <div className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
@@ -267,15 +246,10 @@ export function TranslateSrtPageClient({ lang = "vi" }: { lang?: Lang }) {
           )}
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={!file}
-          onClick={() => void start()}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button size="lg" className="w-full" disabled={!file} onClick={() => void start()}>
           <Play className="h-4 w-4" /> {t.translateNow}
           {file ? t.creditsSuffix(estimate.toLocaleString("vi-VN")) : ""}
-        </button>
+        </Button>
       )}
 
       {(error || job?.status === "failed") && (

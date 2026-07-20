@@ -4,6 +4,7 @@ import { z } from "zod";
 import { subtitleTracks, videos } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { jsonError } from "@/lib/api-helpers";
 
 const segmentSchema = z.object({
   i: z.number().int().min(0),
@@ -18,6 +19,12 @@ const segmentSchema = z.object({
       h: z.number().min(0).max(1),
     })
     .optional(),
+  /** vị trí riêng của dòng (0..1) — điểm neo giữa-dưới khối chữ */
+  pos: z
+    .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
+    .optional(),
+  /** cỡ chữ riêng của dòng (px theo PlayRes) */
+  size: z.number().min(8).max(200).optional(),
 });
 
 const patchSchema = z.object({
@@ -41,7 +48,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const { id } = await params;
   const track = await getOwnTrack(id, session.user.id);
@@ -57,7 +64,7 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    return jsonError("Chưa đăng nhập", 401);
   }
   const { id } = await params;
   const track = await getOwnTrack(id, session.user.id);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, MicOff, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import {
   MAX_COVER_REGIONS,
+  opacityToHexAlpha,
   tokenizeAccents,
   type CoverMode,
   type CoverRegion,
@@ -11,6 +12,7 @@ import {
 } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useDubPreview } from "@/hooks/use-dub-preview";
 import type { RenderSettings } from "./render-settings";
 
 const T = {
@@ -30,6 +32,7 @@ const T = {
       `; kéo trên nền trống để khoanh vùng che mới (tối đa ${max}).`,
     region: "Vùng",
     clearAll: "Xóa hết",
+    lineCoverTag: "Che dòng này",
   },
   en: {
     previewPlaceholder: "Subtitle preview",
@@ -47,6 +50,7 @@ const T = {
       `; drag on empty space to draw a new cover region (max ${max}).`,
     region: "Region",
     clearAll: "Clear all",
+    lineCoverTag: "Covers this line",
   },
 } as const;
 
@@ -129,6 +133,19 @@ interface RenderPreviewProps {
   originalSegments?: SubtitleSegment[] | null;
   /** studio: nhận thay đổi settings khi kéo/resize logo trực tiếp trên video */
   onSettingsChange?: (patch: Partial<RenderSettings>) => void;
+  /**
+   * studio: đổi vùng che chữ gốc CỦA DÒNG đang chạy (segment.box). Có truyền →
+   * ô che của dòng hiện ra trên preview và kéo/co giãn được.
+   */
+  onActiveLineBoxChange?: (i: number, box: CoverRegion) => void;
+  /**
+   * studio: đổi vị trí / cỡ chữ RIÊNG của dòng đang chạy. Có truyền → dòng nào
+   * đã bật tự chỉnh sẽ kéo được đi chỗ khác và co giãn cỡ chữ ngay trên video.
+   */
+  onActiveLineLayoutChange?: (
+    i: number,
+    layout: { pos?: { x: number; y: number }; size?: number },
+  ) => void;
   lang?: Lang;
 }
 
@@ -144,7 +161,13 @@ type Gesture =
   | { kind: "draw"; start: { x: number; y: number } }
   | { kind: "move-region"; index: number; grab: { dx: number; dy: number } }
   | { kind: "resize-region"; index: number }
-  | { kind: "move-sub"; grab: { dx: number; dy: number } };
+  | { kind: "move-sub"; grab: { dx: number; dy: number } }
+  // ô che chữ gốc gắn theo dòng phụ đề đang chạy
+  | { kind: "move-line-cover"; grab: { dx: number; dy: number } }
+  | { kind: "resize-line-cover" }
+  // dòng phụ đề có vị trí/cỡ chữ riêng
+  | { kind: "move-line-sub"; grab: { dx: number; dy: number } }
+  | { kind: "resize-line-sub"; startX: number; startSize: number };
 
 function clamp01(n: number) {
   return Math.min(1, Math.max(0, n));
@@ -191,11 +214,15 @@ export function RenderPreview({
   dubSpeed = 1,
   originalSegments = null,
   onSettingsChange,
+  onActiveLineBoxChange,
+  onActiveLineLayoutChange,
   lang = "vi",
 }: RenderPreviewProps) {
   const t = T[lang];
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** khối chữ của dòng đang chạy — đo vùng thật để bắt đúng chỗ khi kéo */
+  const subLineRef = useRef<HTMLDivElement>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [draft, setDraft] = useState<CoverRegion | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
@@ -207,30 +234,6 @@ export function RenderPreview({
 
   // âm thanh: tiếng gốc + nghe thử lồng tiếng theo câu (giọng thường, miễn phí)
   const [soundOn, setSoundOn] = useState(true);
-  const [dubMuted, setDubMuted] = useState(false);
-  // nghe thử theo câu: chỉ nguồn có hạn mức rộng (Edge, Google Cloud) —
-  // Gemini/ElevenLabs tính phí theo lượt nên chỉ nghe trong bản xuất
-  const dubSupported =
-    Boolean(dubVoice) &&
-    !dubVoice?.startsWith("gemini:") &&
-    !dubVoice?.startsWith("eleven:");
-  const dubActive = dubSupported && !dubMuted;
-  const clipUrlCache = useRef(new Map<string, string>());
-  const dubAudioRef = useRef<HTMLAudioElement | null>(null);
-  const lastSpokenRef = useRef<number | null>(null);
-
-  // iOS chỉ cho phát audio nếu phần tử từng .play() TRONG một cử chỉ chạm.
-  // Tạo 1 phần tử duy nhất + phát file WAV im lặng ngay lúc bấm nút, các câu
-  // lồng tiếng sau chỉ đổi src trên chính phần tử đã "mở khóa" này.
-  const SILENT_WAV =
-    "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-  function unlockDubAudio() {
-    if (dubAudioRef.current) return;
-    const audio = new Audio(SILENT_WAV);
-    dubAudioRef.current = audio;
-    void audio.play().catch(() => {});
-  }
-
   // kéo/resize logo trực tiếp trên khung preview
   const logoRef = useRef<HTMLDivElement>(null);
   const logoGesture = useRef<
@@ -325,6 +328,18 @@ export function RenderPreview({
 
   const activeSegment = activeSegmentAt(segments, currentMs);
 
+  // nghe thử lồng tiếng theo từng câu — xem hooks/use-dub-preview.ts
+  const { dubSupported, dubActive, setDubMuted, unlockDubAudio } =
+    useDubPreview({
+      dubVoice,
+      playing,
+      activeSegmentIndex: activeSegment?.i ?? null,
+      segments,
+      durationMs,
+      dubAiVolume,
+      dubSpeed,
+    });
+
   // đồng bộ loa: tắt/bật tiếng gốc. Đang nghe thử lồng tiếng → tiếng gốc hạ
   // như bản xuất thật: trong câu = "giọng nói gốc", giữa các câu = "nhạc nền".
   // iOS BỎ QUA video.volume (chỉ nghe muted) → mức < 15% coi như tắt hẳn,
@@ -343,37 +358,19 @@ export function RenderPreview({
     video.muted = level < 15;
   }, [soundOn, dubActive, dubBgVolume, dubOrigVoiceVolume, activeSegment]);
 
-  /** Tải (và cache) clip TTS của một câu — trả về object URL. */
-  const fetchDubClip = useCallback(
-    async (voice: string, seg: SubtitleSegment): Promise<string | null> => {
-      const key = `${voice}:${seg.i}:${seg.text}`;
-      const cached = clipUrlCache.current.get(key);
-      if (cached) return cached;
-      try {
-        const res = await fetch(
-          `/api/tts-preview?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(seg.text.replace(/\*/g, "").slice(0, 300))}`,
-        );
-        if (!res.ok) return null;
-        const url = URL.createObjectURL(await res.blob());
-        clipUrlCache.current.set(key, url);
-        return url;
-      } catch {
-        return null;
-      }
-    },
-    [],
-  );
-
-  // dọn các object URL khi rời trang
-  useEffect(() => {
-    const cache = clipUrlCache.current;
-    return () => {
-      for (const url of cache.values()) URL.revokeObjectURL(url);
-      cache.clear();
-    };
-  }, []);
-
   const covering = coverMode !== "none";
+
+  // Ô che chữ gốc của DÒNG đang chạy — chỉ hiện khi đúng câu đó đang phát,
+  // đúng như lúc render (ffmpeg bật/tắt theo enable='between(t,…)').
+  const activeLineBox = activeSegment?.box ?? null;
+  const lineCoverOn = covering && Boolean(activeLineBox) && Boolean(onActiveLineBoxChange);
+
+  // Dòng đang chạy có tự chỉnh vị trí riêng → đặt chữ đúng chỗ đó (neo giữa-dưới,
+  // khớp \an2\pos của ASS) và cho kéo/co giãn ngay trên khung xem trước.
+  const activeLinePos = activeSegment?.pos ?? null;
+  const lineLayoutOn = Boolean(activeLinePos) && Boolean(onActiveLineLayoutChange);
+  /** cỡ chữ hiệu lực của câu đang chạy — riêng của dòng, không có thì lấy cỡ chung */
+  const activeFontSize = activeSegment?.size ?? settings.fontSize;
 
   // khung phụ đề hiển thị: có subBox thì dùng, không thì dải đáy theo marginV
   const displaySubBox: CoverRegion = useMemo(() => {
@@ -392,60 +389,6 @@ export function RenderPreview({
     (activeSegment?.endMs ?? 2000) - (activeSegment?.startMs ?? 0),
   );
 
-  // nghe thử lồng tiếng: sang câu mới → đọc câu đó bằng giọng đã chọn, ép tốc
-  // độ đọc cho vừa khe thoại (khớp thời gian như bản xuất), tải trước câu kế
-  const activeSegmentIndex = activeSegment?.i ?? null;
-  useEffect(() => {
-    if (!dubActive || !dubVoice || !playing) {
-      dubAudioRef.current?.pause();
-      if (!playing) lastSpokenRef.current = null;
-      return;
-    }
-    if (activeSegmentIndex === null || lastSpokenRef.current === activeSegmentIndex)
-      return;
-    lastSpokenRef.current = activeSegmentIndex;
-    const segIdx = segments.findIndex((s) => s.i === activeSegmentIndex);
-    const seg = segments[segIdx];
-    if (!seg) return;
-    const next = segments[segIdx + 1];
-    // khe thoại của câu = tới lúc câu sau bắt đầu (giống slotMs bên worker)
-    const slotMs = Math.max(
-      300,
-      (next ? next.startMs : Math.max(durationMs, seg.endMs)) - seg.startMs,
-    );
-    let stale = false;
-    void fetchDubClip(dubVoice, seg).then((url) => {
-      if (!url || stale) return;
-      // tái sử dụng phần tử đã mở khóa trong cử chỉ chạm — iOS mới cho phát;
-      // desktop chưa bấm nút nào thì tạo mới (autoplay policy thoáng hơn)
-      const audio = dubAudioRef.current ?? new Audio();
-      dubAudioRef.current = audio;
-      audio.pause();
-      audio.src = url;
-      audio.volume = Math.min(1, Math.max(0, dubAiVolume / 100));
-      audio.onloadedmetadata = () => {
-        // câu dài hơn khe → tăng tốc đọc cho khớp (như atempo khi xuất)
-        const rawMs = audio.duration * 1000;
-        audio.playbackRate = Math.min(4, Math.max(dubSpeed, rawMs / slotMs));
-      };
-      void audio.play().catch(() => {});
-      if (next) void fetchDubClip(dubVoice, next);
-    });
-    return () => {
-      stale = true;
-    };
-  }, [
-    activeSegmentIndex,
-    dubActive,
-    dubVoice,
-    dubAiVolume,
-    dubSpeed,
-    playing,
-    segments,
-    durationMs,
-    fetchDubClip,
-  ]);
-
   function toNorm(e: React.PointerEvent) {
     const rect = boxRef.current!.getBoundingClientRect();
     return {
@@ -457,6 +400,56 @@ export function RenderPreview({
   function handlePointerDown(e: React.PointerEvent) {
     const p = toNorm(e);
     e.currentTarget.setPointerCapture(e.pointerId);
+
+    // Dòng phụ đề tự chỉnh nằm TRÊN CÙNG về mặt hình ảnh (chữ đè lên ô che) nên
+    // bắt trước. Đo vùng thật của khối chữ thay vì ước lượng — chữ dài ngắn khác nhau.
+    if (lineLayoutOn && activeSegment && activeLinePos && subLineRef.current) {
+      const sub = subLineRef.current.getBoundingClientRect();
+      // tay cầm co giãn ở góc phải-dưới khối chữ
+      if (
+        Math.abs(e.clientX - sub.right) < 18 &&
+        Math.abs(e.clientY - sub.bottom) < 18
+      ) {
+        setGesture({
+          kind: "resize-line-sub",
+          startX: p.x,
+          startSize: activeSegment.size ?? settings.fontSize,
+        });
+        return;
+      }
+      if (
+        e.clientX >= sub.left &&
+        e.clientX <= sub.right &&
+        e.clientY >= sub.top &&
+        e.clientY <= sub.bottom
+      ) {
+        setGesture({
+          kind: "move-line-sub",
+          grab: { dx: p.x - activeLinePos.x, dy: p.y - activeLinePos.y },
+        });
+        return;
+      }
+    }
+
+    // Ô che của dòng đang chạy được ưu tiên trước mọi thứ — nó là thứ user vừa
+    // bật lên để chỉnh, và thường nằm đè lên vùng che/khung phụ đề.
+    if (lineCoverOn && activeLineBox) {
+      const rect = boxRef.current!.getBoundingClientRect();
+      const cornerX = rect.left + (activeLineBox.x + activeLineBox.w) * rect.width;
+      const cornerY = rect.top + (activeLineBox.y + activeLineBox.h) * rect.height;
+      if (Math.abs(e.clientX - cornerX) < 18 && Math.abs(e.clientY - cornerY) < 18) {
+        setGesture({ kind: "resize-line-cover" });
+        return;
+      }
+      if (insideBox(p, activeLineBox)) {
+        setGesture({
+          kind: "move-line-cover",
+          grab: { dx: p.x - activeLineBox.x, dy: p.y - activeLineBox.y },
+        });
+        return;
+      }
+    }
+
     // ưu tiên cao nhất: chạm gần góc phải-dưới một vùng che → đổi kích thước
     if (covering) {
       const rect = boxRef.current!.getBoundingClientRect();
@@ -520,6 +513,35 @@ export function RenderPreview({
         h: Math.min(1 - region.y, Math.max(0.03, p.y - region.y)),
       };
       onRegionsChange(regions.map((r, i) => (i === gesture.index ? resized : r)));
+    } else if (gesture.kind === "move-line-sub") {
+      if (!activeSegment) return;
+      onActiveLineLayoutChange?.(activeSegment.i, {
+        pos: {
+          x: clamp01(p.x - gesture.grab.dx),
+          y: clamp01(p.y - gesture.grab.dy),
+        },
+      });
+    } else if (gesture.kind === "resize-line-sub") {
+      if (!activeSegment) return;
+      // kéo sang phải = to ra; 10% chiều ngang video ~ 20px cỡ chữ
+      const next = Math.round(gesture.startSize + (p.x - gesture.startX) * 200);
+      onActiveLineLayoutChange?.(activeSegment.i, {
+        size: Math.min(160, Math.max(12, next)),
+      });
+    } else if (gesture.kind === "move-line-cover") {
+      if (!activeSegment || !activeLineBox) return;
+      onActiveLineBoxChange?.(activeSegment.i, {
+        ...activeLineBox,
+        x: Math.min(Math.max(p.x - gesture.grab.dx, 0), 1 - activeLineBox.w),
+        y: Math.min(Math.max(p.y - gesture.grab.dy, 0), 1 - activeLineBox.h),
+      });
+    } else if (gesture.kind === "resize-line-cover") {
+      if (!activeSegment || !activeLineBox) return;
+      onActiveLineBoxChange?.(activeSegment.i, {
+        ...activeLineBox,
+        w: Math.min(1 - activeLineBox.x, Math.max(0.03, p.x - activeLineBox.x)),
+        h: Math.min(1 - activeLineBox.y, Math.max(0.03, p.y - activeLineBox.y)),
+      });
     } else {
       onSubBoxChange({
         ...displaySubBox,
@@ -546,9 +568,8 @@ export function RenderPreview({
     else video.pause();
   }
 
-  const boxAlpha = Math.round((settings.boxOpacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0");
+  // dùng chung với worker để preview khớp bản xuất — xem opacityToHexAlpha
+  const boxAlpha = opacityToHexAlpha(settings.boxOpacity);
   const outline = settings.outlineColor;
 
   return (
@@ -623,23 +644,62 @@ export function RenderPreview({
             </div>
           ))}
 
+        {/* ô che chữ gốc GẮN THEO DÒNG đang chạy — viền cam để phân biệt với
+            vùng che đỏ (áp cả video). Mô phỏng đúng chế độ che đã chọn. */}
+        {lineCoverOn && activeLineBox && (
+          <div
+            className="absolute cursor-move border-2 border-dashed border-primary-400"
+            style={{
+              left: `${activeLineBox.x * 100}%`,
+              top: `${activeLineBox.y * 100}%`,
+              width: `${activeLineBox.w * 100}%`,
+              height: `${activeLineBox.h * 100}%`,
+              ...(coverMode === "blur"
+                ? {
+                    backdropFilter: `blur(${Math.round(settings.blurStrength * 1.8)}px)`,
+                    background: "rgba(255,255,255,0.02)",
+                  }
+                : { background: "rgba(12,12,12,0.92)" }),
+            }}
+          >
+            <span className="absolute left-0 top-0 bg-primary-600 px-1 text-[10px] font-bold text-white">
+              {t.lineCoverTag}
+            </span>
+            <span className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-primary-600 shadow" />
+          </div>
+        )}
+
         {/* phụ đề dịch thật — đúng font/cỡ/màu, kéo để đổi chỗ */}
         {previewText && (
           <div
-            className="absolute flex cursor-move flex-col items-center justify-end"
-            style={{
-              left: `${displaySubBox.x * 100}%`,
-              top: `${displaySubBox.y * 100}%`,
-              width: `${displaySubBox.w * 100}%`,
-              height: `${displaySubBox.h * 100}%`,
-            }}
+            ref={subLineRef}
+            className={cn(
+              "absolute flex cursor-move flex-col items-center",
+              lineLayoutOn ? "justify-start" : "justify-end",
+            )}
+            style={
+              lineLayoutOn && activeLinePos
+                ? {
+                    // neo GIỮA-DƯỚI đúng như \an2\pos khi render ra video
+                    left: `${activeLinePos.x * 100}%`,
+                    top: `${activeLinePos.y * 100}%`,
+                    transform: "translate(-50%, -100%)",
+                    maxWidth: "94%",
+                  }
+                : {
+                    left: `${displaySubBox.x * 100}%`,
+                    top: `${displaySubBox.y * 100}%`,
+                    width: `${displaySubBox.w * 100}%`,
+                    height: `${displaySubBox.h * 100}%`,
+                  }
+            }
           >
             {/* chế độ "Cả hai": dòng bản gốc nhỏ phía trên */}
             {originalSegments && (
               <span
                 className="mb-0.5 max-w-full px-1 text-center leading-tight text-white/85"
                 style={{
-                  fontSize: Math.max(8, settings.fontSize * previewScale * 0.65),
+                  fontSize: Math.max(8, activeFontSize * previewScale * 0.65),
                   textShadow: "0 0 3px #000, 0 0 3px #000",
                 }}
               >
@@ -650,7 +710,7 @@ export function RenderPreview({
               className="max-w-full px-1.5 py-0.5 text-center leading-tight"
               style={{
                 fontFamily: `'${settings.font}', sans-serif`,
-                fontSize: Math.max(9, settings.fontSize * previewScale),
+                fontSize: Math.max(9, activeFontSize * previewScale),
                 fontWeight: settings.bold ? 700 : 400,
                 backgroundColor: settings.boxed
                   ? `${settings.boxColor}${boxAlpha}`
@@ -698,6 +758,13 @@ export function RenderPreview({
                 )}
               </span>
             </span>
+            {/* dòng đang tự chỉnh: viền cam + tay cầm co giãn cỡ chữ ở góc phải-dưới */}
+            {lineLayoutOn && (
+              <>
+                <span className="pointer-events-none absolute inset-0 rounded border border-dashed border-primary-400" />
+                <span className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-primary-600 shadow" />
+              </>
+            )}
           </div>
         )}
 

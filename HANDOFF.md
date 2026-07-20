@@ -71,6 +71,20 @@ gói thưởng, màn cảm ơn). Đã cấu hình MB Bank `999628999999` / PHAM 
   trong render (dùng prefix-sum thay vì `let x += …`). PowerShell pipe here-string vào git commit
   bị hỏng nếu message chứa dấu `"` → viết message KHÔNG có ngoặc kép, hoặc dùng `node spawnSync` input.
 
+## 4b. CHE CHỮ GỐC THEO TỪNG DÒNG (mới)
+
+Video có chữ nước ngoài xuất hiện rải rác → mỗi dòng phụ đề gắn được 1 ô che riêng
+(`SubtitleSegment.box`, toạ độ 0..1 hệ video NGUỒN), **chỉ che đúng lúc dòng đó chạy**.
+- Worker: `filtergraph.ts` `lineCovers` → `drawbox`/`overlay` kèm `enable='between(t,s,e)'`.
+  Chế độ mờ: blur TOÀN khung **1 lần** rồi dán lại từng ô (blur riêng từng ô = N lượt boxblur, rất chậm).
+  Trần `MAX_LINE_COVERS = 120`, vượt thì `render.ts` cắt bớt **và ghi log** (không cắt âm thầm).
+- Web: nút ô vuông nét đứt ở mỗi dòng trong `segment-table` bật/tắt che; ô cam hiện trên
+  `render-preview` khi câu đó chạy, kéo/co giãn được. Bật che lúc `coverMode="none"` → tự bật `blur`
+  (nếu không thì ô bị bỏ qua ở cả preview lẫn render — bấm mà không thấy gì).
+- **`box` do OCR sinh ra: CHƯA CÓ** — `gemini-video-ocr.ts` không trả toạ độ, nên `hasOnScreenText`
+  ở `editor/page.tsx` luôn false. Muốn tự động che thì phải sửa prompt OCR cho Gemini trả bounding box.
+- Đã verify: 43 test pass (7 test filtergraph mới) + chạy **ffmpeg thật** 4 tổ hợp (box/blur × keep/9:16).
+
 ## 5. LỖI/VẤN ĐỀ đã biết, CHƯA xử lý
 
 - **Nhân bản giọng riêng KHÔNG hoạt động** — key ElevenLabs là gói free, thiếu quyền
@@ -84,8 +98,25 @@ gói thưởng, màn cảm ơn). Đã cấu hình MB Bank `999628999999` / PHAM 
 ## 6. VIỆC TIẾP THEO (ưu tiên cao → thấp)
 
 1. **User đăng ký webhook SePay** trên sepay.vn + test nạp thật 10k (mảnh cuối để thu tiền tự động).
-2. **Cron dọn R2** file `outputs/` quá 7 ngày (đang hứa trong ToS mà chưa làm).
-3. **Rate-limit** các API công khai (`/api/tts-preview`, `/api/voice-clone/speak`, upload) chống lạm dụng.
-4. Trang admin: xem `usage_events` / doanh thu; nút xóa bài/bình luận cộng đồng (dọn spam).
+2. ~~**Cron dọn R2** file `outputs/` quá 7 ngày~~ → **ĐÃ VIẾT script lifecycle** `apps/worker/scripts/set-r2-lifecycle.ts`
+   (Cloudflare tự xóa server-side, không cần cron chạy trên máy user). **CHẶN**: token R2 trong `.env` object-scoped,
+   thiếu quyền cấu hình bucket → `Access Denied`. **User cần làm 1 trong 2**: (a) dashboard Cloudflare → R2 → bucket
+   `dichvideo-prod` → Settings → Object lifecycle rules → Add: prefix `outputs/` xóa sau 7 ngày + abort multipart dở sau 7 ngày;
+   hoặc (b) tạo R2 API token quyền Admin, đặt tạm vào env rồi `cd apps/worker && npx tsx scripts/set-r2-lifecycle.ts`.
+3. ~~**Rate-limit** các API công khai~~ → **XONG**. Helper `apps/web/lib/rate-limit.ts` (cửa sổ cố định trên
+   Redis Upstash, atomic Lua, **fail-open** khi Redis lỗi). Đã gắn vào: `tts-preview` 30/phút (chỉ khi trượt cache),
+   `voice-clone/speak` 15/phút, `srt/translate` 10/phút, `videos/import` 10/phút, `videos` (tạo upload) 20/phút —
+   đều theo userId. Trả 429 + `Retry-After`. Đã test thật trên Redis prod (chặn đúng ngưỡng). Đổi hạn mức: sửa số ngay tại route.
+4. ~~Trang admin: xem `usage_events` / doanh thu; nút xóa bài/bình luận cộng đồng~~ → **XONG** (`app/(app)/admin/page.tsx`).
+   Thêm khối **Doanh thu & chi phí** (tổng nạp = SUM ledger reason=topup; nạp 30 ngày/hôm nay qua SQL `now()`; số người nạp;
+   xu đang lưu hành = SUM `user.creditBalance`; chi phí AI = SUM `usage_events.costUsdMicros`; bảng 15 lượt nạp gần đây) +
+   khối **Kiểm duyệt cộng đồng** (`admin-moderation-client.tsx`: 25 bài + 25 bình luận mới nhất, nút xóa → `DELETE
+   /api/admin/community/posts/:id` và `/comments/:id`, guard `isAdminEmail`, cascade xóa bình luận theo bài). Đã verify query trên DB prod.
 5. (Tùy chọn) Nhân bản giọng thật: nâng ElevenLabs hoặc model open-source trên worker.
-6. Gom bớt code lặp còn lại: `<Dropzone>`, `<Button>` variant, `<StatusBadge>` (đã note ở review trước).
+6. ~~Gom bớt code lặp: `<Dropzone>`, `<Button>`, `<StatusBadge>`~~ → **ĐÃ TẠO primitive** trong `components/ui/`:
+   - `dropzone.tsx` — vùng kéo-thả (state dragOver nội bộ). Đã thay ở `extract-client` + `translate-client` (output class y hệt).
+   - `status-badge.tsx` — nhãn trạng thái, gom bảng màu 1 chỗ. Đã thay 2 chỗ ở `history/page.tsx` (y hệt).
+   - `button.tsx` — Button variant (primary/secondary/ghost/danger) + size (sm/md/lg) + `pill`. Đã thay 2 nút submit y hệt
+     ở extract/translate (Button thêm `shadow-sm`+`transition-colors` → khác biệt thị giác rất nhỏ, coi như đồng bộ hóa).
+   - **CÒN LẠI ~30 nút** dùng class thô đủ biến thể (radius/size khác nhau) — **CHƯA migrate** vì không QA thị giác từng màn
+     được; chuyển dần sang `<Button>` khi sửa từng trang. Đã verify typecheck + lint sạch (0 lỗi, giữ 1 warning cũ).

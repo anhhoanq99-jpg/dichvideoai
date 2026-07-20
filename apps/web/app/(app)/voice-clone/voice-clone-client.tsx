@@ -12,6 +12,7 @@ import {
 } from "@/components/dub/voice-picker";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const T = {
   vi: {
@@ -328,15 +329,10 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
         {speakError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{speakError}</p>}
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={generating || !text.trim()}
-            onClick={() => void generate()}
-            className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-50"
-          >
+          <Button pill disabled={generating || !text.trim()} onClick={() => void generate()}>
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <AudioLines className="h-4 w-4" />}
             {generating ? t.generating : t.generate}
-          </button>
+          </Button>
 
           {audioUrl && (
             <>

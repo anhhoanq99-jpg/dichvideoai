@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloudUpload, GraduationCap, Loader2, Mic, Play, X } from "lucide-react";
+import { CloudUpload, GraduationCap, Loader2, Play, X } from "lucide-react";
+import { BrandMark } from "@/components/brand-logo";
 import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
 import {
   useMultipartUpload,
@@ -194,9 +195,7 @@ export function UploadPageClient({
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="text-center">
         <h1 className="flex items-center justify-center gap-2.5 text-2xl font-semibold tracking-tight">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/50">
-            <Mic className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-          </span>
+          <BrandMark className="h-9 w-9 shrink-0" />
           {t.title}
         </h1>
       </div>

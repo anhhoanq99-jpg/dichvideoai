@@ -9,6 +9,7 @@ import {
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { createPipelineJob, jsonError, parseJsonBody } from "@/lib/api-helpers";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const schema = z.object({
   fileName: z.string().min(1).max(200),
@@ -27,6 +28,10 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return jsonError("Chưa đăng nhập", 401);
+
+  const rl = await rateLimit("srt-translate", callerId(req, session.user.id), 10, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
+
   const body = await parseJsonBody(req, schema);
   if (body.response) return body.response;
 
