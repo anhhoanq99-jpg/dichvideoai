@@ -38,8 +38,8 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
   readonly id = "gemini-video-ocr" as const;
 
   constructor(
-    // đọc chữ trên hình khó hơn dịch nhiều → dùng đời model mới nhất
-    private readonly model = process.env.GEMINI_OCR_MODEL ?? "gemini-3.5-flash",
+    // cùng model với dịch — bản duy nhất chạy được ở bậc miễn phí (xem translate.ts)
+    private readonly model = process.env.GEMINI_OCR_MODEL ?? "gemini-3-flash-preview",
   ) {}
 
   async extract(
