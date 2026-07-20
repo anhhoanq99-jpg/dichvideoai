@@ -89,6 +89,20 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+/* Safari trên iPhone/iPad TỰ PHÓNG TO trang khi focus vào ô nhập có cỡ chữ < 16px
+   (vd ô dán link dùng text-xs = 12px) — trang bị nhảy zoom, phải chụm tay thu lại.
+   Ép 16px trên thiết bị cảm ứng để không nhảy zoom nữa; máy tính giữ nguyên cỡ chữ thiết kế.
+   KHÔNG dùng maximum-scale/user-scalable=no để chặn (hại accessibility, iOS 10+ cũng bỏ qua).
+   Loại trừ các control không nhập chữ (range/checkbox/color/file…) — chúng không gây zoom
+   và đang được canh cỡ nhỏ trong studio. */
+@media (pointer: coarse) {
+  textarea,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]) {
+    font-size: 16px;
+  }
+}
+
 /* ---- Nền tảng trải nghiệm: bàn phím, hover, chuyển theme mượt ---- */
 
 /* vòng focus rõ ràng cho người dùng bàn phím — mọi phần tử tương tác */
