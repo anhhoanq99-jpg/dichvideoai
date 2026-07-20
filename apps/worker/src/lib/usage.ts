@@ -19,9 +19,14 @@ export interface UsageRecord {
 export const PRICING = {
   /** Groq whisper-large-v3-turbo: $0.04/hour → per audio second */
   groqWhisperPerAudioSec: 0.04e6 / 3600,
-  /** Gemini 2.5 Flash input per token ($0.30 / 1M) */
+  /**
+   * Đơn giá token của Gemini Flash — ĐANG lấy theo bảng giá 2.5 Flash
+   * ($0.30 vào / $2.50 ra mỗi 1M token).
+   * ⚠️ Mặc định dịch/OCR đã nâng lên gemini-3.5-flash nên con số này chỉ còn là
+   * ƯỚC LƯỢNG để theo dõi xu hướng chi phí, chưa phải giá thật của model mới.
+   * Cập nhật lại khi tra được bảng giá chính thức của 3.5 Flash.
+   */
   gemini25FlashInPerTok: 0.3e6 / 1_000_000,
-  /** Gemini 2.5 Flash output per token ($2.50 / 1M) */
   gemini25FlashOutPerTok: 2.5e6 / 1_000_000,
   /** Gemini 2.5 Flash TTS: text input ($0.50 / 1M), audio output ($10 / 1M tok) */
   geminiTtsInPerTok: 0.5e6 / 1_000_000,

@@ -295,7 +295,9 @@ export async function translateSegments(
     // ưu tiên Gemini (chất lượng dịch tốt hơn); không có key → chạy thẳng Groq
     provider: keys.length > 0 ? "gemini" : "groq",
     geminiModel:
-      input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-2.5-flash",
+      // gemini-3.5-flash: đời mới nhất, hơn 2.5-flash hai thế hệ về chất lượng
+      // tiếng Việt. Đổi lại bằng GEMINI_TRANSLATE_MODEL nếu cần hạ về bản cũ.
+      input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-3.5-flash",
     groqModel: process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile",
     usage: [],
   };
