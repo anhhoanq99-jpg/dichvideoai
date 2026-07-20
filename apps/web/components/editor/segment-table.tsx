@@ -19,6 +19,7 @@ const T = {
     layoutOn: "Dòng này đang đặt chỗ riêng — bấm để trả về vị trí/cỡ chung",
     layoutOff: "Cho dòng này vị trí và cỡ chữ riêng (kéo chữ trên video để chỉnh)",
     seekRow: "Tua video tới dòng này",
+    speakerTitle: (n: number) => `Nhân vật đọc dòng này — bấm để đổi (có ${n} giọng)`,
     editStart: "Lúc bắt đầu — sửa được (vd 1:23.5 hoặc 83.5). Enter để lưu, Esc để hủy",
     editEnd: "Lúc kết thúc — sửa được (vd 1:23.5 hoặc 83.5). Enter để lưu, Esc để hủy",
   },
@@ -33,6 +34,7 @@ const T = {
     layoutOn: "This line has its own placement — click to use the shared one",
     layoutOff: "Give this line its own position and size (drag the text on the video)",
     seekRow: "Jump the video to this line",
+    speakerTitle: (n: number) => `Who reads this line — click to change (${n} voices)`,
     editStart: "Start time — editable (e.g. 1:23.5 or 83.5). Enter to save, Esc to cancel",
     editEnd: "End time — editable (e.g. 1:23.5 or 83.5). Enter to save, Esc to cancel",
   },
@@ -92,6 +94,13 @@ function TimeCell({
   );
 }
 
+/** Màu nhãn nhân vật đọc — mỗi giọng một màu để lướt mắt là thấy ai đọc dòng nào. */
+const SPEAKER_CLS = [
+  "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300",
+  "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300",
+  "bg-accent-100 text-accent-700 dark:bg-accent-950/60 dark:text-accent-300",
+];
+
 /** chars/second — tốc độ đọc; phụ đề Việt thường thoải mái tới ~20 C/S */
 const CPS_WARN = 20;
 
@@ -116,6 +125,13 @@ interface SegmentTableProps {
   onEditTime?: (i: number, startMs: number, endMs: number) => void;
   /** có truyền → hiện nút bật/tắt tự chỉnh vị trí + cỡ chữ cho từng dòng */
   onToggleLayout?: (i: number) => void;
+  /**
+   * Số giọng đang bật (1..3). >1 thì mỗi dòng hiện nút gán nhân vật đọc.
+   * Bằng 1 thì giấu đi cho đỡ rối — đa số video chỉ cần một giọng.
+   */
+  voiceCount?: number;
+  /** đổi nhân vật đọc dòng này (0/1/2) */
+  onCycleSpeaker?: (i: number) => void;
   lang?: Lang;
 }
 
@@ -130,6 +146,8 @@ export function SegmentTable({
   onToggleCover,
   onEditTime,
   onToggleLayout,
+  voiceCount = 1,
+  onCycleSpeaker,
   lang = "vi",
 }: SegmentTableProps) {
   const t = T[lang];
@@ -238,6 +256,19 @@ export function SegmentTable({
                     </span>
                   );
                 })()}
+                {voiceCount > 1 && onCycleSpeaker && (
+                  <button
+                    type="button"
+                    onClick={() => onCycleSpeaker(seg.i)}
+                    title={t.speakerTitle(voiceCount)}
+                    className={cn(
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] font-bold",
+                      SPEAKER_CLS[Math.min(seg.speaker ?? 0, 2)],
+                    )}
+                  >
+                    {(seg.speaker ?? 0) + 1}
+                  </button>
+                )}
                 {onToggleLayout && (
                   <button
                     type="button"

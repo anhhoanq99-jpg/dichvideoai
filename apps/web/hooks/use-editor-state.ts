@@ -185,6 +185,29 @@ export function useEditorState(
     [persist],
   );
 
+  /** Gán nhân vật đọc dòng này (0/1/2) khi lồng tiếng nhiều giọng. */
+  const setSegmentSpeaker = useCallback(
+    (i: number, speaker: number) => {
+      setSegments((prev) => {
+        const next = prev.map((s) => {
+          if (s.i !== i) return s;
+          // 0 là mặc định → bỏ hẳn khoá cho JSON gọn
+          if (speaker === 0) {
+            const rest = { ...s };
+            delete rest.speaker;
+            return rest;
+          }
+          return { ...s, speaker };
+        });
+        setSaveState("dirty");
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => void persist(next), 1500);
+        return next;
+      });
+    },
+    [persist],
+  );
+
   const deleteSegment = useCallback(
     (i: number) => {
       setSegments((prev) => {
@@ -216,6 +239,7 @@ export function useEditorState(
     updateSegmentTime,
     insertSegment,
     setSegmentLayout,
+    setSegmentSpeaker,
     setSegmentBox,
     deleteSegment,
     replaceAll,

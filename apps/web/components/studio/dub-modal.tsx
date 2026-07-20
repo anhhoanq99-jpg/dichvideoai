@@ -6,7 +6,7 @@ import { estimateJobCredits } from "@dichvideo/shared";
 import { Modal } from "@/components/ui/modal";
 import { fieldLabelClass } from "@/components/ui/form-styles";
 import type { Lang } from "@/lib/i18n";
-import { VoicePicker } from "@/components/dub/voice-picker";
+import { VoicePicker, type VoiceSelection } from "@/components/dub/voice-picker";
 import type { DubConfig } from "./export-modal";
 
 const T = {
@@ -14,6 +14,10 @@ const T = {
     dubTitle: "Lồng tiếng AI khi xuất",
     dubEnable: "Lồng tiếng vào video khi xuất (giọng đọc khớp thời gian từng câu)",
     volumesTitle: "Âm lượng nhạc & giọng nói",
+    voice1: "Giọng 1 (mặc định — mọi dòng chưa gán)",
+    voice2: "Bật Giọng 2 (nhân vật khác)",
+    voice3: "Bật Giọng 3 (nhân vật khác)",
+    multiHint: "Bật thêm giọng rồi bấm nút số ở mỗi dòng trong bảng phụ đề để gán nhân vật đọc dòng đó.",
     speed: "Tốc độ đọc:",
     pitch: "Cao độ:",
     pitchHint: "Trầm hơn ← 0 → cao hơn. Giọng thường và Google Standard/Wavenet dùng được; giọng Google HD (Chirp3) bỏ qua mục này.",
@@ -34,6 +38,10 @@ const T = {
     dubTitle: "AI dubbing on export",
     dubEnable: "Dub the video on export (voice-over timed to each line)",
     volumesTitle: "Music & voice volumes",
+    voice1: "Voice 1 (default — every unassigned line)",
+    voice2: "Enable Voice 2 (another character)",
+    voice3: "Enable Voice 3 (another character)",
+    multiHint: "Enable extra voices, then use the number button on each subtitle row to assign who reads it.",
     speed: "Speaking speed:",
     pitch: "Pitch:",
     pitchHint: "Lower ← 0 → higher. Works on standard and Google Standard/Wavenet voices; Google HD (Chirp3) voices ignore it.",
@@ -84,13 +92,56 @@ export function DubModal({ dub, setDub, durationSec, onClose, lang = "vi" }: Dub
           {t.dubEnable}
         </label>
         <div className="space-y-4">
-          <VoicePicker
-            value={dub.selection}
-            onChange={(p) =>
-              setDub((d) => ({ ...d, selection: { ...d.selection, ...p } }))
-            }
-            lang={lang}
-          />
+          <div>
+            <p className="mb-1 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+              {t.voice1}
+            </p>
+            <VoicePicker
+              value={dub.selection}
+              onChange={(p) =>
+                setDub((d) => ({ ...d, selection: { ...d.selection, ...p } }))
+              }
+              lang={lang}
+            />
+          </div>
+
+          {/* Giọng 2 & 3 — phim nhiều nhân vật, gán từng dòng ở bảng phụ đề */}
+          {([2, 3] as const).map((slot) => {
+            const key = slot === 2 ? "selection2" : "selection3";
+            const value = dub[key];
+            return (
+              <div key={slot}>
+                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+                  <input
+                    type="checkbox"
+                    checked={value !== null}
+                    onChange={(e) =>
+                      setDub((d) => ({
+                        ...d,
+                        [key]: e.target.checked ? { ...d.selection } : null,
+                      }))
+                    }
+                  />
+                  {slot === 2 ? t.voice2 : t.voice3}
+                </label>
+                {value && (
+                  <div className="mt-1">
+                    <VoicePicker
+                      value={value}
+                      onChange={(p) =>
+                        setDub((d) => ({
+                          ...d,
+                          [key]: { ...(d[key] as VoiceSelection), ...p },
+                        }))
+                      }
+                      lang={lang}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <p className="text-xs text-neutral-400">{t.multiHint}</p>
           <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
             <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
               {t.volumesTitle}

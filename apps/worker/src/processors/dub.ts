@@ -128,12 +128,25 @@ export async function dubProcessor(job: Job<JobPayload>) {
   if (!track) throw new Error("Không tìm thấy track phụ đề để lồng tiếng");
 
   const voice = isValidVoiceId(params.voice) ? params.voice : DUB_VOICES[0].id;
-  // edge & gcloud bake tốc độ ngay khi tổng hợp; gemini & eleven không có
-  // tham số rate → phải áp tốc độ bằng atempo lúc ép khớp khe thoại
-  // các provider nhận sẵn tham số tốc độ → khỏi ép lại bằng atempo (đỡ méo tiếng)
-  const speedBaked = ["edge", "gcloud", "viettel", "fpt"].includes(
-    voiceProvider(voice),
-  );
+
+  /**
+   * Giọng theo từng nhân vật. Slot 0 luôn là giọng chính; slot 1/2 chỉ có khi
+   * user bật lồng tiếng nhiều giọng. Id sai/thiếu → rơi về giọng chính, chứ
+   * không để job fail vì một dòng gán nhầm.
+   */
+  const voiceSlots: string[] = [
+    voice,
+    ...(params.voices ?? []).slice(0, 2).map((v) => (isValidVoiceId(v) ? v : voice)),
+  ];
+  const voiceFor = (seg: SubtitleSegment) =>
+    voiceSlots[Math.min(Math.max(seg.speaker ?? 0, 0), voiceSlots.length - 1)] ?? voice;
+
+  /**
+   * Provider nào nhận sẵn tham số tốc độ thì khỏi ép lại bằng atempo (đỡ méo
+   * tiếng). Phải xét THEO TỪNG CÂU vì mỗi nhân vật có thể dùng nguồn khác nhau.
+   */
+  const speedBakedFor = (v: string) =>
+    ["edge", "gcloud", "viettel", "fpt"].includes(voiceProvider(v));
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const pitch = clamp(params.pitch ?? 0, -10, 10);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
@@ -166,12 +179,14 @@ export async function dubProcessor(job: Job<JobPayload>) {
     let ttsDone = 0;
     const synthResults = await mapPool(
       segments,
-      ttsConcurrency(voice),
+      // trộn nhiều giọng thì lấy mức DÈ DẶT NHẤT — chạy song song theo nguồn
+      // khỏe sẽ vượt hạn mức của nguồn yếu hơn trong cùng job
+      Math.min(...voiceSlots.map(ttsConcurrency)),
       (seg, k) =>
         synthesizeClipWithRetry({
           // bỏ *dấu sao* đánh dấu từ nhấn màu — không để giọng đọc vấp
           text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
-          voice,
+          voice: voiceFor(seg),
           speed,
           pitch,
           dir,
@@ -191,10 +206,12 @@ export async function dubProcessor(job: Job<JobPayload>) {
     const fitted = await mapPool(
       segments,
       6,
-      async (_seg, k) => {
+      async (seg, k) => {
         const rawMs = await audioDurationMs(clips[k]);
         const slot = slotMs(segments, k, videoDurMs);
-        const atempoFilter = atempoChain(Math.max(rawMs / slot, speedBaked ? 1 : speed));
+        // xét theo giọng CỦA CHÍNH câu này — mỗi nhân vật có thể khác nguồn
+        const baked = speedBakedFor(voiceFor(seg));
+        const atempoFilter = atempoChain(Math.max(rawMs / slot, baked ? 1 : speed));
         const out = path.join(dir, `fit-${k}.wav`);
         // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt
         const expectedMs = Math.min(atempoFilter ? slot : rawMs, slot);

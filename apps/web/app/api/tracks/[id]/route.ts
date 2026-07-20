@@ -25,6 +25,8 @@ const segmentSchema = z.object({
     .optional(),
   /** cỡ chữ riêng của dòng (px theo PlayRes) */
   size: z.number().min(8).max(200).optional(),
+  /** nhân vật đọc dòng này: 0/1/2 ứng với Giọng 1/2/3 */
+  speaker: z.number().int().min(0).max(2).optional(),
 });
 
 const patchSchema = z.object({

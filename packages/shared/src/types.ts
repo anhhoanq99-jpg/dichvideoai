@@ -35,6 +35,12 @@ export interface SubtitleSegment {
   pos?: { x: number; y: number };
   /** Cỡ chữ RIÊNG của dòng này (px theo PlayRes), ghi đè cỡ chung. */
   size?: number;
+  /**
+   * Nhân vật đọc dòng này khi lồng tiếng nhiều giọng: 0 / 1 / 2 ứng với
+   * Giọng 1 / 2 / 3. Bỏ trống = giọng 1. Dùng cho phim có nhiều nhân vật
+   * đối thoại, mỗi người một giọng.
+   */
+  speaker?: number;
 }
 
 // ---- Upload constraints (MVP caps — Phase 2) ----

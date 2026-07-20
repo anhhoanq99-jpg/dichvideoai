@@ -206,6 +206,7 @@ export function StudioShell({
     updateSegmentTime,
     insertSegment,
     setSegmentLayout,
+    setSegmentSpeaker,
     setSegmentBox,
     deleteSegment,
     replaceAll,
@@ -227,6 +228,8 @@ export function StudioShell({
   const [dub, setDub] = useState<DubConfig>({
     enabled: false,
     selection: DEFAULT_VOICE_SELECTION,
+    selection2: null,
+    selection3: null,
     speed: 1,
     pitch: 0,
     aiVolume: 100,
@@ -257,6 +260,17 @@ export function StudioShell({
 
   const patch = (p: Partial<RenderSettings>) =>
     setSettings((prev) => ({ ...prev, ...p }));
+
+  /** số giọng đang bật (1..3) — quyết định có hiện nút gán nhân vật hay không */
+  const voiceCount =
+    1 + (dub.selection2 ? 1 : 0) + (dub.selection3 ? 1 : 0);
+
+  /** Đổi nhân vật đọc dòng này, xoay vòng trong số giọng đang bật. */
+  function cycleSpeaker(i: number) {
+    const seg = segments.find((s) => s.i === i);
+    if (!seg) return;
+    setSegmentSpeaker(i, ((seg.speaker ?? 0) + 1) % voiceCount);
+  }
 
   /**
    * Bật/tắt vị trí + cỡ chữ RIÊNG cho một dòng. Bật lên thì dòng đó tách khỏi
@@ -566,6 +580,8 @@ export function StudioShell({
               onEdit={updateSegmentText}
               onEditTime={updateSegmentTime}
               onToggleLayout={toggleLineLayout}
+              voiceCount={voiceCount}
+              onCycleSpeaker={cycleSpeaker}
               onToggleCover={toggleLineCover}
               onDelete={deleteSegment}
               onRowClick={(startMs) => {

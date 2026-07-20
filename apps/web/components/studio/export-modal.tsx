@@ -72,6 +72,12 @@ const T = {
 export interface DubConfig {
   enabled: boolean;
   selection: VoiceSelection;
+  /**
+   * Giọng 2 & 3 cho phim nhiều nhân vật (null = chưa bật slot đó).
+   * Dòng phụ đề gán `speaker = 1|2` sẽ đọc bằng các giọng này.
+   */
+  selection2: VoiceSelection | null;
+  selection3: VoiceSelection | null;
   speed: number;
   /** -10..10 nửa cung — trầm/cao hơn giọng gốc */
   pitch: number;
@@ -228,6 +234,9 @@ export function ExportModal({
                 dub: true,
                 voice: resolveVoice(dub.selection),
                 speed: dub.speed,
+                voices: [dub.selection2, dub.selection3]
+                  .filter((s): s is VoiceSelection => s !== null)
+                  .map(resolveVoice),
                 pitch: dub.pitch,
                 aiVolume: dub.aiVolume,
                 bgVolume: dub.bgVolume,

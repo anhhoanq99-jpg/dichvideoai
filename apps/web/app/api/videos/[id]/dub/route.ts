@@ -12,6 +12,8 @@ import {
 const schema = z.object({
   trackId: z.string().uuid(),
   voice: z.string().refine(isValidVoiceId, "Giọng không hợp lệ"),
+  /** giọng 2 & 3 cho lồng tiếng nhiều nhân vật */
+  voices: z.array(z.string().refine(isValidVoiceId, "Giọng không hợp lệ")).max(2).optional(),
   speed: z.number().min(0.8).max(1.3).default(1),
   /** cao độ giọng đọc (nửa cung) — chỉ Google Cloud & Edge dùng được */
   pitch: z.number().int().min(-10).max(10).default(0),

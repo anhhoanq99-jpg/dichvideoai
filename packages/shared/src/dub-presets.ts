@@ -210,8 +210,13 @@ export function isValidVoiceId(id: string): boolean {
 
 export interface DubParams {
   trackId: string;
-  /** id giọng Edge TTS bất kỳ trong EDGE_VOICES (322 giọng, đủ mọi quốc gia) */
+  /** giọng chính (Giọng 1) — mọi dòng không gán nhân vật đều đọc bằng giọng này */
   voice: string;
+  /**
+   * Giọng 2 và 3 cho lồng tiếng NHIỀU NHÂN VẬT. Dòng nào có `speaker = 1|2`
+   * thì đọc bằng giọng tương ứng; thiếu giọng đó thì rơi về giọng chính.
+   */
+  voices?: string[];
   /** lồng tiếng lên file khác video gốc (vd: bản đã render phụ đề) */
   sourceR2Key?: string;
   /** 0.8 .. 1.3 — tốc độ đọc cơ bản (trước khi ép khớp thời lượng) */
