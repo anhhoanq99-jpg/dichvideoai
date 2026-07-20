@@ -228,6 +228,7 @@ export function StudioShell({
     enabled: false,
     selection: DEFAULT_VOICE_SELECTION,
     speed: 1,
+    pitch: 0,
     aiVolume: 100,
     bgVolume: 20,
     origVoiceVolume: 5,

@@ -73,6 +73,8 @@ export interface DubConfig {
   enabled: boolean;
   selection: VoiceSelection;
   speed: number;
+  /** -10..10 nửa cung — trầm/cao hơn giọng gốc */
+  pitch: number;
   aiVolume: number;
   /** % nhạc nền gốc giữa các câu */
   bgVolume: number;
@@ -226,6 +228,7 @@ export function ExportModal({
                 dub: true,
                 voice: resolveVoice(dub.selection),
                 speed: dub.speed,
+                pitch: dub.pitch,
                 aiVolume: dub.aiVolume,
                 bgVolume: dub.bgVolume,
                 origVoiceVolume: dub.origVoiceVolume,

@@ -13,6 +13,8 @@ const schema = z.object({
   trackId: z.string().uuid(),
   voice: z.string().refine(isValidVoiceId, "Giọng không hợp lệ"),
   speed: z.number().min(0.8).max(1.3).default(1),
+  /** cao độ giọng đọc (nửa cung) — chỉ Google Cloud & Edge dùng được */
+  pitch: z.number().int().min(-10).max(10).default(0),
   aiVolume: z.number().int().min(0).max(200).default(100),
   bgVolume: z.number().int().min(0).max(100).default(20),
   origVoiceVolume: z.number().int().min(0).max(100).optional(),

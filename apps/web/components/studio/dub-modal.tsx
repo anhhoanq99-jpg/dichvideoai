@@ -15,6 +15,8 @@ const T = {
     dubEnable: "Lồng tiếng vào video khi xuất (giọng đọc khớp thời gian từng câu)",
     volumesTitle: "Âm lượng nhạc & giọng nói",
     speed: "Tốc độ đọc:",
+    pitch: "Cao độ:",
+    pitchHint: "Trầm hơn ← 0 → cao hơn. Giọng thường và Google Standard/Wavenet dùng được; giọng Google HD (Chirp3) bỏ qua mục này.",
     aiVol: "Âm lượng giọng đọc AI:",
     bgVol: "Âm lượng nhạc nền gốc (giữa các câu):",
     bgVolOff: " — tắt hẳn",
@@ -33,6 +35,8 @@ const T = {
     dubEnable: "Dub the video on export (voice-over timed to each line)",
     volumesTitle: "Music & voice volumes",
     speed: "Speaking speed:",
+    pitch: "Pitch:",
+    pitchHint: "Lower ← 0 → higher. Works on standard and Google Standard/Wavenet voices; Google HD (Chirp3) voices ignore it.",
     aiVol: "AI voice volume:",
     bgVol: "Original background music (between lines):",
     bgVolOff: " — fully off",
@@ -107,6 +111,23 @@ export function DubModal({ dub, setDub, durationSec, onClose, lang = "vi" }: Dub
                   }
                   className="mt-2 w-full"
                 />
+              </label>
+              <label className="text-sm">
+                <span className={fieldLabelClass}>
+                  {t.pitch} {dub.pitch > 0 ? `+${dub.pitch}` : dub.pitch}
+                </span>
+                <input
+                  type="range"
+                  min={-10}
+                  max={10}
+                  step={1}
+                  value={dub.pitch}
+                  onChange={(e) =>
+                    setDub((d) => ({ ...d, pitch: Number(e.target.value) }))
+                  }
+                  className="mt-2 w-full"
+                />
+                <span className="mt-1 block text-xs text-neutral-400">{t.pitchHint}</span>
               </label>
               <label className="text-sm">
                 <span className={fieldLabelClass}>

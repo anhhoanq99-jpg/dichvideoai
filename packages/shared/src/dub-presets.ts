@@ -216,6 +216,11 @@ export interface DubParams {
   sourceR2Key?: string;
   /** 0.8 .. 1.3 — tốc độ đọc cơ bản (trước khi ép khớp thời lượng) */
   speed: number;
+  /**
+   * -10 .. 10 — cao độ giọng đọc (0 = giữ nguyên). Số âm là trầm hơn, số dương
+   * là cao hơn. CHỈ Google Cloud và Edge nhận tham số này; các nguồn khác bỏ qua.
+   */
+  pitch?: number;
   /** 0 .. 200 (%) — âm lượng giọng AI */
   aiVolume: number;
   /** 0 .. 100 (%) — âm lượng audio gốc GIỮA các câu thoại (nhạc nền); 0 = tắt */

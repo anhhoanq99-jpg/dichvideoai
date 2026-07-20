@@ -28,6 +28,8 @@ export async function synthesizeClip(input: {
   voice: string;
   /** 0.8 .. 1.3 */
   speed: number;
+  /** -10..10 nửa cung, 0/bỏ trống = giữ nguyên */
+  pitch?: number;
   dir: string;
   /** tên thư mục con cho clip này */
   name: string;
@@ -40,8 +42,11 @@ export async function synthesizeClip(input: {
     OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3,
   );
   const ratePct = Math.round((input.speed - 1) * 100);
+  // Edge nhận pitch theo Hz; -10..10 nửa cung ~ ±50Hz là dải nghe rõ mà không méo
+  const pitchHz = Math.round((input.pitch ?? 0) * 5);
   const { audioFilePath } = await tts.toFile(clipDir, input.text, {
     rate: `${ratePct >= 0 ? "+" : ""}${ratePct}%`,
+    ...(pitchHz ? { pitch: `${pitchHz >= 0 ? "+" : ""}${pitchHz}Hz` } : {}),
   });
   return audioFilePath;
 }
@@ -167,6 +172,8 @@ export async function synthesizeGCloudClip(input: {
   voiceName: string;
   /** 0.8 .. 1.3 — Google hỗ trợ speakingRate nên bake luôn */
   speed: number;
+  /** -10..10 nửa cung, 0/bỏ trống = giữ nguyên */
+  pitch?: number;
   dir: string;
   name: string;
 }): Promise<{ file: string; usage: UsageRecord[] }> {
@@ -185,7 +192,17 @@ export async function synthesizeGCloudClip(input: {
       body: JSON.stringify({
         input: { text: input.text },
         voice: { languageCode, name: input.voiceName },
-        audioConfig: { audioEncoding: "MP3", speakingRate: input.speed },
+        audioConfig: {
+        audioEncoding: "MP3",
+        speakingRate: input.speed,
+        // Chirp3-HD TỪ CHỐI tham số pitch ("This voice does not support pitch
+        // parameters at this time") và trả 400 → hỏng cả job lồng tiếng. Đã kiểm
+        // bằng API thật: Standard/Wavenet/Neural2 nhận pitch, Chirp3-HD thì không.
+        // Google nhận -20..20 nửa cung; UI của mình giới hạn -10..10 cho dễ dùng.
+        ...(input.pitch && !/chirp/i.test(input.voiceName)
+          ? { pitch: Math.max(-20, Math.min(20, input.pitch)) }
+          : {}),
+      },
       }),
     },
   );
@@ -350,6 +367,8 @@ export async function synthesizeClipWithRetry(input: {
   text: string;
   voice: string;
   speed: number;
+  /** -10..10 nửa cung — chỉ Google Cloud và Edge dùng được, nguồn khác bỏ qua */
+  pitch?: number;
   dir: string;
   name: string;
 }): Promise<{ file: string; usage: UsageRecord[] }> {
@@ -382,6 +401,7 @@ export async function synthesizeClipWithRetry(input: {
           text: input.text,
           voiceName: gcloud,
           speed: input.speed,
+          pitch: input.pitch,
           dir: input.dir,
           name: input.name,
         });

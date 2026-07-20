@@ -135,6 +135,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
     voiceProvider(voice),
   );
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
+  const pitch = clamp(params.pitch ?? 0, -10, 10);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;
   const bgVol = clamp(params.bgVolume ?? 20, 0, 100) / 100;
   // âm lượng tiếng gốc TRONG lúc AI đọc (hạ giọng nói gốc); mặc định = bgVol
@@ -172,6 +173,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
           text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
           voice,
           speed,
+          pitch,
           dir,
           name: `clip-${k}`,
         }),
