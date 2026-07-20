@@ -18,7 +18,7 @@ import { audioDurationMs, ffBin, ffprobe, makeSilence } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
 import { synthesizeClipWithRetry } from "../lib/tts";
-import { recordUsage, type UsageRecord } from "../lib/usage";
+import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
 
 const execFileAsync = promisify(execFile);

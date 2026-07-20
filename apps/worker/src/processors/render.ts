@@ -9,6 +9,7 @@ import {
   STYLE_PRESETS,
   SUB_EFFECT_IDS,
   buildAss,
+  opacityToHexAlpha,
   type JobPayload,
   type RenderParams,
   type SubtitleSegment,
@@ -63,11 +64,10 @@ export async function renderProcessor(job: Job<JobPayload>) {
     params.boxColor && HEX_RE.test(params.boxColor)
       ? params.boxColor
       : (preset.back ?? "#000000");
-  const opacity = clamp(params.boxOpacity ?? (preset.id === "solid-box" ? 100 : 67), 0, 100);
-  const alpha = Math.round((opacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0")
-    .toUpperCase();
+  // mặc định lấy backOpacity của chính preset (trước đây hard-code theo id
+  // "solid-box" nên các preset mới có hộp nền đều bị ép về 67)
+  const opacity = clamp(params.boxOpacity ?? preset.backOpacity ?? 67, 0, 100);
+  const alpha = opacityToHexAlpha(opacity);
 
   // user-drawn subtitle box → margins (position + wrap width); falls back to marginV
   const boxMargins = params.subBox

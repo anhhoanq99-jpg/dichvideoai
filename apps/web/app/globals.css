@@ -227,15 +227,18 @@ body {
 }
 
 /* glow nền hero "thở" chậm — giữ translateX(-50%) căn giữa */
+/* CHỈ opacity — cố tình KHÔNG scale. Phần tử này đang bị blur-3xl (64px):
+   scale một lớp đã blur buộc trình duyệt vẽ lại toàn bộ vệt blur mỗi khung
+   hình, rất tốn GPU trên điện thoại (máy nóng, cuộn trang giật) — mà đây lại
+   là thứ 100% khách vào trang chủ đều thấy. Đổi opacity thì raster được cache,
+   gần như miễn phí. Vị trí ngang do class -translate-x-1/2 lo. */
 @keyframes glow-pulse {
   0%,
   100% {
     opacity: 0.7;
-    transform: translateX(-50%) scale(1);
   }
   50% {
     opacity: 1;
-    transform: translateX(-50%) scale(1.06);
   }
 }
 .animate-glow-pulse {

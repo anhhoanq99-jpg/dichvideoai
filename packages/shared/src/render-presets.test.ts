@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildAss, hexToAss } from "./ass-builder";
-import { RENDER_FONTS, STYLE_PRESETS } from "./render-presets";
+import { RENDER_FONTS, STYLE_PRESETS, opacityToHexAlpha } from "./render-presets";
 
 const SEGS = [{ i: 0, startMs: 0, endMs: 2000, text: "Ăn quả nhớ kẻ trồng cây" }];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
@@ -60,4 +60,16 @@ test("cỡ chữ và lề dưới nằm trong khoảng hợp lý", () => {
     assert.ok(p.size >= 20 && p.size <= 90, `preset "${p.id}" size lạ: ${p.size}`);
     assert.ok(p.marginV >= 0 && p.marginV <= 300, `preset "${p.id}" marginV lạ: ${p.marginV}`);
   }
+});
+
+test("opacityToHexAlpha: chuyen dung va kep trong 0..100", () => {
+  assert.equal(opacityToHexAlpha(100), "FF");
+  assert.equal(opacityToHexAlpha(0), "00");
+  assert.equal(opacityToHexAlpha(67), "AB");
+  assert.equal(opacityToHexAlpha(55), "8C");
+  // luon 2 ky tu — thieu se lam hong chuoi #RRGGBBAA
+  for (let p = 0; p <= 100; p++) assert.equal(opacityToHexAlpha(p).length, 2);
+  // ngoai khoang thi kep lai, khong sinh hex rac
+  assert.equal(opacityToHexAlpha(-20), "00");
+  assert.equal(opacityToHexAlpha(500), "FF");
 });

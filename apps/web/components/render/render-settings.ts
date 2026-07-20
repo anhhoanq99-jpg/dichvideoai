@@ -99,24 +99,16 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   logoFy: null,
 };
 
+/**
+ * Dải che mặc định — bám đáy khung hình, nơi phụ đề gốc hay nằm.
+ * Để ở đây (không phải trong cover-modal) vì studio dùng nó lúc khởi tạo state:
+ * nếu để trong modal thì modal luôn bị kéo vào bundle chính, không tách tải động được.
+ */
+export const DEFAULT_BAND: CoverRegion = { x: 0.02, y: 0.78, w: 0.96, h: 0.16 };
+
 /** Vùng che thấp nhất trên khung hình — phụ đề Việt sẽ đè vào đúng chỗ này. */
 export function lowestRegion(regions: CoverRegion[]): CoverRegion | null {
   if (regions.length === 0) return null;
   return regions.reduce((a, b) => (a.y + a.h >= b.y + b.h ? a : b));
 }
 
-const SAVED_PRESETS_KEY = "dichvideo:render-presets";
-
-/** Cài đặt render người dùng đã lưu theo tên trong localStorage. */
-export function loadSavedPresets(): Record<string, RenderSettings> {
-  try {
-    const raw = localStorage.getItem(SAVED_PRESETS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {}; // preset hỏng → bỏ qua
-  }
-}
-
-export function storeSavedPresets(presets: Record<string, RenderSettings>) {
-  localStorage.setItem(SAVED_PRESETS_KEY, JSON.stringify(presets));
-}

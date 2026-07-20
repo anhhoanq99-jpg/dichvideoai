@@ -54,6 +54,21 @@ export const KARAOKE_BASE_COLOR = "#C9C9C9";
 /** Màu nhấn mặc định cho từ khóa quan trọng (bọc trong *dấu sao* ở bản dịch). */
 export const ACCENT_HIGHLIGHT_COLOR = "#FFD400";
 
+/**
+ * Độ đục 0..100 → 2 ký tự hex alpha ("AA" trong #RRGGBBAA).
+ *
+ * Dùng CHUNG cho khung xem trước (web) và bản xuất thật (worker). Trước đây mỗi
+ * bên tự tính một bản: lệch nhau là preview không khớp video xuất ra, mà người
+ * dùng chỉ phát hiện SAU KHI đã trả xu để render.
+ */
+export function opacityToHexAlpha(percent: number): string {
+  const clamped = Math.min(100, Math.max(0, percent));
+  return Math.round((clamped / 100) * 255)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+}
+
 export const STYLE_PRESETS: StylePreset[] = [
   {
     id: "white-outline",

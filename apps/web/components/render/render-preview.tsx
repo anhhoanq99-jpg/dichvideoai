@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, MicOff, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import {
   MAX_COVER_REGIONS,
+  opacityToHexAlpha,
   tokenizeAccents,
   type CoverMode,
   type CoverRegion,
@@ -11,6 +12,7 @@ import {
 } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useDubPreview } from "@/hooks/use-dub-preview";
 import type { RenderSettings } from "./render-settings";
 
 const T = {
@@ -232,30 +234,6 @@ export function RenderPreview({
 
   // âm thanh: tiếng gốc + nghe thử lồng tiếng theo câu (giọng thường, miễn phí)
   const [soundOn, setSoundOn] = useState(true);
-  const [dubMuted, setDubMuted] = useState(false);
-  // nghe thử theo câu: chỉ nguồn có hạn mức rộng (Edge, Google Cloud) —
-  // Gemini/ElevenLabs tính phí theo lượt nên chỉ nghe trong bản xuất
-  const dubSupported =
-    Boolean(dubVoice) &&
-    !dubVoice?.startsWith("gemini:") &&
-    !dubVoice?.startsWith("eleven:");
-  const dubActive = dubSupported && !dubMuted;
-  const clipUrlCache = useRef(new Map<string, string>());
-  const dubAudioRef = useRef<HTMLAudioElement | null>(null);
-  const lastSpokenRef = useRef<number | null>(null);
-
-  // iOS chỉ cho phát audio nếu phần tử từng .play() TRONG một cử chỉ chạm.
-  // Tạo 1 phần tử duy nhất + phát file WAV im lặng ngay lúc bấm nút, các câu
-  // lồng tiếng sau chỉ đổi src trên chính phần tử đã "mở khóa" này.
-  const SILENT_WAV =
-    "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-  function unlockDubAudio() {
-    if (dubAudioRef.current) return;
-    const audio = new Audio(SILENT_WAV);
-    dubAudioRef.current = audio;
-    void audio.play().catch(() => {});
-  }
-
   // kéo/resize logo trực tiếp trên khung preview
   const logoRef = useRef<HTMLDivElement>(null);
   const logoGesture = useRef<
@@ -350,6 +328,18 @@ export function RenderPreview({
 
   const activeSegment = activeSegmentAt(segments, currentMs);
 
+  // nghe thử lồng tiếng theo từng câu — xem hooks/use-dub-preview.ts
+  const { dubSupported, dubActive, setDubMuted, unlockDubAudio } =
+    useDubPreview({
+      dubVoice,
+      playing,
+      activeSegmentIndex: activeSegment?.i ?? null,
+      segments,
+      durationMs,
+      dubAiVolume,
+      dubSpeed,
+    });
+
   // đồng bộ loa: tắt/bật tiếng gốc. Đang nghe thử lồng tiếng → tiếng gốc hạ
   // như bản xuất thật: trong câu = "giọng nói gốc", giữa các câu = "nhạc nền".
   // iOS BỎ QUA video.volume (chỉ nghe muted) → mức < 15% coi như tắt hẳn,
@@ -367,36 +357,6 @@ export function RenderPreview({
     video.volume = Math.min(1, Math.max(0, level / 100));
     video.muted = level < 15;
   }, [soundOn, dubActive, dubBgVolume, dubOrigVoiceVolume, activeSegment]);
-
-  /** Tải (và cache) clip TTS của một câu — trả về object URL. */
-  const fetchDubClip = useCallback(
-    async (voice: string, seg: SubtitleSegment): Promise<string | null> => {
-      const key = `${voice}:${seg.i}:${seg.text}`;
-      const cached = clipUrlCache.current.get(key);
-      if (cached) return cached;
-      try {
-        const res = await fetch(
-          `/api/tts-preview?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(seg.text.replace(/\*/g, "").slice(0, 300))}`,
-        );
-        if (!res.ok) return null;
-        const url = URL.createObjectURL(await res.blob());
-        clipUrlCache.current.set(key, url);
-        return url;
-      } catch {
-        return null;
-      }
-    },
-    [],
-  );
-
-  // dọn các object URL khi rời trang
-  useEffect(() => {
-    const cache = clipUrlCache.current;
-    return () => {
-      for (const url of cache.values()) URL.revokeObjectURL(url);
-      cache.clear();
-    };
-  }, []);
 
   const covering = coverMode !== "none";
 
@@ -428,60 +388,6 @@ export function RenderPreview({
     300,
     (activeSegment?.endMs ?? 2000) - (activeSegment?.startMs ?? 0),
   );
-
-  // nghe thử lồng tiếng: sang câu mới → đọc câu đó bằng giọng đã chọn, ép tốc
-  // độ đọc cho vừa khe thoại (khớp thời gian như bản xuất), tải trước câu kế
-  const activeSegmentIndex = activeSegment?.i ?? null;
-  useEffect(() => {
-    if (!dubActive || !dubVoice || !playing) {
-      dubAudioRef.current?.pause();
-      if (!playing) lastSpokenRef.current = null;
-      return;
-    }
-    if (activeSegmentIndex === null || lastSpokenRef.current === activeSegmentIndex)
-      return;
-    lastSpokenRef.current = activeSegmentIndex;
-    const segIdx = segments.findIndex((s) => s.i === activeSegmentIndex);
-    const seg = segments[segIdx];
-    if (!seg) return;
-    const next = segments[segIdx + 1];
-    // khe thoại của câu = tới lúc câu sau bắt đầu (giống slotMs bên worker)
-    const slotMs = Math.max(
-      300,
-      (next ? next.startMs : Math.max(durationMs, seg.endMs)) - seg.startMs,
-    );
-    let stale = false;
-    void fetchDubClip(dubVoice, seg).then((url) => {
-      if (!url || stale) return;
-      // tái sử dụng phần tử đã mở khóa trong cử chỉ chạm — iOS mới cho phát;
-      // desktop chưa bấm nút nào thì tạo mới (autoplay policy thoáng hơn)
-      const audio = dubAudioRef.current ?? new Audio();
-      dubAudioRef.current = audio;
-      audio.pause();
-      audio.src = url;
-      audio.volume = Math.min(1, Math.max(0, dubAiVolume / 100));
-      audio.onloadedmetadata = () => {
-        // câu dài hơn khe → tăng tốc đọc cho khớp (như atempo khi xuất)
-        const rawMs = audio.duration * 1000;
-        audio.playbackRate = Math.min(4, Math.max(dubSpeed, rawMs / slotMs));
-      };
-      void audio.play().catch(() => {});
-      if (next) void fetchDubClip(dubVoice, next);
-    });
-    return () => {
-      stale = true;
-    };
-  }, [
-    activeSegmentIndex,
-    dubActive,
-    dubVoice,
-    dubAiVolume,
-    dubSpeed,
-    playing,
-    segments,
-    durationMs,
-    fetchDubClip,
-  ]);
 
   function toNorm(e: React.PointerEvent) {
     const rect = boxRef.current!.getBoundingClientRect();
@@ -662,9 +568,8 @@ export function RenderPreview({
     else video.pause();
   }
 
-  const boxAlpha = Math.round((settings.boxOpacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0");
+  // dùng chung với worker để preview khớp bản xuất — xem opacityToHexAlpha
+  const boxAlpha = opacityToHexAlpha(settings.boxOpacity);
   const outline = settings.outlineColor;
 
   return (

@@ -5,7 +5,6 @@ export const VIDEO_STATUSES = [
   "ready",
   "failed",
 ] as const;
-export type VideoStatus = (typeof VIDEO_STATUSES)[number];
 
 export const JOB_STATUSES = [
   "queued",

@@ -48,7 +48,8 @@ export function HeroSection({ lang = "vi" }: { lang?: Lang }) {
   const t = T[lang];
   return (
     <section className="relative overflow-hidden px-4 pb-16 pt-20 sm:pt-28">
-      {/* glow nền — phập phồng rất chậm, chỉ opacity/scale nên không giật */}
+      {/* glow nền — phập phồng rất chậm bằng opacity (KHÔNG scale: lớp này đang
+          blur, scale sẽ bắt vẽ lại vệt blur mỗi khung hình) */}
       <div
         aria-hidden
         className="animate-glow-pulse pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[720px] -translate-x-1/2 rounded-full bg-primary-600/20 blur-3xl"

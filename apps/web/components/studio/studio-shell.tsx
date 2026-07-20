@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Check,
   Droplets,
@@ -28,6 +29,7 @@ import { inputClass } from "@/components/ui/form-styles";
 import { cn } from "@/lib/utils";
 import { RenderPreview } from "@/components/render/render-preview";
 import {
+  DEFAULT_BAND,
   DEFAULT_RENDER_SETTINGS,
   lowestRegion,
   type RenderSettings,
@@ -39,15 +41,26 @@ import {
   type StudioPreset,
 } from "./studio-presets";
 import { LogoFields } from "@/components/render/logo-fields";
-import { RetranslateModal } from "@/components/editor/retranslate-modal";
 import { SegmentTable } from "@/components/editor/segment-table";
 import { DEFAULT_VOICE_SELECTION, resolveVoice } from "@/components/dub/voice-picker";
-import { ExportModal, type DubConfig } from "./export-modal";
-import { CoverModal, DEFAULT_BAND } from "./cover-modal";
-import { StyleModal } from "./style-modal";
-import { DubModal } from "./dub-modal";
-import { PresetsModal } from "./presets-modal";
-import { AddSegmentModal } from "./add-segment-modal";
+import type { DubConfig } from "./export-modal";
+
+/**
+ * Các modal chỉ mở khi người dùng bấm nút, nhưng trước đây vẫn bị tải + phân
+ * tích ngay lúc vào studio (~1.400 dòng JS). Tải động để route nặng nhất của
+ * app tương tác được sớm hơn, nhất là trên 4G.
+ */
+const RetranslateModal = dynamic(() =>
+  import("@/components/editor/retranslate-modal").then((m) => m.RetranslateModal),
+);
+const ExportModal = dynamic(() => import("./export-modal").then((m) => m.ExportModal));
+const CoverModal = dynamic(() => import("./cover-modal").then((m) => m.CoverModal));
+const StyleModal = dynamic(() => import("./style-modal").then((m) => m.StyleModal));
+const DubModal = dynamic(() => import("./dub-modal").then((m) => m.DubModal));
+const PresetsModal = dynamic(() => import("./presets-modal").then((m) => m.PresetsModal));
+const AddSegmentModal = dynamic(() =>
+  import("./add-segment-modal").then((m) => m.AddSegmentModal),
+);
 
 const SAVE_ICONS = {
   saved: Check,

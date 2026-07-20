@@ -1,4 +1,4 @@
-import { Download, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobStreamInfo } from "@/hooks/use-job-stream";
 
@@ -64,14 +64,3 @@ export function JobError({
   );
 }
 
-/** Nút tải kết quả khi job render/dub hoàn tất. */
-export function JobDownloadLink({ jobId, label }: { jobId: string; label: string }) {
-  return (
-    <a
-      href={`/api/jobs/${jobId}/download`}
-      className="mt-3 inline-flex items-center gap-2 rounded-md bg-success-600 px-4 py-2 text-sm font-medium text-white hover:bg-success-700"
-    >
-      <Download className="h-4 w-4" /> {label}
-    </a>
-  );
-}
