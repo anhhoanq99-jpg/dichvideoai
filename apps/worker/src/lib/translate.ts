@@ -4,7 +4,11 @@ import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
 import { isDailyQuotaError, rateLimitDelayMs, withGeminiRetry } from "./gemini-limits";
-import { POLISH_STYLES, STYLE_INSTRUCTIONS } from "./translation-style-prompts";
+import {
+  POLISH_STYLES,
+  STYLE_BRIEF_HINTS,
+  STYLE_INSTRUCTIONS,
+} from "./translation-style-prompts";
 import { PRICING, type UsageRecord } from "./usage";
 
 export type TranslationStyle = TranslationStyleId;
@@ -180,16 +184,25 @@ async function generate(ctx: TranslateContext, opts: GenerateOptions) {
  * Global-context pass: read ALL source lines once, produce a brief the
  * translator uses for consistent pronouns, tone and terminology.
  */
-async function buildStoryBrief(ctx: TranslateContext, segments: SubtitleSegment[]): Promise<string> {
+async function buildStoryBrief(
+  ctx: TranslateContext,
+  segments: SubtitleSegment[],
+  styleHint: string,
+): Promise<string> {
   const fullText = segments.map((s) => s.text).join("\n").slice(0, 100_000);
   try {
     const text = await generate(ctx, {
       prompt:
         "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
         "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
-        "2. Các nhân vật chính và QUAN HỆ giữa họ → đề xuất cách xưng hô tiếng Việt cho từng cặp (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
-        "3. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
-        "Chỉ trả về nội dung tóm tắt, tối đa 300 từ.\n\n" +
+        "2. MẠCH TRUYỆN: chuyện gì xảy ra từ đầu tới cuối (3-5 gạch đầu dòng) — để dịch câu\n" +
+        "   mơ hồ biết chọn nghĩa nào cho khớp diễn biến.\n" +
+        "3. Các nhân vật chính và QUAN HỆ giữa họ (vai vế, thân/sơ, trên/dưới) → đề xuất cách\n" +
+        "   xưng hô tiếng Việt cho TỪNG CẶP nhân vật (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
+        "4. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
+        "5. Những câu dễ dịch sai vì đa nghĩa hoặc phụ thuộc bối cảnh — ghi rõ nên hiểu thế nào.\n" +
+        styleHint +
+        "Chỉ trả về nội dung tóm tắt, tối đa 400 từ.\n\n" +
         fullText,
       json: false,
       temperature: 0.2,
@@ -265,7 +278,10 @@ export async function translateSegments(
   };
 
   // Pass 0 (5%): global story brief for consistent pronouns/terms
-  const brief = await buildStoryBrief(ctx, input.segments);
+  // Bản tóm tắt biết trước phong cách sẽ dịch → gợi ý xưng hô đúng chất ngay từ
+  // đầu (hoạt hình khác cổ trang khác review), thay vì gợi ý chung chung rồi
+  // bước dịch phải tự uốn lại.
+  const brief = await buildStoryBrief(ctx, input.segments, STYLE_BRIEF_HINTS[input.style] ?? "");
   onProgress(5);
 
   const styleInstruction =

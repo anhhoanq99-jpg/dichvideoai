@@ -16,6 +16,11 @@ export const TRANSLATION_STYLES = [
     hint: "Giọng thuyết minh review, giữ chân người xem",
   },
   {
+    id: "hoat-hinh",
+    name: "Hoạt hình / Anime",
+    hint: "Lời thoại sống động, biểu cảm, trong sáng — hợp trẻ em",
+  },
+  {
     id: "ngan-gon",
     name: "Ngắn gọn — súc tích",
     hint: "Rút gọn tối đa, dễ đọc kịp",
