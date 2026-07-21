@@ -5,11 +5,35 @@ import { logger } from "../logger";
 export function rateLimitDelayMs(err: unknown): number | null {
   const message = err instanceof Error ? err.message : String(err);
   if (!/429|RESOURCE_EXHAUSTED/i.test(message)) return null;
-  const delayMatch =
-    /retry in ([\d.]+)\s*s/i.exec(message) ??
-    /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(message);
-  const sec = delayMatch ? Number.parseFloat(delayMatch[1]) : 60;
+  // "try again in 18m50.976s" (Groq, có phần PHÚT) · "retry in 12.5s" · "retryDelay":"5s" (Gemini)
+  const clock = /(?:retry|try again) in (?:(\d+)m)?([\d.]+)\s*s/i.exec(message);
+  const retryDelay = /"retryDelay"\s*:\s*"([\d.]+)s"/i.exec(message);
+  let sec = 60;
+  if (clock) sec = Number.parseInt(clock[1] ?? "0", 10) * 60 + Number.parseFloat(clock[2]);
+  else if (retryDelay) sec = Number.parseFloat(retryDelay[1]);
   return Math.ceil((Number.isFinite(sec) ? sec : 60) * 1000) + 1500;
+}
+
+/**
+ * Groq hết hạn mức TOKEN/NGÀY (TPD) hoặc REQUEST/NGÀY (RPD) — phải chờ tới lúc
+ * reset (hàng chục phút tới vài giờ), retry chỉ tổ treo job. Khác hạn mức PHÚT
+ * (TPM/RPM) — cái đó chờ ~1 phút là chạy lại được nên vẫn retry bình thường.
+ */
+export function isGroqDailyLimitError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  return (
+    /429|rate_limit_exceeded/i.test(m) &&
+    /tokens per day|requests per day|\(TPD\)|\(RPD\)/i.test(m)
+  );
+}
+
+export function groqDailyLimitMessage(): string {
+  return (
+    "Nguồn dịch dự phòng (Groq) đã hết hạn mức token trong NGÀY, và key Gemini cũng đang cạn " +
+    "— không còn nguồn dịch nào khả dụng lúc này. Thêm key Gemini mới hoặc nạp tiền tại " +
+    "aistudio.google.com (mục Billing), hoặc thử lại sau khi hạn mức reset. " +
+    "Credits của job này được hoàn tự động."
+  );
 }
 
 /** Hết hạn mức NGÀY của gói miễn phí — retry vô ích, phải dừng ngay. */

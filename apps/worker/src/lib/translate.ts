@@ -1,10 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
+import { UnrecoverableError } from "bullmq";
 import Groq from "groq-sdk";
 import { targetLangName } from "@dichvideo/shared";
 import type { SubtitleSegment, TranslationStyleId } from "@dichvideo/shared";
 import { logger } from "../logger";
 import {
+  groqDailyLimitMessage,
   isDailyQuotaError,
+  isGroqDailyLimitError,
   isKeyExhaustedError,
   rateLimitDelayMs,
   withGeminiRetry,
@@ -50,6 +53,8 @@ interface TranslateContext {
   /** provider đang dùng — tự hạ từ gemini xuống groq khi hết sạch key */
   provider: "gemini" | "groq";
   geminiModel: string;
+  /** model Gemini nhẹ hơn, HẠN MỨC FREE RIÊNG — dùng khi model chính cạn sạch key */
+  geminiFallbackModel: string;
   groqModel: string;
   usage: UsageRecord[];
 }
@@ -146,6 +151,9 @@ async function generateGroq(ctx: TranslateContext, opts: GenerateOptions) {
       recordGroqUsage(ctx, res.usage);
       return res.choices[0]?.message?.content ?? "";
     } catch (err) {
+      // Hết hạn mức NGÀY → chờ cả tiếng cũng không cứu được: dừng ngay, hoàn credits.
+      // (Trước đây retry 5 lần × ~61s = treo job 5 phút rồi BullMQ lại chạy lại từ đầu.)
+      if (isGroqDailyLimitError(err)) throw new UnrecoverableError(groqDailyLimitMessage());
       lastErr = err;
       const wait = rateLimitDelayMs(err) ?? 2000 * (attempt + 1);
       logger.warn(
@@ -187,6 +195,23 @@ async function generate(ctx: TranslateContext, opts: GenerateOptions) {
         logger.warn(
           { key: `${ctx.keyIdx + 1}/${ctx.keys.length}` },
           "key Gemini hết hạn mức — chuyển sang key tiếp theo",
+        );
+        continue;
+      }
+      // Cạn sạch key ở model chính → thử model Gemini nhẹ hơn (hạn mức free ĐẾM
+      // RIÊNG cho từng model) trước khi rơi xuống Groq. Quan trọng vì model
+      // preview chỉ cho 20 lượt/ngày/key — một video dài đã đủ đốt hết.
+      if (
+        isKeyExhaustedError(err) &&
+        ctx.geminiFallbackModel &&
+        ctx.geminiModel !== ctx.geminiFallbackModel
+      ) {
+        ctx.geminiModel = ctx.geminiFallbackModel;
+        ctx.keyIdx = 0;
+        ctx.gemini = new GoogleGenAI({ apiKey: ctx.keys[0] });
+        logger.warn(
+          { model: ctx.geminiFallbackModel },
+          "Cạn hạn mức model Gemini chính — chuyển sang model Gemini dự phòng",
         );
         continue;
       }
@@ -299,6 +324,11 @@ export async function translateSegments(
       // KHÔNG dùng gemini-3.5-flash (luôn 503 "high demand" ở bậc miễn phí) và
       // KHÔNG quay lại gemini-2.5-flash ("no longer available to new users").
       input.model ?? process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-3-flash-preview",
+    // gemini-flash-lite-latest: ĐÃ ĐO bằng key thật — vẫn 200 OK đúng lúc
+    // gemini-3-flash-preview đã 429 hết hạn mức ngày (hạn mức tính riêng mỗi model).
+    // KHÔNG dùng gemini-flash-latest ở đây (503 "high demand" ở bậc miễn phí).
+    geminiFallbackModel:
+      process.env.GEMINI_TRANSLATE_FALLBACK_MODEL ?? "gemini-flash-lite-latest",
     groqModel: process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile",
     usage: [],
   };
