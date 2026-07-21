@@ -6,8 +6,10 @@ import {
   DUB_VOICES,
   EDGE_VOICES,
   ELEVEN_VOICES,
+  FPT_VOICES,
   GCLOUD_VOICES,
   GEMINI_VOICES,
+  VIETTEL_VOICES,
   type VoiceProvider,
 } from "@dichvideo/shared";
 import { fieldLabelClass, selectClass } from "@/components/ui/form-styles";
@@ -35,6 +37,14 @@ const T = {
         label: `ElevenLabs — Adam, Rachel... (${ELEVEN_VOICES.length} giọng, key riêng, free ~10 phút/tháng)`,
       },
       {
+        value: "viettel",
+        label: `Viettel AI — giọng Việt bản địa (${VIETTEL_VOICES.length} giọng, key riêng)`,
+      },
+      {
+        value: "fpt",
+        label: `FPT.AI — giọng Việt đủ 3 miền (${FPT_VOICES.length} giọng, key riêng)`,
+      },
+      {
         value: "gemini",
         label: `Giọng cao cấp AI — tiếng Việt diễn cảm (${GEMINI_VOICES.length} giọng, tính phí API)`,
       },
@@ -44,6 +54,10 @@ const T = {
       "Cần ELEVENLABS_API_KEY trong .env (đăng ký free tại elevenlabs.io). Giọng gốc tiếng Anh, đọc tiếng Việt qua model multilingual.",
     gcloudHint:
       "Cần GOOGLE_TTS_API_KEY trong .env (bật Text-to-Speech API trong Google Cloud Console — có hạn mức miễn phí hằng tháng).",
+    viettelHint:
+      "Cần VIETTEL_TTS_TOKEN trong .env (đăng ký tại viettelgroup.ai). Giọng người Việt đọc tiếng Việt — tự nhiên hơn giọng ngoại đọc tiếng Việt.",
+    fptHint:
+      "Cần FPT_TTS_API_KEY trong .env (đăng ký tại console.fpt.ai). Giọng Bắc/Trung/Nam. FPT trả file sau vài giây nên nghe thử hơi lâu.",
     localeLabel: "Quốc gia / ngôn ngữ",
     gender: "Giới tính",
     genderAll: "Tất cả",
@@ -66,6 +80,14 @@ const T = {
         label: `ElevenLabs — Adam, Rachel... (${ELEVEN_VOICES.length} voices, own key, free ~10 min/month)`,
       },
       {
+        value: "viettel",
+        label: `Viettel AI — native Vietnamese (${VIETTEL_VOICES.length} voices, own key)`,
+      },
+      {
+        value: "fpt",
+        label: `FPT.AI — Vietnamese, all 3 regions (${FPT_VOICES.length} voices, own key)`,
+      },
+      {
         value: "gemini",
         label: `Premium AI voices — expressive (${GEMINI_VOICES.length} voices, API charges apply)`,
       },
@@ -75,6 +97,10 @@ const T = {
       "Requires ELEVENLABS_API_KEY in .env (free signup at elevenlabs.io). English-native voices, speak Vietnamese via the multilingual model.",
     gcloudHint:
       "Requires GOOGLE_TTS_API_KEY in .env (enable the Text-to-Speech API in Google Cloud Console — has a free monthly quota).",
+    viettelHint:
+      "Requires VIETTEL_TTS_TOKEN in .env (sign up at viettelgroup.ai). Native Vietnamese speakers — more natural than foreign voices reading Vietnamese.",
+    fptHint:
+      "Requires FPT_TTS_API_KEY in .env (sign up at console.fpt.ai). Northern/Central/Southern accents. FPT returns the file after a few seconds, so preview is slower.",
     localeLabel: "Country / language",
     gender: "Gender",
     genderAll: "All",
@@ -118,11 +144,21 @@ function localesFor(lang: Lang) {
 }
 
 export function voiceOptionsFor(sel: VoiceSelection) {
-  const byGender = <T extends { gender: string }>(voices: readonly T[]) =>
-    voices.filter((v) => sel.gender === "all" || v.gender === sel.gender);
+  /**
+   * Lọc theo giới tính, nhưng lọc ra RỖNG thì trả lại nguyên danh sách.
+   * Nhà cung cấp ít giọng (Viettel chỉ có 1 giọng nam) mà gặp bộ lọc "Nữ" sẽ
+   * hết sạch lựa chọn → resolveVoice rơi về giọng của nhà cung cấp TRƯỚC ĐÓ,
+   * thành ra UI hiện Viettel mà lồng tiếng lại chạy giọng Edge.
+   */
+  const byGender = <T extends { gender: string }>(voices: readonly T[]) => {
+    const hit = voices.filter((v) => sel.gender === "all" || v.gender === sel.gender);
+    return hit.length > 0 ? hit : voices;
+  };
   if (sel.provider === "gemini") return byGender(GEMINI_VOICES);
   if (sel.provider === "eleven") return byGender(ELEVEN_VOICES);
   if (sel.provider === "gcloud") return byGender(GCLOUD_VOICES);
+  if (sel.provider === "viettel") return byGender(VIETTEL_VOICES);
+  if (sel.provider === "fpt") return byGender(FPT_VOICES);
   return EDGE_VOICES.filter(
     (v) => v.locale === sel.locale && (sel.gender === "all" || v.gender === sel.gender),
   );
@@ -196,6 +232,16 @@ export function VoicePicker({ value, onChange, onError, lang = "vi" }: VoicePick
         {value.provider === "gcloud" && (
           <span className="mt-1 block text-xs text-amber-600 dark:text-amber-400">
             {t.gcloudHint}
+          </span>
+        )}
+        {value.provider === "viettel" && (
+          <span className="mt-1 block text-xs text-amber-600 dark:text-amber-400">
+            {t.viettelHint}
+          </span>
+        )}
+        {value.provider === "fpt" && (
+          <span className="mt-1 block text-xs text-amber-600 dark:text-amber-400">
+            {t.fptHint}
           </span>
         )}
       </label>

@@ -7,14 +7,22 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import {
   EDGE_VOICE_IDS,
   elevenVoiceId,
+  fptVoiceName,
   gcloudVoiceName,
   geminiVoiceName,
   isValidVoiceId,
   pcmToWav,
+  viettelVoiceName,
 } from "@dichvideo/shared";
 import { getSession } from "@/lib/session";
 import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+// Viettel/FPT dùng lại hàm trong lib/tts-web thay vì chép lần nữa — route này
+// vốn đã lặp lại 4 hàm synth của tts-web, đừng nhân thêm chỗ phải sửa.
+import { synthFpt, synthViettel } from "@/lib/tts-web";
+
+// FPT trả link mp3 phải chờ (poll) nên cần trần thời gian rộng hơn mặc định
+export const maxDuration = 60;
 
 const VI_SAMPLE = "Xin chào! Đây là giọng đọc thử của mình, rất vui được đồng hành cùng video của bạn.";
 const EN_SAMPLE = "Hello! This is a short preview of my voice.";
@@ -142,6 +150,8 @@ export async function GET(req: NextRequest) {
     const gemini = geminiVoiceName(voice);
     const eleven = elevenVoiceId(voice);
     const gcloud = gcloudVoiceName(voice);
+    const viettel = viettelVoiceName(voice);
+    const fpt = fptVoiceName(voice);
     if (gemini) {
       body = await synthesizeGeminiSample(gemini);
       type = "audio/wav";
@@ -149,6 +159,11 @@ export async function GET(req: NextRequest) {
       body = await synthesizeElevenSample(eleven);
     } else if (gcloud) {
       body = await synthesizeGCloud(gcloud, customText ?? VI_SAMPLE);
+    } else if (viettel) {
+      body = await synthViettel(viettel, VI_SAMPLE);
+      type = "audio/wav";
+    } else if (fpt) {
+      body = await synthFpt(fpt, VI_SAMPLE);
     } else {
       body = await synthesizeEdge(
         voice,
