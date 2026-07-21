@@ -42,7 +42,13 @@ export async function GET(
   if (inR2) {
     const url = await getSignedUrl(
       getR2(),
-      new GetObjectCommand({ Bucket: r2Bucket(), Key: key }),
+      // ép MIME: admin PUT thẳng lên R2 không gửi content-type (né preflight
+      // CORS) nên object lưu là octet-stream — thẻ <video> sẽ không phát.
+      new GetObjectCommand({
+        Bucket: r2Bucket(),
+        Key: key,
+        ResponseContentType: "video/mp4",
+      }),
       { expiresIn: 3600 },
     );
     return new NextResponse(null, {

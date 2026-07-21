@@ -12,24 +12,24 @@ const T = {
     slotGoc: "Video gốc (bên trái)",
     slotBanViet: "Bản tiếng Việt (bên phải)",
     slotHuongDan: "Video hướng dẫn sử dụng (trang Dịch & lồng tiếng)",
-    pick: "Chọn video MP4 (tối đa 50MB)…",
+    pick: "Chọn video MP4 (tối đa 200MB)…",
     upload: "Cập nhật video này",
     uploading: "Đang tải lên…",
     done: "Đã cập nhật — trang chủ sẽ hiện video mới sau ~5 phút (bộ nhớ đệm).",
     fail: "Tải lên không được — thử lại",
-    hint: "Hai video này hiện ở mục “Xem kết quả thực tế” trên trang chủ. Nên dùng video dọc 9:16 ngắn (~10–60 giây) để cân đối.",
+    hint: "Hai video này hiện ở mục “Xem kết quả thực tế” trên trang chủ. Dọc 9:16 hay ngang 16:9 đều được — nhưng nên để CẢ HAI cùng tỉ lệ và ngắn (~10–60 giây) thì hai khung mới cân nhau.",
     current: "Đang hiển thị:",
   },
   en: {
     slotGoc: "Original video (left)",
     slotBanViet: "Vietnamese version (right)",
     slotHuongDan: "Tutorial video (Translate & dub page)",
-    pick: "Choose an MP4 video (max 50MB)…",
+    pick: "Choose an MP4 video (max 200MB)…",
     upload: "Update this video",
     uploading: "Uploading…",
     done: "Updated — the homepage will show it in ~5 min (cache).",
     fail: "Upload failed — try again",
-    hint: "These two videos appear in the “See real results” section on the homepage. Use short 9:16 vertical clips (~10–60s).",
+    hint: "These two videos appear in the “See real results” section on the homepage. Vertical 9:16 or horizontal 16:9 both work — keep BOTH the same ratio and short (~10–60s) so the two frames match.",
     current: "Currently showing:",
   },
 } as const;
@@ -55,15 +55,28 @@ function DemoSlot({
     if (!file || busy) return;
     setBusy(true);
     try {
-      const form = new FormData();
-      form.append("slot", slot);
-      form.append("file", file);
-      const res = await fetch("/api/admin/demo", { method: "POST", body: form });
+      // 1. xin URL ký sẵn — file KHÔNG đi qua route Next.js (Vercel chặn body ~4.5MB)
+      const contentType = file.type || "video/mp4";
+      const res = await fetch("/api/admin/demo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slot, contentType, sizeBytes: file.size }),
+      });
       const data = await res.json().catch(() => null);
-      if (!res.ok) {
+      if (!res.ok || !data?.url) {
         toast(data?.error ?? t.fail, "error");
         return;
       }
+
+      // 2. PUT thẳng lên R2. Gửi `file.slice()` (blob KHÔNG type) để trình duyệt
+      // không tự thêm header content-type — thêm header là dính preflight CORS
+      // mà bucket chưa chắc mở. Kiểu MIME do route /api/demo ép khi trả về.
+      const put = await fetch(data.url, { method: "PUT", body: file.slice() });
+      if (!put.ok) {
+        toast(`${t.fail} (R2 ${put.status})`, "error");
+        return;
+      }
+
       toast(t.done);
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";

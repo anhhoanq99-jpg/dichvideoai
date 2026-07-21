@@ -2,6 +2,7 @@ import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  PutObjectCommand,
   S3Client,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -29,6 +30,25 @@ export function getR2(): S3Client {
 
 export function r2Bucket(): string {
   return requireEnv("R2_BUCKET");
+}
+
+/**
+ * URL PUT ký sẵn cho file NHỎ tải 1 lượt (video demo…). Trình duyệt PUT thẳng
+ * lên R2 — KHÔNG đẩy file qua route Next.js, vì Vercel chặn body request ở
+ * ~4.5MB nên nhồi qua route là hỏng với mọi video thật.
+ *
+ * CỐ TÌNH không ký ContentType: client sẽ PUT blob không type nên KHÔNG gửi
+ * header `content-type`, đúng như luồng upload video của user đang chạy được.
+ * Thêm header lạ sẽ kéo theo preflight CORS mà token R2 trong .env là
+ * object-scoped, không sửa được cấu hình CORS của bucket để mở thêm.
+ * Bù lại, route đọc ép kiểu MIME khi trả về (xem /api/demo/[slot]).
+ */
+export async function presignPut(key: string) {
+  return getSignedUrl(
+    getR2(),
+    new PutObjectCommand({ Bucket: r2Bucket(), Key: key }),
+    { expiresIn: 900 },
+  );
 }
 
 export async function createMultipart(key: string, contentType: string) {
