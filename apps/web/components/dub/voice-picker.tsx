@@ -29,16 +29,17 @@ export interface VoiceSelection {
 const T = {
   vi: {
     providerOptions: [
-      // Nhãn ngắn: "Tên nguồn — mô tả 3-5 chữ (số giọng)". Chi tiết dài dòng
-      // (cần key gì, hạn mức bao nhiêu) đã có ở dòng hint bên dưới ô chọn.
-      { value: "vieneu", label: `VieNeu — Việt bản địa, nét nhất (${VIENEU_VOICES.length})` },
-      { value: "kokoro", label: `Kokoro — Việt, đọc nhanh (${KOKORO_VOICES.length})` },
+      // Nhãn ĐẶT THEO THƯƠNG HIỆU MÌNH, không lộ tên nhà cung cấp thật
+      // (Google/VieNeu/Kokoro/Viettel/FPT). Thứ tự cũng cố ý: giọng khuyên dùng
+      // lên đầu. Chi tiết cần key gì nằm ở dòng hint bên dưới ô chọn.
+      { value: "gcloud", label: `SubdubAI — Việt, rõ ràng (Nên dùng) (${GCLOUD_VOICES.length})` },
       { value: "edge", label: "Cơ bản — miễn phí, mọi thứ tiếng (322)" },
-      { value: "gcloud", label: `Google — Việt, rõ ràng (${GCLOUD_VOICES.length})` },
-      { value: "viettel", label: `Viettel — Việt bản địa (${VIETTEL_VOICES.length})` },
-      { value: "fpt", label: `FPT — Việt đủ 3 miền (${FPT_VOICES.length})` },
+      { value: "vieneu", label: `Vie — Việt bản địa, nét nhất (${VIENEU_VOICES.length})` },
+      { value: "kokoro", label: `Ko — Việt, đọc nhanh (${KOKORO_VOICES.length})` },
+      { value: "viettel", label: `VT — Việt bản địa (${VIETTEL_VOICES.length})` },
+      { value: "fpt", label: `FT — Việt đủ 3 miền (${FPT_VOICES.length})` },
       { value: "gemini", label: `Cao cấp — Việt diễn cảm (${GEMINI_VOICES.length})` },
-      { value: "eleven", label: `ElevenLabs — giọng Âu Mỹ (${ELEVEN_VOICES.length})` },
+      { value: "eleven", label: `Eleven — giọng Âu Mỹ (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
     providerLabel: "Loại giọng",
     elevenHint:
@@ -61,14 +62,14 @@ const T = {
   },
   en: {
     providerOptions: [
-      { value: "vieneu", label: `VieNeu — native Vietnamese, sharpest (${VIENEU_VOICES.length})` },
-      { value: "kokoro", label: `Kokoro — Vietnamese, fast (${KOKORO_VOICES.length})` },
+      { value: "gcloud", label: `SubdubAI — Vietnamese, crisp (Recommended) (${GCLOUD_VOICES.length})` },
       { value: "edge", label: "Basic — free, every language (322)" },
-      { value: "gcloud", label: `Google — Vietnamese, crisp (${GCLOUD_VOICES.length})` },
-      { value: "viettel", label: `Viettel — native Vietnamese (${VIETTEL_VOICES.length})` },
-      { value: "fpt", label: `FPT — Vietnamese, 3 regions (${FPT_VOICES.length})` },
+      { value: "vieneu", label: `Vie — native Vietnamese, sharpest (${VIENEU_VOICES.length})` },
+      { value: "kokoro", label: `Ko — Vietnamese, fast (${KOKORO_VOICES.length})` },
+      { value: "viettel", label: `VT — native Vietnamese (${VIETTEL_VOICES.length})` },
+      { value: "fpt", label: `FT — Vietnamese, 3 regions (${FPT_VOICES.length})` },
       { value: "gemini", label: `Premium — expressive Vietnamese (${GEMINI_VOICES.length})` },
-      { value: "eleven", label: `ElevenLabs — Western voices (${ELEVEN_VOICES.length})` },
+      { value: "eleven", label: `Eleven — Western voices (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
     providerLabel: "Voice type",
     elevenHint:
