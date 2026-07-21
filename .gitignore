@@ -27,3 +27,6 @@ apps/worker/tts-samples/
 .venv-tts/
 __pycache__/
 *.pyc
+
+# cau hinh IDE ca nhan
+.vscode/
