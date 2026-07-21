@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import {
   DUB_VOICES,
+  edgeFallbackVoice,
   isValidVoiceId,
   voiceProvider,
   type DubParams,
@@ -17,7 +18,7 @@ import { slotMs, atempoChain } from "../lib/dub-timing";
 import { audioDurationMs, ffBin, ffprobe, makeSilence } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
 import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
-import { synthesizeClipWithRetry } from "../lib/tts";
+import { isGCloudQuotaError, synthesizeClipWithRetry } from "../lib/tts";
 import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
 
@@ -182,6 +183,42 @@ export async function dubProcessor(job: Job<JobPayload>) {
 
     const videoDurMs = video.durationSec * 1000;
 
+    /**
+     * Google Cloud hết hạn mức → hạ xuống Edge (miễn phí, không giới hạn).
+     *
+     * Quyết định MỘT LẦN cho cả job, TRƯỚC khi sinh câu nào: nếu để từng câu tự
+     * hạ khi gặp lỗi thì hạn mức cạn giữa chừng sẽ cho ra video nửa giọng
+     * Google nửa giọng Edge — lỗi nghe thấy ngay và rất khó hiểu với khách.
+     * Giá phải trả là một câu thử ngắn (~10 ký tự), không đáng kể.
+     */
+    const voiceOverride = new Map<string, string>();
+    const gcloudSlots = [...new Set(voiceSlots)].filter(
+      (v) => voiceProvider(v) === "gcloud",
+    );
+    if (gcloudSlots.length > 0) {
+      try {
+        await synthesizeClipWithRetry({
+          text: "Xin chào",
+          voice: gcloudSlots[0],
+          speed: 1,
+          dir,
+          name: "preflight",
+        });
+      } catch (err) {
+        if (!isGCloudQuotaError(err)) throw err;
+        for (const v of gcloudSlots) voiceOverride.set(v, edgeFallbackVoice(v));
+        logger.warn(
+          { jobId: job.data.jobId, slots: gcloudSlots, err: String(err).slice(0, 200) },
+          "Google Cloud hết hạn mức — cả job hạ xuống giọng Edge (miễn phí)",
+        );
+      }
+    }
+    /** Giọng THỰC DÙNG của câu (đã tính hạ cấp) — dùng ở mọi nơi thay voiceFor. */
+    const finalVoiceFor = (seg: SubtitleSegment) => {
+      const v = voiceFor(seg);
+      return voiceOverride.get(v) ?? v;
+    };
+
     // 1. TTS từng câu — chạy song song có giới hạn (5→55%)
     let ttsDone = 0;
     const synthResults = await mapPool(
@@ -193,7 +230,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
         synthesizeClipWithRetry({
           // bỏ *dấu sao* đánh dấu từ nhấn màu — không để giọng đọc vấp
           text: seg.text.replace(/\*/g, "").replace(/\s+/g, " ").trim(),
-          voice: voiceFor(seg),
+          voice: finalVoiceFor(seg),
           speed,
           pitch,
           dir,
@@ -217,7 +254,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
         const rawMs = await audioDurationMs(clips[k]);
         const slot = slotMs(segments, k, videoDurMs);
         // xét theo giọng CỦA CHÍNH câu này — mỗi nhân vật có thể khác nguồn
-        const baked = speedBakedFor(voiceFor(seg));
+        const baked = speedBakedFor(finalVoiceFor(seg));
         const atempoFilter = atempoChain(Math.max(rawMs / slot, baked ? 1 : speed));
         const out = path.join(dir, `fit-${k}.wav`);
         // fade 20ms hai đầu chống "click/vấp" khi ghép câu sát nhau hoặc bị cắt

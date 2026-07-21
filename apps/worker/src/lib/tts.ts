@@ -366,6 +366,24 @@ export async function synthesizeFptClip(input: {
 }
 
 /**
+ * Google Cloud TTS hết hạn mức THẬT (hết free tier tháng, chưa bật billing,
+ * API bị tắt) → hạ xuống Edge miễn phí thay vì để job fail.
+ *
+ * CỐ TÌNH loại trừ hạn mức THEO PHÚT: đó chỉ là chặn tốc độ, chờ vài giây là
+ * đọc tiếp được. Hạ cấp vì nó sẽ đổi giọng giữa video chỉ vì đọc hơi nhanh —
+ * mất chất lượng mà chẳng để làm gì.
+ */
+export function isGCloudQuotaError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  if (!/Google Cloud TTS/i.test(m)) return false;
+  if (/per minute|PerMinute|per_minute/i.test(m)) return false;
+  return (
+    /\b429\b|\b403\b|RESOURCE_EXHAUSTED|PERMISSION_DENIED/i.test(m) ||
+    /quota|billing|has not been used|is disabled/i.test(m)
+  );
+}
+
+/**
  * Sinh 1 clip bằng service TTS CHẠY TẠI CHỖ (`services/tts-local`, pm2
  * `dichvideo-tts`) — VieNeu v3-turbo hoặc Kokoro-Vietnamese.
  *

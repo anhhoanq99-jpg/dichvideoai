@@ -265,6 +265,27 @@ export function voiceProvider(id: string): VoiceProvider {
   return "edge";
 }
 
+/**
+ * Giọng Edge tiếng Việt tương đương (CÙNG GIỚI TÍNH) để hạ cấp khi nguồn trả
+ * phí hết hạn mức. Edge miễn phí không giới hạn nên luôn là lưới an toàn cuối.
+ * Không tra được giới tính thì lấy giọng nữ (Hoài My) làm mặc định.
+ */
+export function edgeFallbackVoice(voiceId: string): string {
+  const all = [
+    ...GEMINI_VOICES,
+    ...ELEVEN_VOICES,
+    ...GCLOUD_VOICES,
+    ...FPT_VOICES,
+    ...VIETTEL_VOICES,
+    ...VIENEU_VOICES,
+    ...KOKORO_VOICES,
+  ];
+  const found = all.find((v) => v.id === voiceId);
+  const male = DUB_VOICES.find((v) => v.gender === "male")!.id;
+  const female = DUB_VOICES.find((v) => v.gender === "female")!.id;
+  return found?.gender === "M" ? male : female;
+}
+
 /** Id giọng thuộc một trong các catalog đã hỗ trợ — dùng validate mọi API. */
 export function isValidVoiceId(id: string): boolean {
   return (
