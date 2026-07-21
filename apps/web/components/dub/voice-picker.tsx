@@ -9,6 +9,8 @@ import {
   FPT_VOICES,
   GCLOUD_VOICES,
   GEMINI_VOICES,
+  KOKORO_VOICES,
+  VIENEU_VOICES,
   VIETTEL_VOICES,
   type VoiceProvider,
 } from "@dichvideo/shared";
@@ -28,6 +30,14 @@ const T = {
   vi: {
     providerOptions: [
       { value: "edge", label: "Giọng thường — miễn phí (322 giọng, mọi quốc gia)" },
+      {
+        value: "vieneu",
+        label: `VieNeu — giọng Việt bản địa 48kHz (${VIENEU_VOICES.length} giọng, miễn phí)`,
+      },
+      {
+        value: "kokoro",
+        label: `Kokoro — giọng Việt nhẹ, đọc nhanh (${KOKORO_VOICES.length} giọng, miễn phí)`,
+      },
       {
         value: "gcloud",
         label: `Google Cloud — ${GCLOUD_VOICES.length} giọng Việt (key riêng, free 1-4tr ký tự/tháng)`,
@@ -71,6 +81,14 @@ const T = {
   en: {
     providerOptions: [
       { value: "edge", label: "Standard voices — free (322 voices, every country)" },
+      {
+        value: "vieneu",
+        label: `VieNeu — native Vietnamese 48kHz (${VIENEU_VOICES.length} voices, free)`,
+      },
+      {
+        value: "kokoro",
+        label: `Kokoro — lightweight Vietnamese, fast (${KOKORO_VOICES.length} voices, free)`,
+      },
       {
         value: "gcloud",
         label: `Google Cloud — ${GCLOUD_VOICES.length} Vietnamese voices (own key, free 1-4M chars/month)`,
@@ -159,6 +177,8 @@ export function voiceOptionsFor(sel: VoiceSelection) {
   if (sel.provider === "gcloud") return byGender(GCLOUD_VOICES);
   if (sel.provider === "viettel") return byGender(VIETTEL_VOICES);
   if (sel.provider === "fpt") return byGender(FPT_VOICES);
+  if (sel.provider === "vieneu") return byGender(VIENEU_VOICES);
+  if (sel.provider === "kokoro") return byGender(KOKORO_VOICES);
   return EDGE_VOICES.filter(
     (v) => v.locale === sel.locale && (sel.gender === "all" || v.gender === sel.gender),
   );

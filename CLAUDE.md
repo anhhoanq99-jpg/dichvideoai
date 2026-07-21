@@ -45,7 +45,18 @@ Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
   `getLang()` trong `apps/web/lib/i18n.ts`. Trang client tách: page server mỏng `await getLang()` + `*-client.tsx`.
 - **Admin**: nhận diện qua env `ADMIN_EMAILS`, helper `apps/web/lib/admin.ts` `isAdminEmail()`. Dùng cho chat hỗ trợ + trang `/admin`.
 - **Giọng nói**: catalog `packages/shared/src/dub-presets.ts` — Edge (322, free) · Google Cloud (40, có Chirp3-HD)
-  · ElevenLabs (14 premade) · Gemini (premium). Prefix id: `gcloud:` `eleven:` `gemini:`; validate `isValidVoiceId()`.
+  · ElevenLabs (14 premade) · Gemini (premium) · Viettel/FPT (key riêng) · **VieNeu (14) + Kokoro (14) chạy TẠI CHỖ**.
+  Prefix id: `gcloud:` `eleven:` `gemini:` `viettel:` `fpt:` `vieneu:` `kokoro:`; validate `isValidVoiceId()`.
+- **Giọng chạy tại chỗ (VieNeu/Kokoro)**: service Python riêng `services/tts-local` — pm2 **`dichvideo-tts`**
+  (tiến trình thứ 2, cạnh `dichvideo-worker`), nghe ở `127.0.0.1:8123`, venv `.venv-tts` (KHÔNG commit).
+  Miễn phí, không key, không hạn mức — nhưng chỉ sống khi service chạy trên CÙNG máy với worker.
+  Chỉ **v3-turbo** chạy local được (48kHz); VieNeu v2 cần LMDeploy server nên KHÔNG dùng.
+  Id giọng VieNeu dùng **slug ascii** (`vieneu:minh-duc`), service tự đổi ra tên thật có dấu — tên thật
+  ("Minh Đức") đi qua URL/JSON/shell là vỡ. Catalog + bảng map do `scripts/tts-gen-catalog.py` sinh từ
+  chính engine, chạy lại khi đổi giọng — ĐỪNG sửa tay một bên.
+  Kokoro bake được `speed`, VieNeu KHÔNG (không có tham số) → xem `speedBakedFor` trong `dub.ts`.
+  **Nghe thử** không tổng hợp trực tiếp được (Vercel không gọi tới máy user) → dùng mẫu sinh sẵn trên R2
+  `voice-samples/{voiceId}.wav`, tạo bằng `apps/worker/scripts/upload-local-voice-samples.ts`.
   `VoicePicker` (components/dub) là bộ chọn dùng chung; nghe thử qua `/api/tts-preview`.
 - **Render/ASS**: `packages/shared/src/ass-builder.ts` sinh .ass (hiệu ứng chữ + màu nhấn `*từ*`); worker `render.ts`
   burn bằng ffmpeg libx264 (KHÔNG GPU — đã đo, không nhanh hơn).

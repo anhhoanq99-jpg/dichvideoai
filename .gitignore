@@ -21,3 +21,9 @@ coverage/
 
 # file nghe thu giong TTS (sinh boi scripts/list-tts-voices.ts)
 apps/worker/tts-samples/
+
+# venv cua service giong chay tai cho (torch + onnx ~vai GB) — cai lai bang
+# services/tts-local/requirements.txt, dung commit
+.venv-tts/
+__pycache__/
+*.pyc

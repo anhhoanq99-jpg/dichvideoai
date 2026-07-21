@@ -8,6 +8,8 @@ import {
   fptVoiceName,
   gcloudVoiceName,
   geminiVoiceName,
+  kokoroVoiceName,
+  vieneuVoiceName,
   viettelVoiceName,
   pcmToWav,
 } from "@dichvideo/shared";
@@ -363,6 +365,71 @@ export async function synthesizeFptClip(input: {
   };
 }
 
+/**
+ * Sinh 1 clip bằng service TTS CHẠY TẠI CHỖ (`services/tts-local`, pm2
+ * `dichvideo-tts`) — VieNeu v3-turbo hoặc Kokoro-Vietnamese.
+ *
+ * Khác mọi provider còn lại: không gọi ra Internet, không key, không hạn mức.
+ * Đổi lại nó chỉ sống khi service pm2 đang chạy trên CÙNG máy với worker, nên
+ * service chết là phải báo lỗi rõ ràng thay vì để retry 6 lần vô ích.
+ *
+ * Kokoro nhận `speed` nên bake luôn; VieNeu KHÔNG có tham số speed (đã kiểm tra
+ * chữ ký infer) nên để worker kéo giãn bằng ffmpeg — xem `speedBakedFor` ở dub.ts.
+ */
+export async function synthesizeLocalClip(input: {
+  text: string;
+  engine: "vieneu" | "kokoro";
+  /** slug đã bỏ tiền tố, vd "minh-duc" hoặc "diem_trinh" */
+  voiceName: string;
+  speed: number;
+  dir: string;
+  name: string;
+}): Promise<{ file: string; usage: UsageRecord[] }> {
+  const base = process.env.TTS_LOCAL_URL ?? "http://127.0.0.1:8123";
+  let res: Response;
+  try {
+    res = await fetch(`${base}/tts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        engine: input.engine,
+        voice: input.voiceName,
+        text: input.text,
+        speed: input.speed,
+      }),
+    });
+  } catch (err) {
+    throw new UnrecoverableError(
+      `Không kết nối được service giọng nội bộ (${base}). Giọng VieNeu/Kokoro chạy ` +
+        `trên chính máy cài worker — kiểm tra "pm2 status dichvideo-tts". ` +
+        `Chi tiết: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 200);
+    // 400 = sai id giọng → retry vô nghĩa
+    if (res.status === 400) {
+      throw new UnrecoverableError(`Giọng không hợp lệ với ${input.engine}: ${detail}`);
+    }
+    throw new Error(`Service giọng nội bộ ${res.status}: ${detail}`);
+  }
+
+  const file = path.join(input.dir, `${input.name}.wav`);
+  await mkdir(input.dir, { recursive: true });
+  await writeFile(file, Buffer.from(await res.arrayBuffer()));
+  return {
+    file,
+    usage: [
+      {
+        provider: input.engine,
+        metric: "chars",
+        quantity: input.text.length,
+        costUsdMicros: 0, // chạy tại chỗ — không mất tiền
+      },
+    ],
+  };
+}
+
 export async function synthesizeClipWithRetry(input: {
   text: string;
   voice: string;
@@ -377,6 +444,8 @@ export async function synthesizeClipWithRetry(input: {
   const gcloud = gcloudVoiceName(input.voice);
   const fpt = fptVoiceName(input.voice);
   const viettel = viettelVoiceName(input.voice);
+  const vieneu = vieneuVoiceName(input.voice);
+  const kokoro = kokoroVoiceName(input.voice);
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
@@ -419,6 +488,16 @@ export async function synthesizeClipWithRetry(input: {
         return await synthesizeFptClip({
           text: input.text,
           voiceName: fpt,
+          speed: input.speed,
+          dir: input.dir,
+          name: input.name,
+        });
+      }
+      if (vieneu || kokoro) {
+        return await synthesizeLocalClip({
+          text: input.text,
+          engine: vieneu ? "vieneu" : "kokoro",
+          voiceName: (vieneu ?? kokoro)!,
           speed: input.speed,
           dir: input.dir,
           name: input.name,

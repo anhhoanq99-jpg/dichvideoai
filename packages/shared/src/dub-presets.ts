@@ -178,13 +178,77 @@ export function viettelVoiceName(id: string): string | null {
   return id.startsWith("viettel:") ? id.slice("viettel:".length) : null;
 }
 
+/**
+ * VieNeu-TTS v3-turbo — CHAY TAI CHO trên máy có worker (service Python ở
+ * `services/tts-local`), KHÔNG gọi API ngoài nên miễn phí và không giới hạn.
+ * 48 kHz, Apache-2.0. Danh sách này do `scripts/tts-gen-catalog.py` SINH RA từ
+ * chính engine và đã sinh thử audio cho TỪNG giọng — đừng sửa tay.
+ *
+ * id dùng SLUG ascii ("vieneu:minh-duc") chứ không dùng tên thật ("Minh Đức"):
+ * tên thật có dấu + khoảng trắng, đi qua URL/JSON/shell là vỡ. Service tự đổi
+ * slug về tên thật bằng bảng trong `services/tts-local/voices.py` (cùng nguồn sinh).
+ */
+export const VIENEU_VOICES = [
+  { id: "vieneu:minh-duc", name: "Minh Đức — nam Bắc (tin tức)", gender: "M" as const },
+  { id: "vieneu:pham-tuyen", name: "Phạm Tuyên — nam Bắc (tự nhiên)", gender: "M" as const },
+  { id: "vieneu:thai-son", name: "Thái Sơn — nam Nam (kể chuyện)", gender: "M" as const },
+  { id: "vieneu:xuan-vinh", name: "Xuân Vĩnh — nam Nam (tự nhiên)", gender: "M" as const },
+  { id: "vieneu:thanh-binh", name: "Thanh Bình — nam Bắc (kể chuyện)", gender: "M" as const },
+  { id: "vieneu:truc-ly", name: "Trúc Ly — nữ Bắc (tự nhiên)", gender: "F" as const },
+  { id: "vieneu:ngoc-linh", name: "Ngọc Linh — nữ Bắc (kể chuyện)", gender: "F" as const },
+  { id: "vieneu:doan-trang", name: "Đoan Trang — nữ Bắc (tự nhiên)", gender: "F" as const },
+  { id: "vieneu:mai-anh", name: "Mai Anh — nữ Bắc (tin tức)", gender: "F" as const },
+  { id: "vieneu:thuc-doan", name: "Thục Đoan — nữ Nam (kể chuyện)", gender: "F" as const },
+  { id: "vieneu:minh-triet", name: "Minh Triết — nam Nam (tin tức)", gender: "M" as const },
+  { id: "vieneu:thuy-dung", name: "Thùy Dung — nữ Nam (tin tức)", gender: "F" as const },
+  { id: "vieneu:quang-son", name: "Quang Sơn — nam Trung (tự nhiên)", gender: "M" as const },
+  { id: "vieneu:ngoc-tran", name: "Ngọc Trân — nữ Trung (tự nhiên)", gender: "F" as const },
+] as const;
+
+export const VIENEU_VOICE_IDS = new Set<string>(VIENEU_VOICES.map((v) => v.id));
+
+export function vieneuVoiceName(id: string): string | null {
+  return id.startsWith("vieneu:") ? id.slice("vieneu:".length) : null;
+}
+
+/**
+ * Kokoro-Vietnamese — bản tinh chỉnh tiếng Việt của Kokoro-82M, cũng CHẠY TẠI
+ * CHỖ qua service ở `services/tts-local`. 24 kHz, Apache-2.0.
+ * Nhẹ hơn VieNeu nên đổi giọng gần như tức thì (tráo voicepack ~1ms).
+ * Cũng do `scripts/tts-gen-catalog.py` sinh ra và đã thử từng giọng.
+ */
+export const KOKORO_VOICES = [
+  { id: "kokoro:diem_trinh", name: "Diễm Trinh", gender: "F" as const },
+  { id: "kokoro:hung_thinh", name: "Hưng Thịnh", gender: "M" as const },
+  { id: "kokoro:mai_linh", name: "Mai Linh", gender: "F" as const },
+  { id: "kokoro:mai_loan", name: "Mai Loan", gender: "F" as const },
+  { id: "kokoro:manh_dung", name: "Mạnh Dũng", gender: "M" as const },
+  { id: "kokoro:my_yen", name: "Mỹ Yến", gender: "F" as const },
+  { id: "kokoro:ngoc_huyen", name: "Ngọc Huyền", gender: "F" as const },
+  { id: "kokoro:phat_tai", name: "Phát Tài", gender: "M" as const },
+  { id: "kokoro:thanh_dat", name: "Thành Đạt", gender: "M" as const },
+  { id: "kokoro:thuc_trinh", name: "Thục Trinh", gender: "F" as const },
+  { id: "kokoro:tuan_ngoc", name: "Tuấn Ngọc", gender: "M" as const },
+  { id: "kokoro:storyvert", name: "Kể Chuyện", gender: "F" as const },
+  { id: "kokoro:duc_an", name: "Đức Ân", gender: "M" as const },
+  { id: "kokoro:duc_duy", name: "Đức Duy", gender: "M" as const },
+] as const;
+
+export const KOKORO_VOICE_IDS = new Set<string>(KOKORO_VOICES.map((v) => v.id));
+
+export function kokoroVoiceName(id: string): string | null {
+  return id.startsWith("kokoro:") ? id.slice("kokoro:".length) : null;
+}
+
 export type VoiceProvider =
   | "edge"
   | "gemini"
   | "eleven"
   | "gcloud"
   | "fpt"
-  | "viettel";
+  | "viettel"
+  | "vieneu"
+  | "kokoro";
 
 /** Provider của một id giọng (theo tiền tố) — mặc định edge (không tiền tố). */
 export function voiceProvider(id: string): VoiceProvider {
@@ -193,6 +257,8 @@ export function voiceProvider(id: string): VoiceProvider {
   if (id.startsWith("gcloud:")) return "gcloud";
   if (id.startsWith("fpt:")) return "fpt";
   if (id.startsWith("viettel:")) return "viettel";
+  if (id.startsWith("vieneu:")) return "vieneu";
+  if (id.startsWith("kokoro:")) return "kokoro";
   return "edge";
 }
 
@@ -204,7 +270,9 @@ export function isValidVoiceId(id: string): boolean {
     ELEVEN_VOICE_IDS.has(id) ||
     GCLOUD_VOICE_IDS.has(id) ||
     FPT_VOICE_IDS.has(id) ||
-    VIETTEL_VOICE_IDS.has(id)
+    VIETTEL_VOICE_IDS.has(id) ||
+    VIENEU_VOICE_IDS.has(id) ||
+    KOKORO_VOICE_IDS.has(id)
   );
 }
 

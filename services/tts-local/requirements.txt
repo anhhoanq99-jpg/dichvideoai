@@ -1,0 +1,21 @@
+# Service TTS chay tai cho (VieNeu + Kokoro-Vietnamese).
+# Dung venv rieng o goc repo: .venv-tts
+#
+#   python -m venv .venv-tts
+#   .venv-tts/Scripts/python.exe -m pip install -r services/tts-local/requirements.txt
+#   .venv-tts/Scripts/python.exe -m pip install -e C:/Users/Admin/tts-engines/Kokoro-Vietnamese
+#
+# Kokoro-Vietnamese KHONG co tren PyPI -> phai clone tu GitHub roi cai -e:
+#   git clone https://github.com/iamdinhthuan/Kokoro-Vietnamese.git
+# Ca hai model deu Apache-2.0, dung thuong mai duoc.
+# Model tu tai ve ~/.cache/huggingface lan chay dau (VieNeu ~1 phut, Kokoro ~1 phut).
+
+vieneu==3.2.3
+fastapi
+uvicorn
+numpy
+soundfile
+
+# torch ban CPU — KHONG cai ban CUDA, may nay khong co GPU NVIDIA:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch

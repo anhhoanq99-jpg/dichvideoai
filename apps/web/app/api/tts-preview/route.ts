@@ -2,6 +2,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { GoogleGenAI } from "@google/genai";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import {
@@ -11,9 +13,12 @@ import {
   gcloudVoiceName,
   geminiVoiceName,
   isValidVoiceId,
+  kokoroVoiceName,
   pcmToWav,
+  vieneuVoiceName,
   viettelVoiceName,
 } from "@dichvideo/shared";
+import { getR2, r2Bucket } from "@/lib/r2";
 import { getSession } from "@/lib/session";
 import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -34,6 +39,19 @@ declare global {
   var __ttsPreviewCache: Map<string, { body: Buffer; type: string }> | undefined;
 }
 const cache = (globalThis.__ttsPreviewCache ??= new Map());
+
+/** URL ký sẵn tới mẫu giọng đã sinh sẵn trên R2; null nếu chưa upload. */
+async function presignedVoiceSample(voice: string): Promise<string | null> {
+  const key = `voice-samples/${voice}.wav`;
+  try {
+    await getR2().send(new HeadObjectCommand({ Bucket: r2Bucket(), Key: key }));
+  } catch {
+    return null;
+  }
+  return getSignedUrl(getR2(), new GetObjectCommand({ Bucket: r2Bucket(), Key: key }), {
+    expiresIn: 3600,
+  });
+}
 
 /** Nghe thử theo câu tùy ý: chỉ nguồn có hạn mức rộng (Edge free, GCloud 1-4tr ký tự). */
 function allowsCustomText(voice: string): boolean {
@@ -121,6 +139,23 @@ export async function GET(req: NextRequest) {
   const voice = req.nextUrl.searchParams.get("voice") ?? "";
   if (!isValidVoiceId(voice)) {
     return NextResponse.json({ error: "Giọng không hợp lệ" }, { status: 400 });
+  }
+
+  // VieNeu/Kokoro chạy trên máy có worker — Vercel không gọi tới được, nên nghe
+  // thử dùng mẫu đã sinh sẵn trên R2 (apps/worker/scripts/upload-local-voice-samples.ts).
+  const local = vieneuVoiceName(voice) !== null || kokoroVoiceName(voice) !== null;
+  if (local) {
+    const url = await presignedVoiceSample(voice);
+    if (!url) {
+      return NextResponse.json(
+        { error: "Chưa có mẫu nghe thử cho giọng này — chạy upload-local-voice-samples.ts" },
+        { status: 404 },
+      );
+    }
+    return NextResponse.redirect(url, {
+      status: 302,
+      headers: { "cache-control": "private, max-age=3600" },
+    });
   }
   // text tùy chỉnh (nghe thử lồng tiếng theo từng câu trong preview)
   const customText =
