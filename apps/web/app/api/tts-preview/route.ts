@@ -53,9 +53,46 @@ async function presignedVoiceSample(voice: string): Promise<string | null> {
   });
 }
 
-/** Nghe thử theo câu tùy ý: chỉ nguồn có hạn mức rộng (Edge free, GCloud 1-4tr ký tự). */
+/**
+ * Nghe thử theo câu tùy ý: chỉ nguồn có hạn mức rộng — Edge (free),
+ * GCloud (1-4tr ký tự), và VieNeu/Kokoro (chạy tại chỗ, hoàn toàn không tốn phí).
+ */
 function allowsCustomText(voice: string): boolean {
-  return EDGE_VOICE_IDS.has(voice) || gcloudVoiceName(voice) !== null;
+  return (
+    EDGE_VOICE_IDS.has(voice) ||
+    gcloudVoiceName(voice) !== null ||
+    vieneuVoiceName(voice) !== null ||
+    kokoroVoiceName(voice) !== null
+  );
+}
+
+/**
+ * Gọi service giọng chạy tại chỗ (pm2 `dichvideo-tts`).
+ * CHỈ tới được khi web chạy CÙNG máy với service (pnpm dev:web). Trên Vercel
+ * thì không — nên lỗi kết nối phải nói rõ điều đó thay vì báo chung chung.
+ */
+async function synthesizeLocalSample(
+  engine: "vieneu" | "kokoro",
+  voiceName: string,
+  text: string,
+): Promise<Buffer> {
+  const base = process.env.TTS_LOCAL_URL ?? "http://127.0.0.1:8123";
+  let res: Response;
+  try {
+    res = await fetch(`${base}/tts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ engine, voice: voiceName, text, speed: 1 }),
+    });
+  } catch {
+    throw new Error(
+      "Nghe thử theo câu cho giọng VieNeu/Kokoro chỉ chạy khi web mở trên chính " +
+        "máy cài worker (pnpm dev:web). Lồng tiếng cả video thì vẫn chạy bình thường " +
+        "vì worker nằm sẵn trên máy đó.",
+    );
+  }
+  if (!res.ok) throw new Error(`Service giọng nội bộ ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 async function synthesizeEdge(voice: string, text: string): Promise<Buffer> {
@@ -141,10 +178,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Giọng không hợp lệ" }, { status: 400 });
   }
 
-  // VieNeu/Kokoro chạy trên máy có worker — Vercel không gọi tới được, nên nghe
-  // thử dùng mẫu đã sinh sẵn trên R2 (apps/worker/scripts/upload-local-voice-samples.ts).
-  const local = vieneuVoiceName(voice) !== null || kokoroVoiceName(voice) !== null;
-  if (local) {
+  // text tùy chỉnh (nghe thử lồng tiếng theo từng câu trong preview)
+  const customText =
+    req.nextUrl.searchParams.get("text")?.trim().slice(0, MAX_PREVIEW_TEXT) || null;
+  if (customText && !allowsCustomText(voice)) {
+    return NextResponse.json(
+      { error: "Nghe thử theo câu chỉ hỗ trợ giọng thường / Google Cloud / VieNeu / Kokoro" },
+      { status: 400 },
+    );
+  }
+
+  const vieneu = vieneuVoiceName(voice);
+  const kokoro = kokoroVoiceName(voice);
+  // Nghe thử GIỌNG (không kèm câu) → mẫu sinh sẵn trên R2: luôn có, không phụ
+  // thuộc máy user bật hay không.
+  // CÓ kèm câu (studio đọc từng dòng phụ đề) thì BẮT BUỘC tổng hợp thật — trước
+  // đây chỗ này trả mẫu R2 nên mọi dòng đều phát cùng một câu "Xin chào…",
+  // trông như lồng tiếng không đọc theo video.
+  if ((vieneu || kokoro) && !customText) {
     const url = await presignedVoiceSample(voice);
     if (!url) {
       return NextResponse.json(
@@ -156,15 +207,6 @@ export async function GET(req: NextRequest) {
       status: 302,
       headers: { "cache-control": "private, max-age=3600" },
     });
-  }
-  // text tùy chỉnh (nghe thử lồng tiếng theo từng câu trong preview)
-  const customText =
-    req.nextUrl.searchParams.get("text")?.trim().slice(0, MAX_PREVIEW_TEXT) || null;
-  if (customText && !allowsCustomText(voice)) {
-    return NextResponse.json(
-      { error: "Nghe thử theo câu chỉ hỗ trợ giọng thường / Google Cloud" },
-      { status: 400 },
-    );
   }
 
   const cacheKey = customText ? `${voice}:${customText}` : voice;
@@ -187,7 +229,14 @@ export async function GET(req: NextRequest) {
     const gcloud = gcloudVoiceName(voice);
     const viettel = viettelVoiceName(voice);
     const fpt = fptVoiceName(voice);
-    if (gemini) {
+    if (vieneu || kokoro) {
+      body = await synthesizeLocalSample(
+        vieneu ? "vieneu" : "kokoro",
+        (vieneu ?? kokoro)!,
+        customText ?? VI_SAMPLE,
+      );
+      type = "audio/wav";
+    } else if (gemini) {
       body = await synthesizeGeminiSample(gemini);
       type = "audio/wav";
     } else if (eleven) {

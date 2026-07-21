@@ -29,35 +29,16 @@ export interface VoiceSelection {
 const T = {
   vi: {
     providerOptions: [
-      { value: "edge", label: "Giọng thường — miễn phí (322 giọng, mọi quốc gia)" },
-      {
-        value: "vieneu",
-        label: `VieNeu — giọng Việt bản địa 48kHz (${VIENEU_VOICES.length} giọng, miễn phí)`,
-      },
-      {
-        value: "kokoro",
-        label: `Kokoro — giọng Việt nhẹ, đọc nhanh (${KOKORO_VOICES.length} giọng, miễn phí)`,
-      },
-      {
-        value: "gcloud",
-        label: `Google Cloud — ${GCLOUD_VOICES.length} giọng Việt (key riêng, free 1-4tr ký tự/tháng)`,
-      },
-      {
-        value: "eleven",
-        label: `ElevenLabs — Adam, Rachel... (${ELEVEN_VOICES.length} giọng, key riêng, free ~10 phút/tháng)`,
-      },
-      {
-        value: "viettel",
-        label: `Viettel AI — giọng Việt bản địa (${VIETTEL_VOICES.length} giọng, key riêng)`,
-      },
-      {
-        value: "fpt",
-        label: `FPT.AI — giọng Việt đủ 3 miền (${FPT_VOICES.length} giọng, key riêng)`,
-      },
-      {
-        value: "gemini",
-        label: `Giọng cao cấp AI — tiếng Việt diễn cảm (${GEMINI_VOICES.length} giọng, tính phí API)`,
-      },
+      // Nhãn ngắn: "Tên nguồn — mô tả 3-5 chữ (số giọng)". Chi tiết dài dòng
+      // (cần key gì, hạn mức bao nhiêu) đã có ở dòng hint bên dưới ô chọn.
+      { value: "vieneu", label: `VieNeu — Việt bản địa, nét nhất (${VIENEU_VOICES.length})` },
+      { value: "kokoro", label: `Kokoro — Việt, đọc nhanh (${KOKORO_VOICES.length})` },
+      { value: "edge", label: "Cơ bản — miễn phí, mọi thứ tiếng (322)" },
+      { value: "gcloud", label: `Google — Việt, rõ ràng (${GCLOUD_VOICES.length})` },
+      { value: "viettel", label: `Viettel — Việt bản địa (${VIETTEL_VOICES.length})` },
+      { value: "fpt", label: `FPT — Việt đủ 3 miền (${FPT_VOICES.length})` },
+      { value: "gemini", label: `Cao cấp — Việt diễn cảm (${GEMINI_VOICES.length})` },
+      { value: "eleven", label: `ElevenLabs — giọng Âu Mỹ (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
     providerLabel: "Loại giọng",
     elevenHint:
@@ -80,35 +61,14 @@ const T = {
   },
   en: {
     providerOptions: [
-      { value: "edge", label: "Standard voices — free (322 voices, every country)" },
-      {
-        value: "vieneu",
-        label: `VieNeu — native Vietnamese 48kHz (${VIENEU_VOICES.length} voices, free)`,
-      },
-      {
-        value: "kokoro",
-        label: `Kokoro — lightweight Vietnamese, fast (${KOKORO_VOICES.length} voices, free)`,
-      },
-      {
-        value: "gcloud",
-        label: `Google Cloud — ${GCLOUD_VOICES.length} Vietnamese voices (own key, free 1-4M chars/month)`,
-      },
-      {
-        value: "eleven",
-        label: `ElevenLabs — Adam, Rachel... (${ELEVEN_VOICES.length} voices, own key, free ~10 min/month)`,
-      },
-      {
-        value: "viettel",
-        label: `Viettel AI — native Vietnamese (${VIETTEL_VOICES.length} voices, own key)`,
-      },
-      {
-        value: "fpt",
-        label: `FPT.AI — Vietnamese, all 3 regions (${FPT_VOICES.length} voices, own key)`,
-      },
-      {
-        value: "gemini",
-        label: `Premium AI voices — expressive (${GEMINI_VOICES.length} voices, API charges apply)`,
-      },
+      { value: "vieneu", label: `VieNeu — native Vietnamese, sharpest (${VIENEU_VOICES.length})` },
+      { value: "kokoro", label: `Kokoro — Vietnamese, fast (${KOKORO_VOICES.length})` },
+      { value: "edge", label: "Basic — free, every language (322)" },
+      { value: "gcloud", label: `Google — Vietnamese, crisp (${GCLOUD_VOICES.length})` },
+      { value: "viettel", label: `Viettel — native Vietnamese (${VIETTEL_VOICES.length})` },
+      { value: "fpt", label: `FPT — Vietnamese, 3 regions (${FPT_VOICES.length})` },
+      { value: "gemini", label: `Premium — expressive Vietnamese (${GEMINI_VOICES.length})` },
+      { value: "eleven", label: `ElevenLabs — Western voices (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
     providerLabel: "Voice type",
     elevenHint:
