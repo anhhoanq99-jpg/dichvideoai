@@ -56,6 +56,7 @@ export function StyleModal({
       }
       onClose={onClose}
       wide
+      dock
       lang={lang}
     >
       <div className="space-y-4">

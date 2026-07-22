@@ -9,6 +9,7 @@ export * from "./translate-styles";
 export * from "./dub-presets";
 export * from "./edge-voices";
 export * from "./audio";
+export * from "./support";
 export * from "./target-langs";
 export * from "./ass-builder";
 export * from "./video-sources";

@@ -86,6 +86,7 @@ export function CoverModal({
         </>
       }
       onClose={onClose}
+      dock
       lang={lang}
     >
       <div className="space-y-4">

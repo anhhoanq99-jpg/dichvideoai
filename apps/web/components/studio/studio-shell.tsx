@@ -648,6 +648,7 @@ export function StudioShell({
           }
           onClose={() => setModal(null)}
           wide
+          dock
           lang={lang}
         >
           <LogoFields settings={settings} onChange={patch} lang={lang} />

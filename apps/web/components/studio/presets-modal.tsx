@@ -122,6 +122,7 @@ export function PresetsModal({
         </>
       }
       onClose={onClose}
+      dock
       lang={lang}
     >
       <div className="space-y-4">

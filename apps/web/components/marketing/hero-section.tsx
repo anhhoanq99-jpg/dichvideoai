@@ -12,7 +12,7 @@ const T = {
     cta1: "Bắt đầu miễn phí — tặng 10.000 xu",
     cta2: "Xem cách hoạt động",
     trustPrefix: "Đang được tin dùng bởi",
-    trustCount: "2.500+",
+    trustCount: "1.500+",
     trustSuffix: "nhà sáng tạo nội dung",
     stats: [
       { value: "322+", label: "giọng lồng tiếng" },
@@ -28,7 +28,7 @@ const T = {
     cta1: "Start free — 10,000 credits included",
     cta2: "See how it works",
     trustPrefix: "Trusted by",
-    trustCount: "2,500+",
+    trustCount: "1,500+",
     trustSuffix: "content creators",
     stats: [
       { value: "322+", label: "AI voices" },

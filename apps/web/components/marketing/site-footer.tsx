@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Clapperboard } from "lucide-react";
+import { ArrowRight, Clapperboard, MessageCircle } from "lucide-react";
+import { SUPPORT_ZALO, SUPPORT_ZALO_URL } from "@dichvideo/shared";
 import type { Lang } from "@/lib/i18n";
 import { Reveal } from "./reveal";
 
@@ -15,6 +16,8 @@ const T = {
     navTerms: "Điều khoản",
     navPrivacy: "Bảo mật",
     navLogin: "Đăng nhập",
+    support: "Hỗ trợ",
+    zalo: "Zalo",
     copyright: "Người dùng chịu trách nhiệm bản quyền nội dung tải lên.",
   },
   en: {
@@ -28,6 +31,8 @@ const T = {
     navTerms: "Terms",
     navPrivacy: "Privacy",
     navLogin: "Sign in",
+    support: "Support",
+    zalo: "Zalo",
     copyright: "Users are responsible for the copyright of uploaded content.",
   },
 } as const;
@@ -71,6 +76,17 @@ export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
           <Link href="/dieu-khoan" className="hover:text-white">{t.navTerms}</Link>
           <Link href="/bao-mat" className="hover:text-white">{t.navPrivacy}</Link>
           <Link href="/login" className="hover:text-white">{t.navLogin}</Link>
+          {/* Bán qua chuyển khoản mà không có kênh liên hệ nào là rào cản
+              chuyển đổi lớn nhất — khách cần biết gọi ai khi tiền đã chuyển. */}
+          <a
+            href={SUPPORT_ZALO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-semibold text-white hover:text-primary-300"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {t.zalo} {SUPPORT_ZALO}
+          </a>
         </nav>
         <p className="text-xs text-neutral-500">
           © {new Date().getFullYear()} {t.brand}. {t.copyright}

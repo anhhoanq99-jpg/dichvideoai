@@ -12,7 +12,12 @@ import {
   Loader2,
   QrCode,
 } from "lucide-react";
-import { CREDIT_PRICING, topupPacks } from "@dichvideo/shared";
+import {
+  CREDIT_PRICING,
+  SUPPORT_ZALO,
+  SUPPORT_ZALO_URL,
+  topupPacks,
+} from "@dichvideo/shared";
 import { useToast } from "@/components/ui/toaster";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -41,6 +46,7 @@ const T = {
     comingSoon: "Sắp ra mắt",
     qrAlt: "QR chuyển khoản VietQR",
     waiting: "Đang chờ nhận tiền…",
+    stuckHelp: `Đã chuyển nhưng chưa nhận được xu? Nhắn Zalo ${SUPPORT_ZALO}`,
     // KHÔNG nêu tên biến .env: đây là màn hình khách trả tiền nhìn thấy, lộ cấu
     // hình nội bộ vừa mất chuyên nghiệp vừa cho biết hệ thống đang thiếu gì
     notConfigured:
@@ -80,6 +86,7 @@ const T = {
     comingSoon: "Coming soon",
     qrAlt: "VietQR bank transfer QR code",
     waiting: "Waiting for payment…",
+    stuckHelp: "Transferred but credits not showing? Message us on Zalo",
     notConfigured:
       "Top-up is temporarily unavailable. Please try again shortly or contact support for a manual top-up.",
     manualTitle: "Manual bank transfer details",
@@ -265,6 +272,16 @@ export function TopupPanel({
                     <Loader2 className="h-3.5 w-3.5 animate-spin [animation-duration:2s]" />
                     {t.waiting}
                   </p>
+                  {/* Đã chuyển tiền mà chưa được cộng xu là lúc khách hoảng
+                      nhất — phải có lối thoát ngay tại đây, đừng để họ đi tìm. */}
+                  <a
+                    href={SUPPORT_ZALO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-neutral-500 underline hover:text-primary-600 dark:text-neutral-400"
+                  >
+                    {t.stuckHelp}
+                  </a>
                 </>
               ) : (
                 <p className="rounded-md bg-amber-50 px-3 py-4 text-center text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">

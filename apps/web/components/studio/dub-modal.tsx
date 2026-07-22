@@ -80,6 +80,7 @@ export function DubModal({ dub, setDub, durationSec, onClose, lang = "vi" }: Dub
       }
       onClose={onClose}
       wide
+      dock
       lang={lang}
     >
       <div className="space-y-4">
