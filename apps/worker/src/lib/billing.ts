@@ -9,7 +9,7 @@ import {
 } from "@dichvideo/db";
 import {
   estimateJobCredits,
-  geminiVoiceName,
+  isPremiumVoice,
   type JobPayload,
   type JobType,
 } from "@dichvideo/shared";
@@ -47,7 +47,7 @@ export async function chargeJobStart(db: Db, payload: JobPayload, type: JobType)
     durationSec: video?.durationSec,
     lines,
     premiumVoice:
-      type === "dub" && geminiVoiceName(String(payload.params.voice ?? "")) !== null,
+      type === "dub" && isPremiumVoice(String(payload.params.voice ?? "")),
   });
   if (credits <= 0) return;
 

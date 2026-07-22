@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import type { z } from "zod";
-import { jobs, subtitleTracks } from "@dichvideo/db";
+import { jobs, schema, subtitleTracks } from "@dichvideo/db";
 import type { JobType } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
@@ -62,6 +62,44 @@ export async function parseJsonBody<S extends z.ZodType>(
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return { response: jsonError("Dữ liệu không hợp lệ", 400) };
   return { data: parsed.data };
+}
+
+/**
+ * Chặn TRƯỚC khi tạo job nếu không đủ xu.
+ *
+ * Trước đây route cứ tạo job, worker mới phát hiện thiếu rồi cho job fail —
+ * khách bấm "Xuất file" xong ngồi chờ để nhận về một job hỏng, đúng vào lúc họ
+ * đang muốn trả tiền. Trả 402 kèm SỐ LIỆU (cần bao nhiêu, có bao nhiêu, thiếu
+ * bao nhiêu) để giao diện mời nạp đúng số còn thiếu.
+ *
+ * Không thay thế việc trừ xu ở worker: giữa lúc kiểm tra và lúc worker chạy,
+ * số dư vẫn có thể tụt vì job khác. Đây là lớp lọc sớm cho trải nghiệm, còn
+ * chốt chặn thật vẫn nằm ở applyCreditDelta.
+ */
+export async function requireCredits(
+  userId: string,
+  needed: number,
+): Promise<{ response?: NextResponse; balance: number }> {
+  const [row] = await db
+    .select({ balance: schema.user.creditBalance })
+    .from(schema.user)
+    .where(eq(schema.user.id, userId));
+  const balance = row?.balance ?? 0;
+  if (balance >= needed) return { balance };
+
+  return {
+    balance,
+    response: NextResponse.json(
+      {
+        error: `Không đủ xu: cần ${needed.toLocaleString("vi-VN")}, bạn đang có ${balance.toLocaleString("vi-VN")}`,
+        code: "INSUFFICIENT_CREDITS",
+        needed,
+        balance,
+        shortfall: needed - balance,
+      },
+      { status: 402 },
+    ),
+  };
 }
 
 /** Track phụ đề chỉ hợp lệ khi thuộc đúng video (chặn dùng track chéo video). */

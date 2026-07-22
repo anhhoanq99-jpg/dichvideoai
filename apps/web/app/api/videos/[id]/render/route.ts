@@ -6,6 +6,7 @@ import {
   MAX_COVER_REGIONS,
   RENDER_FONTS,
   STYLE_PRESETS,
+  estimateJobCredits,
   isValidVoiceId,
 } from "@dichvideo/shared";
 import {
@@ -13,6 +14,7 @@ import {
   findVideoTrack,
   jsonError,
   parseJsonBody,
+  requireCredits,
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -108,6 +110,13 @@ export async function POST(
 
   const track = await findVideoTrack(body.data.trackId, video.id);
   if (!track) return jsonError("Track phụ đề không hợp lệ", 400);
+
+  // báo thiếu xu NGAY, đừng để khách chờ job rồi mới biết hỏng
+  const credits = await requireCredits(
+    session.user.id,
+    estimateJobCredits("render", { durationSec: video.durationSec }),
+  );
+  if (credits.response) return credits.response;
 
   const job = await createPipelineJob("render", video.id, session.user.id, body.data);
   return NextResponse.json({ ok: true, jobId: job.id });

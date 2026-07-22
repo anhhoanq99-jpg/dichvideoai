@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isValidVoiceId } from "@dichvideo/shared";
+import {
+  estimateJobCredits,
+  isPremiumVoice,
+  isValidVoiceId,
+} from "@dichvideo/shared";
 import {
   createPipelineJob,
   findVideoTrack,
   jsonError,
   parseJsonBody,
+  requireCredits,
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -41,6 +46,18 @@ export async function POST(
 
   const track = await findVideoTrack(body.data.trackId, video.id);
   if (!track) return jsonError("Track phụ đề không hợp lệ", 400);
+
+  // bao thieu xu NGAY, dung de khach cho job roi moi biet hong.
+  // Gia theo giong: nguon tinh tien theo ky tu (Gemini/ElevenLabs) dat hon.
+  const voice = String(body.data.voice ?? "");
+  const credits = await requireCredits(
+    session.user.id,
+    estimateJobCredits("dub", {
+      durationSec: video.durationSec,
+      premiumVoice: isPremiumVoice(voice),
+    }),
+  );
+  if (credits.response) return credits.response;
 
   const job = await createPipelineJob("dub", video.id, session.user.id, body.data);
   return NextResponse.json({ ok: true, jobId: job.id });

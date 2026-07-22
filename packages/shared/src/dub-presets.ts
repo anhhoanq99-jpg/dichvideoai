@@ -301,6 +301,23 @@ export function hasWideTtsQuota(id: string): boolean {
   return p === "edge" || p === "gcloud" || p === "vieneu" || p === "kokoro";
 }
 
+/**
+ * Giọng tính giá CAO CẤP khi lồng tiếng — nguồn tính tiền theo từng ký tự.
+ *
+ * Trước đây "cao cấp" nghĩa là "đúng Gemini", và định nghĩa đó bị chép lại ở 4
+ * nơi (worker trừ xu, 2 chỗ hiển thị giá, route tạo job). Hệ quả: lồng tiếng
+ * bằng ElevenLabs — nguồn ĐẮT NHẤT — lại bị tính đúng bằng giá Edge miễn phí.
+ * Gom về một hàm để không nơi nào lệch nơi nào nữa.
+ *
+ * Viettel/FPT KHÔNG nằm đây: hạn mức miễn phí của họ rất rộng (Viettel ~500.000
+ * ký tự/ngày) nên thực tế chưa tốn tiền theo lượt dùng.
+ * VieNeu/Kokoro chạy ngay trên máy mình nên không tốn gì.
+ */
+export function isPremiumVoice(id: string): boolean {
+  const p = voiceProvider(id);
+  return p === "gemini" || p === "eleven";
+}
+
 /** Id giọng thuộc một trong các catalog đã hỗ trợ — dùng validate mọi API. */
 export function isValidVoiceId(id: string): boolean {
   return (

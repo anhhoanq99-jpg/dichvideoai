@@ -2,9 +2,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloudUpload, GraduationCap, Loader2, Play, X } from "lucide-react";
+import { CloudUpload, Gift, GraduationCap, Loader2, Play, X } from "lucide-react";
 import { BrandMark } from "@/components/brand-logo";
-import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
+import {
+  CREDIT_PRICING,
+  UPLOAD_ALLOWED_TYPES,
+  UPLOAD_MAX_BYTES,
+} from "@dichvideo/shared";
+
+/**
+ * Xu cho MỘT phút Việt hóa trọn gói — tính từ đơn giá thật thay vì gõ số cứng,
+ * để lời chào không bao giờ nói lệch bảng giá khi giá đổi.
+ * Trọn gói 1 phút ≈ tách phụ đề cứng + render + lồng tiếng thường + ~15 dòng dịch
+ * (cùng công thức trang Nạp xu đang dùng).
+ */
+const FULL_LOCALIZE_PER_MIN =
+  CREDIT_PRICING.ocrPerMin +
+  CREDIT_PRICING.renderPerMin +
+  CREDIT_PRICING.dubEdgePerMin +
+  15 * CREDIT_PRICING.translatePerLine;
 import {
   useMultipartUpload,
   type PipelineSettings,
@@ -28,6 +44,10 @@ const T = {
   vi: {
     title: "Dịch & lồng tiếng video",
     tutorialTitle: "Video hướng dẫn sử dụng",
+    welcomeTitle: "Chào bạn! Tài khoản đã có sẵn xu để dùng thử",
+    welcomeBody: (xu: string, phut: string) =>
+      `Bạn đang có ${xu} xu — đủ Việt hóa trọn gói khoảng ${phut} phút video. Xu không bao giờ hết hạn.`,
+    welcomeHint: "Chưa có video sẵn? Dán link YouTube/TikTok/Facebook ở ô bên dưới là làm được ngay.",
     errFormat: (name: string) =>
       `"${name}": định dạng không hỗ trợ (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": vượt giới hạn 2GB.`,
@@ -42,6 +62,11 @@ const T = {
   en: {
     title: "Translate & dub videos",
     tutorialTitle: "How-to video",
+    welcomeTitle: "Welcome! Your account already has trial credits",
+    welcomeBody: (xu: string, phut: string) =>
+      `You have ${xu} credits — enough to fully localize about ${phut} minutes of video. Credits never expire.`,
+    welcomeHint:
+      "No video handy? Paste a YouTube/TikTok/Facebook link in the box below.",
     errFormat: (name: string) =>
       `"${name}": unsupported format (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": exceeds the 2GB limit.`,
@@ -111,9 +136,14 @@ function readDuration(file: File): Promise<number | null> {
 export function UploadPageClient({
   lang = "vi",
   initialUrl = "",
+  firstTime = false,
+  balance = 0,
 }: {
   lang?: Lang;
   initialUrl?: string;
+  /** chưa có video nào → hiện lời chào + số xu đang có */
+  firstTime?: boolean;
+  balance?: number;
 }) {
   const t = T[lang];
   const { state, upload, cancel } = useMultipartUpload();
@@ -199,6 +229,25 @@ export function UploadPageClient({
           {t.title}
         </h1>
       </div>
+
+      {/* Lần đầu vào: nói rõ đang có bao nhiêu xu và làm được gì với số đó.
+          Con số quy đổi tính từ ĐƠN GIÁ THẬT nên không bao giờ lệch bảng giá. */}
+      {firstTime && balance > 0 && (
+        <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 dark:border-primary-900 dark:bg-primary-950/30">
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary-800 dark:text-primary-200">
+            <Gift className="h-4 w-4 shrink-0" /> {t.welcomeTitle}
+          </p>
+          <p className="mt-1.5 text-sm text-primary-900/80 dark:text-primary-100/80">
+            {t.welcomeBody(
+              balance.toLocaleString("vi-VN"),
+              Math.max(1, Math.floor(balance / FULL_LOCALIZE_PER_MIN)).toLocaleString("vi-VN"),
+            )}
+          </p>
+          <p className="mt-1 text-xs text-primary-800/70 dark:text-primary-200/70">
+            {t.welcomeHint}
+          </p>
+        </div>
+      )}
 
       {/* video hướng dẫn — admin thêm ở trang Quản trị; chỉ hiện khi đã có */}
       <TutorialVideo title={t.tutorialTitle} />

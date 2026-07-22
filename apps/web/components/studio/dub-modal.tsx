@@ -2,11 +2,15 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { Mic } from "lucide-react";
-import { estimateJobCredits } from "@dichvideo/shared";
+import { estimateJobCredits, isPremiumVoice } from "@dichvideo/shared";
 import { Modal } from "@/components/ui/modal";
 import { fieldLabelClass } from "@/components/ui/form-styles";
 import type { Lang } from "@/lib/i18n";
-import { VoicePicker, type VoiceSelection } from "@/components/dub/voice-picker";
+import {
+  VoicePicker,
+  resolveVoice,
+  type VoiceSelection,
+} from "@/components/dub/voice-picker";
 import type { DubConfig } from "./export-modal";
 
 const T = {
@@ -247,7 +251,7 @@ export function DubModal({ dub, setDub, durationSec, onClose, lang = "vi" }: Dub
                 ={" "}
                 {estimateJobCredits("dub", {
                   durationSec,
-                  premiumVoice: dub.selection.provider === "gemini",
+                  premiumVoice: isPremiumVoice(resolveVoice(dub.selection)),
                 }).toLocaleString("vi-VN")}{" "}
                 {t.estTotalSuffix}
               </p>

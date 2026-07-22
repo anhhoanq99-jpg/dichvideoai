@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clapperboard, Download, FileText } from "lucide-react";
+import { Clapperboard, Download, FileText, Wallet } from "lucide-react";
 import {
   estimateJobCredits,
+  isPremiumVoice,
   type CoverRegion,
   type JobStatus,
 } from "@dichvideo/shared";
@@ -13,6 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import type { RenderSettings } from "@/components/render/render-settings";
 import { resolveVoice, type VoiceSelection } from "@/components/dub/voice-picker";
 import type { Lang } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 const T = {
   vi: {
@@ -28,6 +30,9 @@ const T = {
     wysiwyg:
       "Video xuất đúng như những gì bạn thấy trong khung xem trước. Job lỗi được hoàn xu tự động.",
     exportNow: "Xuất video ngay",
+    balance: "Xu của bạn:",
+    shortfall: (n: string) => `Còn thiếu ${n} xu`,
+    topupNow: "Nạp thêm xu",
     rendering: "Đang render video…",
     dubbing: "Đang lồng tiếng lên bản đã render…",
     done: "Hoàn tất! Video đã sẵn sàng.",
@@ -54,6 +59,9 @@ const T = {
     wysiwyg:
       "The export matches exactly what you see in the preview. Failed jobs are refunded automatically.",
     exportNow: "Export now",
+    balance: "Your credits:",
+    shortfall: (n: string) => `${n} credits short`,
+    topupNow: "Top up",
     rendering: "Rendering video…",
     dubbing: "Dubbing over the rendered video…",
     done: "Done! Your video is ready.",
@@ -144,9 +152,34 @@ export function ExportModal({
     dub.enabled && durationSec
       ? estimateJobCredits("dub", {
           durationSec,
-          premiumVoice: dub.selection.provider === "gemini",
+          premiumVoice: isPremiumVoice(resolveVoice(dub.selection)),
         })
       : 0;
+
+  /**
+   * Số dư để đối chiếu với chi phí NGAY tại đây.
+   * Trước đây khách bấm "Xuất video ngay" rồi mới biết thiếu xu — đúng vào lúc
+   * họ sẵn sàng trả tiền thì lại nhận về một job hỏng. Giờ thấy trước, và thiếu
+   * thì có ngay nút nạp.
+   */
+  const [balance, setBalance] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/credits/balance")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && typeof d?.balance === "number") setBalance(d.balance);
+      })
+      .catch(() => {
+        // không lấy được số dư thì im lặng — server vẫn chặn bằng 402
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const totalCredits = renderCredits + dubCredits;
+  const shortfall = balance !== null ? Math.max(0, totalCredits - balance) : 0;
 
   // render xong + có lồng tiếng → chờ job dub nối tiếp hoàn tất
   useEffect(() => {
@@ -277,8 +310,23 @@ export function ExportModal({
               </li>
             )}
             <li className="border-t border-neutral-200 pt-1.5 font-semibold dark:border-neutral-700">
-              {t.total} {(renderCredits + dubCredits).toLocaleString("vi-VN")} xu
+              {t.total} {totalCredits.toLocaleString("vi-VN")} xu
             </li>
+            {balance !== null && (
+              <li
+                className={cn(
+                  "flex items-center justify-between border-t border-neutral-200 pt-1.5 text-xs dark:border-neutral-700",
+                  shortfall > 0
+                    ? "font-semibold text-red-600 dark:text-red-400"
+                    : "text-neutral-500 dark:text-neutral-400",
+                )}
+              >
+                <span>
+                  {t.balance} {balance.toLocaleString("vi-VN")} xu
+                </span>
+                {shortfall > 0 && <span>{t.shortfall(shortfall.toLocaleString("vi-VN"))}</span>}
+              </li>
+            )}
           </ul>
           {missingRegions && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
@@ -288,13 +336,24 @@ export function ExportModal({
           <p className="text-xs text-neutral-400">
             {t.wysiwyg}
           </p>
-          <button
-            type="button"
-            onClick={startExport}
-            className="w-full rounded-md bg-success-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-success-800"
-          >
-            {t.exportNow}
-          </button>
+          {shortfall > 0 ? (
+            // thiếu xu → mời nạp thay vì để bấm rồi nhận lỗi
+            <a
+              href="/credits"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800"
+            >
+              <Wallet className="h-4 w-4" />
+              {t.topupNow}
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={startExport}
+              className="w-full rounded-md bg-success-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-success-800"
+            >
+              {t.exportNow}
+            </button>
+          )}
         </div>
       )}
 
