@@ -18,6 +18,42 @@ interface InitResponse {
 const PARALLEL = 4;
 const PART_RETRIES = 3;
 
+/**
+ * Đọc JSON mà KHÔNG bao giờ ném "Unexpected end of JSON input".
+ *
+ * Trước đây mọi bước upload đều gọi thẳng `res.json()`. Khi một route chết vì
+ * lỗi không bắt được, Next trả về thân rỗng (hoặc HTML), `res.json()` ném, và
+ * người dùng nhận đúng câu vô nghĩa "Failed to execute 'json' on 'Response'" —
+ * lỗi THẬT bị nuốt sạch, không biết bước nào hỏng, mã lỗi bao nhiêu.
+ * Giờ luôn kèm mã HTTP + đoạn đầu thân phản hồi để lần sau lỗi tự khai báo.
+ */
+async function readJson<T>(res: Response, what: string): Promise<T> {
+  const raw = await res.text();
+  if (!raw.trim()) {
+    throw new Error(`${what}: máy chủ trả về rỗng (HTTP ${res.status})`);
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`${what}: phản hồi không hợp lệ (HTTP ${res.status}) — ${raw.slice(0, 120)}`);
+  }
+}
+
+/** Dựng Error từ phản hồi lỗi, ưu tiên `error` do server gửi. */
+async function httpError(res: Response, fallback: string): Promise<Error> {
+  const raw = await res.text().catch(() => "");
+  if (raw.trim()) {
+    try {
+      const data = JSON.parse(raw) as { error?: string };
+      if (data.error) return new Error(data.error);
+    } catch {
+      // không phải JSON → dùng nguyên văn bên dưới
+    }
+    return new Error(`${fallback} (HTTP ${res.status}) — ${raw.slice(0, 120)}`);
+  }
+  return new Error(`${fallback} (HTTP ${res.status})`);
+}
+
 async function putPartWithRetry(
   url: string,
   blob: Blob,
@@ -88,11 +124,8 @@ export function useMultipartUpload() {
         }),
         signal: abort.signal,
       });
-      if (!initRes.ok) {
-        const { error } = await initRes.json();
-        throw new Error(error ?? "Không khởi tạo được upload");
-      }
-      const info: InitResponse = await initRes.json();
+      if (!initRes.ok) throw await httpError(initRes, "Không khởi tạo được upload");
+      const info = await readJson<InitResponse>(initRes, "Không khởi tạo được upload");
       uploadInfoRef.current = info;
 
       // 2. slice into parts
@@ -113,8 +146,11 @@ export function useMultipartUpload() {
               body: JSON.stringify({ uploadId: info.uploadId, partNumbers: [partNumber] }),
               signal: abort.signal,
             });
-            if (!urlRes.ok) throw new Error("Không lấy được URL upload");
-            const { urls } = await urlRes.json();
+            if (!urlRes.ok) throw await httpError(urlRes, "Không lấy được URL upload");
+            const { urls } = await readJson<{ urls: { url: string }[] }>(
+              urlRes,
+              "Không lấy được URL upload",
+            );
             const blob = file.slice(
               (partNumber - 1) * UPLOAD_PART_SIZE,
               Math.min(partNumber * UPLOAD_PART_SIZE, file.size),
@@ -142,10 +178,7 @@ export function useMultipartUpload() {
         }),
         signal: abort.signal,
       });
-      if (!doneRes.ok) {
-        const { error } = await doneRes.json();
-        throw new Error(error ?? "Không hoàn tất được upload");
-      }
+      if (!doneRes.ok) throw await httpError(doneRes, "Không hoàn tất được upload");
 
       setState({ phase: "done", videoId: info.videoId });
       uploadInfoRef.current = null;

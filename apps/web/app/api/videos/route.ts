@@ -26,9 +26,21 @@ export async function POST(req: NextRequest) {
   const rl = await rateLimit("video-create", callerId(req, session.user.id), 20, 60);
   if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
 
-  const body = initSchema.safeParse(await req.json());
+  // req.json() ném nếu thân request hỏng → phải bắt, không thì route đổ ra 500
+  // với thân RỖNG và client chỉ nhận được "Unexpected end of JSON input"
+  const raw = await req.json().catch(() => null);
+  const body = initSchema.safeParse(raw);
   if (!body.success) {
-    return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
+    // nói rõ sai ở đâu thay vì "Dữ liệu không hợp lệ" chung chung — tên file
+    // Douyin/TikTok kèm hashtag rất dễ vượt 255 ký tự
+    const issue = body.error.issues[0];
+    const detail =
+      issue?.path?.[0] === "name"
+        ? "Tên file quá dài hoặc trống — đổi tên ngắn lại rồi tải lên"
+        : issue?.path?.[0] === "sizeBytes"
+          ? "Video vượt giới hạn 2GB"
+          : "Dữ liệu không hợp lệ";
+    return NextResponse.json({ error: detail }, { status: 400 });
   }
   const ext = UPLOAD_ALLOWED_TYPES[body.data.contentType];
   if (!ext) {
@@ -41,23 +53,38 @@ export async function POST(req: NextRequest) {
   const uploadIp =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
 
-  const [video] = await db
-    .insert(videos)
-    .values({
-      userId: session.user.id,
-      originalName: body.data.name,
-      sizeBytes: body.data.sizeBytes,
-      status: "uploading",
-      uploadIp,
-    })
-    .returning();
+  /**
+   * Bọc phần chạm DB + R2: nếu R2 thiếu cấu hình hoặc DB chớp, để lỗi ném ra
+   * ngoài thì Next trả 500 THÂN RỖNG và người dùng chỉ thấy
+   * "Unexpected end of JSON input" — không biết hỏng ở đâu.
+   */
+  try {
+    const [video] = await db
+      .insert(videos)
+      .values({
+        userId: session.user.id,
+        originalName: body.data.name,
+        sizeBytes: body.data.sizeBytes,
+        status: "uploading",
+        uploadIp,
+      })
+      .returning();
 
-  const key = `uploads/${session.user.id}/${video.id}/source.${ext}`;
-  const uploadId = await createMultipart(key, body.data.contentType);
+    const key = `uploads/${session.user.id}/${video.id}/source.${ext}`;
+    const uploadId = await createMultipart(key, body.data.contentType);
 
-  await db.update(videos).set({ r2Key: key }).where(eq(videos.id, video.id));
+    await db.update(videos).set({ r2Key: key }).where(eq(videos.id, video.id));
 
-  return NextResponse.json({ videoId: video.id, key, uploadId });
+    return NextResponse.json({ videoId: video.id, key, uploadId });
+  } catch (err) {
+    console.error("[videos/init] khong tao duoc upload:", err);
+    return NextResponse.json(
+      {
+        error: `Không khởi tạo được upload: ${err instanceof Error ? err.message : String(err)}`,
+      },
+      { status: 500 },
+    );
+  }
 }
 
 /** List own videos. */
