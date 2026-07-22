@@ -286,6 +286,21 @@ export function edgeFallbackVoice(voiceId: string): string {
   return found?.gender === "M" ? male : female;
 }
 
+/**
+ * Giọng được phép đọc văn bản TÙY Ý mà không tính xu — chỉ nguồn có hạn mức
+ * rộng hoặc miễn phí hẳn:
+ *   edge (miễn phí) · gcloud (1-4tr ký tự/tháng) · vieneu + kokoro (chạy tại chỗ)
+ *
+ * ElevenLabs và Gemini CỐ TÌNH không nằm đây: tính tiền theo ký tự, nên cho đọc
+ * tự do là ai đăng ký một tài khoản cũng tiêu được tiền thật của mình không giới hạn.
+ * Dùng chung cho /api/tts-preview và /api/voice-clone/speak — hai chỗ này mà lệch
+ * tiêu chí thì chỗ lỏng hơn thành lỗ hổng.
+ */
+export function hasWideTtsQuota(id: string): boolean {
+  const p = voiceProvider(id);
+  return p === "edge" || p === "gcloud" || p === "vieneu" || p === "kokoro";
+}
+
 /** Id giọng thuộc một trong các catalog đã hỗ trợ — dùng validate mọi API. */
 export function isValidVoiceId(id: string): boolean {
   return (

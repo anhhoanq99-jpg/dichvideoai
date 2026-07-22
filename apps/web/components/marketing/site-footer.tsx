@@ -6,7 +6,7 @@ import { Reveal } from "./reveal";
 const T = {
   vi: {
     ctaH2: "Sẵn sàng Việt hóa video đầu tiên?",
-    ctaP: "Đăng nhập bằng Google, nhận 10.000 credits dùng thử — không cần thẻ.",
+    ctaP: "Đăng nhập bằng Google, nhận 10.000 xu dùng thử — không cần thẻ.",
     ctaBtn: "Bắt đầu ngay",
     brand: "Dịch Video AI",
     navFeatures: "Tính năng",

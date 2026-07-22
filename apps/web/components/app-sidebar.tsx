@@ -136,9 +136,6 @@ export function AppSidebar({ lang = "vi", isAdmin }: { lang?: Lang; isAdmin?: bo
         <BrandLogo />
       </div>
       <NavLinks lang={lang} isAdmin={isAdmin} />
-      <p className="border-t border-neutral-100 p-3 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600">
-        {lang === "vi" ? "Bản dựng Phase 1 — nội bộ" : "Phase 1 build — internal"}
-      </p>
     </aside>
   );
 }

@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
@@ -159,7 +160,18 @@ export const creditLedger = pgTable(
     balanceAfter: integer("balance_after").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
+  (t) => [
+    index("credit_ledger_user_idx").on(t.userId, t.createdAt),
+    /**
+     * Chặn cộng/trừ xu TRÙNG ở tầng DB — thứ duy nhất đúng khi có tranh chấp.
+     * SePay retry webhook lúc timeout: kiểm tra trùng bằng SELECT trước giao
+     * dịch thì cả hai lần gọi đều thấy "chưa có", và user được cộng tiền 2 lần.
+     * `reason` NẰM TRONG khóa vì một job ghi cả job_charge lẫn job_refund dưới
+     * cùng (ref_type="job", ref_id=jobId) — thiếu nó là chặn mất hoàn xu.
+     * Dòng có ref_type/ref_id NULL không bị ràng buộc (Postgres coi NULL khác nhau).
+     */
+    uniqueIndex("credit_ledger_ref_uidx").on(t.refType, t.refId, t.reason),
+  ],
 );
 
 /** Giọng nói nhân bản của user (Instant Voice Cloning — hiện qua ElevenLabs). */

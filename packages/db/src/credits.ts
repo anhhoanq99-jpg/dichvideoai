@@ -23,9 +23,23 @@ export interface CreditDelta {
 }
 
 /**
- * The ONLY way to change a balance. Locks the user row, updates the cached
- * balance and appends a ledger row in one transaction so the invariant
+ * The ONLY way to change a balance. Locks the user row, appends a ledger row and
+ * updates the cached balance in one transaction so the invariant
  * `user.creditBalance == SUM(credit_ledger.delta)` always holds.
+ *
+ * Idempotent whenever `refType`+`refId` are given: the ledger row goes in FIRST,
+ * guarded by `credit_ledger_ref_uidx` UNIQUE (ref_type, ref_id, reason). If that
+ * row already exists the insert is skipped, the balance is left alone and this
+ * returns `null`.
+ *
+ * Order matters. Checking for a duplicate with a SELECT before the transaction
+ * loses the race: SePay retries a webhook on timeout, both deliveries see "no
+ * row yet", and the user gets credited twice for one bank transfer. Letting the
+ * DB constraint decide is the only version that holds under concurrency.
+ *
+ * `reason` is part of the key on purpose — a job writes both `job_charge` and
+ * `job_refund` under the same (refType="job", refId=jobId), and those two must
+ * not collide with each other.
  */
 export async function applyCreditDelta(db: Db, input: CreditDelta) {
   return db.transaction(async (tx) => {
@@ -42,11 +56,6 @@ export async function applyCreditDelta(db: Db, input: CreditDelta) {
       throw new InsufficientCreditsError(-input.delta, current.balance);
     }
 
-    await tx
-      .update(user)
-      .set({ creditBalance: balanceAfter, updatedAt: new Date() })
-      .where(eq(user.id, input.userId));
-
     const [entry] = await tx
       .insert(creditLedger)
       .values({
@@ -57,7 +66,16 @@ export async function applyCreditDelta(db: Db, input: CreditDelta) {
         refId: input.refId,
         balanceAfter,
       })
+      .onConflictDoNothing()
       .returning();
+
+    // đã có dòng y hệt → lần gọi trùng, không đụng vào số dư
+    if (!entry) return null;
+
+    await tx
+      .update(user)
+      .set({ creditBalance: balanceAfter, updatedAt: new Date() })
+      .where(eq(user.id, input.userId));
 
     return entry;
   });

@@ -10,6 +10,7 @@ import {
   parseJsonBody,
   requireOwnVideo,
 } from "@/lib/api-helpers";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const schema = z.object({
   style: z.enum(TRANSLATION_STYLE_IDS).default("natural"),
@@ -24,6 +25,10 @@ export async function POST(
 ) {
   const auth = await requireOwnVideo(params);
   if (auth.response) return auth.response;
+
+  // route tao job = ton CPU worker + tien API; chan spam/script
+  const rl = await rateLimit("job-translate", callerId(req, auth.session.user.id), 10, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
   const { session, video } = auth;
 
   const [original] = await db

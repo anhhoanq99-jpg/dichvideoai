@@ -7,6 +7,7 @@ import {
   parseJsonBody,
   requireOwnVideo,
 } from "@/lib/api-helpers";
+import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 const schema = z.object({
   method: z.enum(EXTRACT_METHODS),
@@ -19,6 +20,10 @@ export async function POST(
 ) {
   const auth = await requireOwnVideo(params);
   if (auth.response) return auth.response;
+
+  // route tao job = ton CPU worker + tien API; chan spam/script
+  const rl = await rateLimit("job-extract", callerId(req, auth.session.user.id), 10, 60);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
   const { session, video } = auth;
   if (video.status !== "uploaded" && video.status !== "ready") {
     return jsonError("Video chưa sẵn sàng để trích xuất (đang tải lên hoặc đang xử lý)", 409);

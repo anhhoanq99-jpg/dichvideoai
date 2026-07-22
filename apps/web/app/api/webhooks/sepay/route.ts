@@ -1,7 +1,8 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { applyCreditDelta, creditLedger, schema } from "@dichvideo/db";
+import { applyCreditDelta, schema } from "@dichvideo/db";
 import { VND_PER_CREDIT, topupBonusPercent } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 
@@ -23,8 +24,15 @@ export async function POST(req: NextRequest) {
   if (!key) {
     return NextResponse.json({ error: "SePay chưa được cấu hình" }, { status: 503 });
   }
+  // so sánh theo thời gian hằng định — endpoint này chuyển tiền, đừng để lộ
+  // độ dài/tiền tố khóa qua thời gian phản hồi
   const authz = req.headers.get("authorization") ?? "";
-  if (authz !== `Apikey ${key}`) {
+  const expected = `Apikey ${key}`;
+  const authzBuf = Buffer.from(authz);
+  const expectedBuf = Buffer.from(expected);
+  const authorized =
+    authzBuf.length === expectedBuf.length && timingSafeEqual(authzBuf, expectedBuf);
+  if (!authorized) {
     return NextResponse.json({ error: "Sai khóa webhook" }, { status: 401 });
   }
 
@@ -37,13 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, skipped: "not incoming" });
   }
 
-  // idempotent theo id giao dịch SePay
   const refId = String(tx.id);
-  const [dup] = await db
-    .select({ id: creditLedger.id })
-    .from(creditLedger)
-    .where(and(eq(creditLedger.refType, "sepay_tx"), eq(creditLedger.refId, refId)));
-  if (dup) return NextResponse.json({ success: true, skipped: "duplicate" });
 
   // tìm mã DVxxxxxxxx trong nội dung CK (ngân hàng thường viết hoa, bỏ dấu cách)
   const haystack = `${tx.content ?? ""} ${tx.description ?? ""}`.replace(/\s+/g, "");
@@ -65,13 +67,20 @@ export async function POST(req: NextRequest) {
   const credits = Math.floor(base * (1 + topupBonusPercent(tx.transferAmount) / 100));
   if (credits <= 0) return NextResponse.json({ success: true, skipped: "amount too small" });
 
-  await applyCreditDelta(db, {
+  /**
+   * Chống cộng trùng bằng RÀNG BUỘC DB, không bằng SELECT trước đó.
+   * SePay retry webhook khi timeout: hai lần gọi song song đều thấy "chưa có
+   * dòng nào" rồi cùng cộng tiền — khách nạp 1 lần được cộng 2 lần.
+   * `credit_ledger_ref_uidx` chặn ở tầng dưới cùng; trùng thì trả null.
+   */
+  const entry = await applyCreditDelta(db, {
     userId: userRow.id,
     delta: credits,
     reason: "topup",
     refType: "sepay_tx",
     refId,
   });
+  if (!entry) return NextResponse.json({ success: true, skipped: "duplicate" });
 
   return NextResponse.json({ success: true, credits });
 }

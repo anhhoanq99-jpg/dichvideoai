@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { isValidVoiceId } from "@dichvideo/shared";
+import { hasWideTtsQuota, isValidVoiceId } from "@dichvideo/shared";
 import { clonedVoices } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
@@ -48,8 +48,21 @@ export async function POST(req: NextRequest) {
       return audio(body, "audio/mpeg");
     }
 
-    // giọng có sẵn trong catalog (322 Edge + 40 Google + Adam… + Gemini)
+    // giọng có sẵn trong catalog
     if (!isValidVoiceId(voiceId)) return jsonError("Giọng không hợp lệ", 400);
+    /**
+     * Chặn ElevenLabs/Gemini ở công cụ đọc thử: hai nguồn này tính tiền theo ký
+     * tự mà route không trừ xu, nên trước đây ai đăng ký một tài khoản cũng đọc
+     * được 2.000 ký tự mỗi lượt, 15 lượt/phút, vô hạn — tiền thật của mình.
+     * Cùng tiêu chí với /api/tts-preview.
+     */
+    if (!hasWideTtsQuota(voiceId)) {
+      return jsonError(
+        "Giọng cao cấp chỉ dùng được khi lồng tiếng video (có tính xu). " +
+          "Ở đây hãy chọn giọng Cơ bản, SubdubAI, Vie hoặc Ko.",
+        403,
+      );
+    }
     const { body, type } = await synthesizeVoice(voiceId, text);
     return audio(body, type);
   } catch (err) {

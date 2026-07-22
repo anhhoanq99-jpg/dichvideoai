@@ -61,19 +61,41 @@ worker.on("completed", async (job) => {
 
 worker.on("failed", async (job, err) => {
   if (!job) return;
+
+  // hết lượt retry, hoặc lỗi không thể phục hồi (fail ngay lần đầu)
+  const attempts = job.opts.attempts ?? 1;
+  const isFinal = job.attemptsMade >= attempts || err.name === "UnrecoverableError";
+
+  /**
+   * CHƯA phải lần cuối thì TUYỆT ĐỐI không đánh dấu "failed".
+   * Web coi "failed" là trạng thái kết thúc: SSE đóng luôn kết nối và studio
+   * dừng hẳn vòng theo dõi. Ghi failed ở lần thử 1/3 nghĩa là một trục trặc
+   * thoáng qua (R2 chớp, Gemini lag) hiện ngay màn "Xử lý thất bại — đã hoàn xu"
+   * cho khách, trong khi vài giây sau job chạy lại và xong xuôi. Khách thấy hỏng
+   * còn hệ thống thì đang chạy bình thường.
+   * Vẫn ghi `error` để còn dấu vết gỡ lỗi, nhưng giữ nguyên trạng thái đang chạy.
+   */
+  if (!isFinal) {
+    await db
+      .update(jobs)
+      .set({ error: err.message })
+      .where(eq(jobs.id, job.data.jobId));
+    logger.warn(
+      { jobId: job.data.jobId, type: job.name, attempt: job.attemptsMade, attempts, err: err.message },
+      "job lỗi tạm — sẽ thử lại, chưa báo thất bại cho khách",
+    );
+    return;
+  }
+
   await db
     .update(jobs)
     .set({ status: "failed", error: err.message, finishedAt: new Date() })
     .where(eq(jobs.id, job.data.jobId));
   logger.error({ jobId: job.data.jobId, type: job.name, err: err.message }, "job failed");
 
-  // hết lượt retry (hoặc lỗi không thể phục hồi — fail ngay lần đầu) → hoàn credit đã trừ
-  const attempts = job.opts.attempts ?? 1;
-  if (job.attemptsMade >= attempts || err.name === "UnrecoverableError") {
-    await refundJobOnFinalFailure(db, job.data.jobId, job.data.userId).catch((e) =>
-      logger.error({ jobId: job.data.jobId, err: String(e) }, "refund failed"),
-    );
-  }
+  await refundJobOnFinalFailure(db, job.data.jobId, job.data.userId).catch((e) =>
+    logger.error({ jobId: job.data.jobId, err: String(e) }, "refund failed"),
+  );
 });
 
 worker.on("error", (err) => {

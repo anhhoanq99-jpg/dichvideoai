@@ -41,8 +41,10 @@ const T = {
     comingSoon: "Sắp ra mắt",
     qrAlt: "QR chuyển khoản VietQR",
     waiting: "Đang chờ nhận tiền…",
+    // KHÔNG nêu tên biến .env: đây là màn hình khách trả tiền nhìn thấy, lộ cấu
+    // hình nội bộ vừa mất chuyên nghiệp vừa cho biết hệ thống đang thiếu gì
     notConfigured:
-      "Tài khoản nhận tiền chưa cấu hình (SEPAY_BANK / SEPAY_ACCOUNT trong .env).",
+      "Hệ thống nạp tiền đang tạm bảo trì. Vui lòng thử lại sau ít phút hoặc liên hệ hỗ trợ để được nạp thủ công.",
     manualTitle: "Thông tin chuyển khoản thủ công",
     bank: "Ngân hàng",
     accountNo: "Số tài khoản",
@@ -55,7 +57,7 @@ const T = {
       "* Lưu ý: nhập chính xác nội dung để hệ thống tự động cộng tiền (~1 phút sau khi tiền vào).",
     bonusPacks: "Gói Thưởng",
     neverExpire: "Xu không bao giờ hết hạn",
-    popular: "Popular",
+    popular: "Phổ biến",
     bonusExtra: (pct: number) => `+${pct}% Tặng thêm`,
     selected: "✓ Đang chọn — quét QR phía trên để nạp",
   },
@@ -79,7 +81,7 @@ const T = {
     qrAlt: "VietQR bank transfer QR code",
     waiting: "Waiting for payment…",
     notConfigured:
-      "Receiving account not configured (SEPAY_BANK / SEPAY_ACCOUNT in .env).",
+      "Top-up is temporarily unavailable. Please try again shortly or contact support for a manual top-up.",
     manualTitle: "Manual bank transfer details",
     bank: "Bank",
     accountNo: "Account number",
