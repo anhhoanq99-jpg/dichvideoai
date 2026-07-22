@@ -291,7 +291,7 @@ export function ExportModal({
           <button
             type="button"
             onClick={startExport}
-            className="w-full rounded-md bg-success-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-success-700"
+            className="w-full rounded-md bg-success-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-success-800"
           >
             {t.exportNow}
           </button>
@@ -317,7 +317,7 @@ export function ExportModal({
           </p>
           <a
             href={`/api/jobs/${finalJobId}/download`}
-            className="mt-3 inline-flex items-center gap-2 rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-success-700"
+            className="mt-3 inline-flex items-center gap-2 rounded-md bg-success-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-success-800"
           >
             <Download className="h-4 w-4" /> {t.download}
           </a>

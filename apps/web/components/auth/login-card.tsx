@@ -212,7 +212,7 @@ export function LoginCard({ lang }: { lang: Lang }) {
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 py-2.5 text-sm font-bold text-white hover:bg-primary-600 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-700 py-2.5 text-sm font-bold text-white hover:bg-primary-800 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === "login" ? t.signIn : t.signUp}

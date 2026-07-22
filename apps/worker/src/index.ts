@@ -7,8 +7,8 @@ config();
 config({ path: "../../.env" });
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { eq } from "drizzle-orm";
-import { createDb, jobs } from "@dichvideo/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { createDb, jobs, videos } from "@dichvideo/db";
 import {
   QUEUES,
   loadEnv,
@@ -96,6 +96,35 @@ worker.on("failed", async (job, err) => {
   await refundJobOnFinalFailure(db, job.data.jobId, job.data.userId).catch((e) =>
     logger.error({ jobId: job.data.jobId, err: String(e) }, "refund failed"),
   );
+
+  /**
+   * Job nạp video (probe/import) chết hẳn thì phải hạ trạng thái VIDEO xuống
+   * "failed". Trước đây probe chỉ set failed cho đúng một nhánh (video quá dài);
+   * mọi lỗi khác — ffprobe không đọc được file, R2 chớp, file hỏng — ném ra
+   * ngoài và bỏ video kẹt ở "processing" VĨNH VIỄN. Trang video là server-render
+   * không polling nên không bao giờ tự sửa: nút tách phụ đề tắt ngấm, mà khách
+   * cũng chẳng thấy báo lỗi gì.
+   *
+   * Xử lý ở đây thay vì trong từng processor để bắt được MỌI nhánh lỗi, kể cả
+   * nhánh sau này ai đó thêm vào mà quên catch.
+   *
+   * Chỉ hạ khi video còn đang dở dang — job dub/render hỏng thì video vẫn dùng
+   * được bình thường, đừng đụng vào.
+   */
+  if (job.name === "probe" || job.name === "import") {
+    await db
+      .update(videos)
+      .set({ status: "failed" })
+      .where(
+        and(
+          eq(videos.id, job.data.videoId),
+          inArray(videos.status, ["uploading", "processing"]),
+        ),
+      )
+      .catch((e) =>
+        logger.error({ videoId: job.data.videoId, err: String(e) }, "khong ha duoc trang thai video"),
+      );
+  }
 });
 
 worker.on("error", (err) => {

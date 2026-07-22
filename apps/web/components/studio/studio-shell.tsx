@@ -370,7 +370,15 @@ export function StudioShell({
     "flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
 
   return (
-    <div className="flex h-[calc(100dvh-7.5rem)] flex-col gap-3">
+    /**
+     * ĐIỆN THOẠI: để trang cuộn tự nhiên, KHÔNG khóa chiều cao.
+     * Trước đây h-[calc(100dvh-7.5rem)] áp cho mọi cỡ màn: trên máy 360×640,
+     * thanh công cụ 8 nút xuống 3-4 hàng đã ăn ~140px, phần còn lại phải chứa
+     * cả video 16:9 lẫn bảng phụ đề (min-h-96) — bảng gần như không tới được.
+     * Từ lg trở lên mới khóa, vì lúc đó bố cục 2 cột cần chiều cao cố định để
+     * hai bên cuộn độc lập.
+     */
+    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-7.5rem)]">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -420,7 +428,7 @@ export function StudioShell({
         <button
           type="button"
           onClick={() => setModal("export")}
-          className="flex items-center gap-1.5 rounded-md bg-success-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-success-700"
+          className="flex items-center gap-1.5 rounded-md bg-success-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-success-800"
         >
           <Upload className="h-3.5 w-3.5" /> {t.exportBtn}
         </button>
@@ -486,7 +494,8 @@ export function StudioShell({
             <p className="flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
               <Replace className="h-3.5 w-3.5" /> {t.findReplace}
             </p>
-            <div className="mt-2 flex gap-2">
+            {/* điện thoại: 2 ô + nút trên một hàng thì mỗi ô còn ~110px, xếp dọc */}
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
               <input
                 value={find}
                 onChange={(e) => setFind(e.target.value)}

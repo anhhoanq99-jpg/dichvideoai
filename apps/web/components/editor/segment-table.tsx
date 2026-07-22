@@ -262,7 +262,7 @@ export function SegmentTable({
                     onClick={() => onCycleSpeaker(seg.i)}
                     title={t.speakerTitle(voiceCount)}
                     className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] font-bold",
+                      "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-[11px] font-bold sm:h-5 sm:min-h-0 sm:w-5 sm:min-w-0",
                       SPEAKER_CLS[Math.min(seg.speaker ?? 0, 2)],
                     )}
                   >
@@ -274,9 +274,13 @@ export function SegmentTable({
                     type="button"
                     onClick={() => onToggleLayout(seg.i)}
                     title={seg.pos ? t.layoutOn : t.layoutOff}
+                    aria-label={seg.pos ? t.layoutOn : t.layoutOff}
                     aria-pressed={Boolean(seg.pos)}
                     className={cn(
-                      "shrink-0 rounded p-0.5",
+                      // ĐIỆN THOẠI: vùng chạm tối thiểu 44px (11*4). Trước đây
+                      // p-0.5 quanh icon 14px ra ~18px — gần như không bấm trúng.
+                      // Từ sm trở lên thu về kích thước cũ cho gọn bảng.
+                      "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded sm:min-h-0 sm:min-w-0 sm:p-0.5",
                       seg.pos
                         ? "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300"
                         : "text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:text-neutral-600 dark:hover:bg-primary-950/40",
@@ -290,9 +294,13 @@ export function SegmentTable({
                     type="button"
                     onClick={() => onToggleCover(seg.i)}
                     title={seg.box ? t.coverOn : t.coverOff}
+                    aria-label={seg.box ? t.coverOn : t.coverOff}
                     aria-pressed={Boolean(seg.box)}
                     className={cn(
-                      "shrink-0 rounded p-0.5",
+                      // ĐIỆN THOẠI: vùng chạm tối thiểu 44px (11*4). Trước đây
+                      // p-0.5 quanh icon 14px ra ~18px — gần như không bấm trúng.
+                      // Từ sm trở lên thu về kích thước cũ cho gọn bảng.
+                      "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded sm:min-h-0 sm:min-w-0 sm:p-0.5",
                       seg.box
                         ? "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300"
                         : "text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:text-neutral-600 dark:hover:bg-primary-950/40",
@@ -306,7 +314,8 @@ export function SegmentTable({
                     type="button"
                     onClick={() => onDelete(seg.i)}
                     title={t.deleteRow}
-                    className="shrink-0 rounded p-0.5 text-neutral-300 hover:bg-red-50 hover:text-red-600 dark:text-neutral-600 dark:hover:bg-red-950/40"
+                    aria-label={t.deleteRow}
+                    className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-red-50 hover:text-red-600 sm:min-h-0 sm:min-w-0 sm:p-0.5 dark:text-neutral-600 dark:hover:bg-red-950/40"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
