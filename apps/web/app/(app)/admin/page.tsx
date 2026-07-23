@@ -14,6 +14,7 @@ import { getLang } from "@/lib/i18n";
 import { isAdminEmail } from "@/lib/admin";
 import { AdminDemoClient } from "./admin-demo-client";
 import { AdminUsagePanel } from "./admin-usage-panel";
+import { AdminTabs } from "./admin-tabs";
 import {
   AdminModerationClient,
   type ModComment,
@@ -199,7 +200,7 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/50">
           <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -207,89 +208,96 @@ export default async function AdminPage() {
         {t.title}
       </h1>
 
-      {/* Doanh thu & chi phí */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {t.revTitle}
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard
-            icon={<TrendingUp className="h-4 w-4" />}
-            label={t.revAll}
-            value={`${num(revAll)} ${t.xu}`}
-            sub={`${num(topupCount)} lượt`}
-          />
-          <StatCard icon={<TrendingUp className="h-4 w-4" />} label={t.rev30} value={`${num(rev30)} ${t.xu}`} />
-          <StatCard icon={<TrendingUp className="h-4 w-4" />} label={t.revToday} value={`${num(revToday)} ${t.xu}`} />
-          <StatCard icon={<Users className="h-4 w-4" />} label={t.payers} value={num(payers)} />
-          <StatCard
-            icon={<Coins className="h-4 w-4" />}
-            label={t.outstanding}
-            value={`${num(outstandingXu)} ${t.xu}`}
-          />
-          <StatCard
-            icon={<Wallet className="h-4 w-4" />}
-            label={t.aiCost}
-            value={`$${aiCostUsd.toFixed(2)}`}
-          />
-        </div>
+      {/* Mỗi mục một tab — trước đây 4 mục xếp dọc một trang rất dài, phải
+          cuộn mới thấy phần kiểm duyệt và video demo. */}
+      <AdminTabs
+        tabs={[
+          {
+            id: "revenue",
+            label: t.revTitle,
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <StatCard
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    label={t.revAll}
+                    value={`${num(revAll)} ${t.xu}`}
+                    sub={`${num(topupCount)} lượt`}
+                  />
+                  <StatCard icon={<TrendingUp className="h-4 w-4" />} label={t.rev30} value={`${num(rev30)} ${t.xu}`} />
+                  <StatCard icon={<TrendingUp className="h-4 w-4" />} label={t.revToday} value={`${num(revToday)} ${t.xu}`} />
+                  <StatCard icon={<Users className="h-4 w-4" />} label={t.payers} value={num(payers)} />
+                  <StatCard
+                    icon={<Coins className="h-4 w-4" />}
+                    label={t.outstanding}
+                    value={`${num(outstandingXu)} ${t.xu}`}
+                  />
+                  <StatCard
+                    icon={<Wallet className="h-4 w-4" />}
+                    label={t.aiCost}
+                    value={`$${aiCostUsd.toFixed(2)}`}
+                  />
+                </div>
 
-        <h3 className="mb-2 mt-5 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {t.recent}
-        </h3>
-        {recentTopups.length === 0 ? (
-          <p className="text-sm text-neutral-400">{t.noTopups}</p>
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800">
-            <table className="w-full text-sm">
-              <tbody>
-                {recentTopups.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60"
-                  >
-                    <td className="px-3 py-2">
-                      <p className="font-medium">{r.userName}</p>
-                      <p className="truncate text-xs text-neutral-400">{r.userEmail}</p>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-success-600 dark:text-success-400">
-                      +{num(r.delta)} {t.xu}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-400">
-                      {fmtWhen(r.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Mức tiêu thụ API — đặt trên cùng nhóm vì đây là thứ chết trước:
-          hết hạn mức là job dừng giữa chừng, khách trả tiền chịu trận. */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {t.usageTitle}
-        </h2>
-        <AdminUsagePanel lang={lang} />
-      </section>
-
-      {/* Kiểm duyệt cộng đồng */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {t.modTitle}
-        </h2>
-        <AdminModerationClient lang={lang} posts={posts} comments={modCommentsView} />
-      </section>
-
-      {/* Video demo */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {t.demoTitle}
-        </h2>
-        <AdminDemoClient lang={lang} />
-      </section>
+                <h3 className="mb-2 mt-5 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+                  {t.recent}
+                </h3>
+                {recentTopups.length === 0 ? (
+                  <p className="text-sm text-neutral-400">{t.noTopups}</p>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {recentTopups.map((r) => (
+                          <tr
+                            key={r.id}
+                            className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60"
+                          >
+                            <td className="px-3 py-2">
+                              <p className="font-medium">{r.userName}</p>
+                              <p className="truncate text-xs text-neutral-400">{r.userEmail}</p>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-success-600 dark:text-success-400">
+                              +{num(r.delta)} {t.xu}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-400">
+                              {fmtWhen(r.createdAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            // Đặt ngay sau doanh thu vì đây là thứ chết trước: hết hạn mức là
+            // job dừng giữa chừng, khách trả tiền chịu trận.
+            id: "usage",
+            label: t.usageTitle,
+            content: <AdminUsagePanel lang={lang} />,
+          },
+          {
+            id: "moderation",
+            label: t.modTitle,
+            badge: posts.length + modCommentsView.length,
+            content: (
+              <AdminModerationClient
+                lang={lang}
+                posts={posts}
+                comments={modCommentsView}
+              />
+            ),
+          },
+          {
+            id: "demo",
+            label: t.demoTitle,
+            content: <AdminDemoClient lang={lang} />,
+          },
+        ]}
+      />
     </div>
   );
 }
