@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Link2, Loader2, Play } from "lucide-react";
 import { detectVideoSource, isImportableUrl } from "@dichvideo/shared";
 import type { PipelineSettings } from "@/hooks/use-multipart-upload";
+import { httpError, readJson } from "@/lib/http-json";
 import type { Lang } from "@/lib/i18n";
 
 const T = {
@@ -88,12 +89,14 @@ export function LinkImportCard({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ url, pipeline: settings }),
         });
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        // `throw new Error()` rỗng + catch nuốt sạch → mọi lỗi đều ra đúng một
+        // câu "tải link thất bại", không biết vì sao. Giữ lại lý do thật.
+        if (!res.ok) throw await httpError(res, t.failed(url));
+        const data = await readJson<{ videoId: string }>(res, t.failed(url));
         okCount++;
-        firstVideoId ??= data.videoId as string;
-      } catch {
-        setError(t.failed(url));
+        firstVideoId ??= data.videoId;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.failed(url));
       }
     }
     setBusy(false);

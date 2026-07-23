@@ -58,32 +58,45 @@ export async function POST(
   const body = await parseJsonBody(req, schema);
   if (body.response) return body.response;
 
-  await completeMultipart(video.r2Key, body.data.uploadId, body.data.parts);
-  const pipeline = body.data.pipeline;
-  await db
-    .update(videos)
-    .set({
-      status: "processing",
-      ...(pipeline
-        ? {
-            sourceLang: pipeline.sourceLang ?? null,
-            targetLang: pipeline.targetLang,
-            translationStyle: pipeline.style,
-            glossary: pipeline.glossary ?? null,
-          }
-        : {}),
-    })
-    .where(eq(videos.id, video.id));
+  /**
+   * Bọc TOÀN BỘ phần chạm hạ tầng (R2 + Postgres + Redis).
+   *
+   * Không có try/catch ở đây thì bất kỳ trục trặc nào cũng thành 500 THÂN RỖNG,
+   * và người dùng chỉ nhận được "Unexpected end of JSON input" — không biết
+   * hỏng ở đâu. Đây chính là bước hay lỗi nhất vì nó đụng cả ba dịch vụ ngoài.
+   */
+  try {
+    await completeMultipart(video.r2Key, body.data.uploadId, body.data.parts);
+    const pipeline = body.data.pipeline;
+    await db
+      .update(videos)
+      .set({
+        status: "processing",
+        ...(pipeline
+          ? {
+              sourceLang: pipeline.sourceLang ?? null,
+              targetLang: pipeline.targetLang,
+              translationStyle: pipeline.style,
+              glossary: pipeline.glossary ?? null,
+            }
+          : {}),
+      })
+      .where(eq(videos.id, video.id));
 
-  const probeParams = pipeline
-    ? {
-        chain: {
-          method: pipeline.method,
-          translate: pipeline.translate,
-          ...(pipeline.finish && pipeline.translate ? { finish: pipeline.finish } : {}),
-        },
-      }
-    : {};
-  const job = await createPipelineJob("probe", video.id, session.user.id, probeParams);
-  return NextResponse.json({ ok: true, probeJobId: job.id });
+    const probeParams = pipeline
+      ? {
+          chain: {
+            method: pipeline.method,
+            translate: pipeline.translate,
+            ...(pipeline.finish && pipeline.translate ? { finish: pipeline.finish } : {}),
+          },
+        }
+      : {};
+    const job = await createPipelineJob("probe", video.id, session.user.id, probeParams);
+    return NextResponse.json({ ok: true, probeJobId: job.id });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[videos/complete] that bai:", detail, err);
+    return jsonError(`Không hoàn tất được upload: ${detail}`, 500);
+  }
 }

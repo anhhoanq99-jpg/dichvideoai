@@ -122,6 +122,25 @@ export async function createPipelineJob(
     .insert(jobs)
     .values({ videoId, userId, type, params })
     .returning();
-  await enqueuePipelineJob(type, { jobId: job.id, videoId, userId, params });
+
+  /**
+   * Ghi DB xong mới đẩy hàng đợi — nên nếu đẩy hỏng, dòng job đã nằm đó và
+   * KẸT "queued" vĩnh viễn: giao diện cứ chờ một job không bao giờ chạy.
+   * Phải hạ nó xuống "failed" rồi mới ném lỗi ra, để khách thấy trạng thái
+   * đúng và bấm làm lại được.
+   */
+  try {
+    await enqueuePipelineJob(type, { jobId: job.id, videoId, userId, params });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    await db
+      .update(jobs)
+      .set({ status: "failed", error: detail, finishedAt: new Date() })
+      .where(eq(jobs.id, job.id))
+      .catch(() => {
+        // DB cũng hỏng nốt thì thôi — vẫn phải ném lỗi gốc lên trên
+      });
+    throw new Error(detail);
+  }
   return job;
 }

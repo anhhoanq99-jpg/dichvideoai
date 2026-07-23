@@ -48,6 +48,19 @@ const worker = new Worker<JobPayload>(
   {
     connection,
     concurrency: 2,
+    /**
+     * TIẾT KIỆM REQUEST REDIS. Upstash tính tiền theo số lệnh, và worker chạy
+     * 24/7 đốt hạn mức kể cả khi KHÔNG có job nào:
+     *   drainDelay mặc định 5s  → ~12 lệnh/phút → ~17.000/ngày → cạn 500.000
+     *   của gói free trong đúng một tháng, rồi Redis từ chối MỌI lệnh và cả
+     *   web lẫn worker cùng chết.
+     *
+     * drainDelay chỉ là thời gian chờ tối đa của lệnh chặn — job mới đẩy vào
+     * là nhận NGAY, không thêm độ trễ. Nâng lên 60s giảm ~12 lần lệnh lúc rảnh.
+     * stalledInterval là nhịp quét job treo, 30s → 90s cũng đủ an toàn.
+     */
+    drainDelay: 60,
+    stalledInterval: 90_000,
   },
 );
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { UPLOAD_PART_SIZE, type TranslationStyleId } from "@dichvideo/shared";
+import { httpError, readJson } from "@/lib/http-json";
 
 export type UploadState =
   | { phase: "idle" }
@@ -17,42 +18,6 @@ interface InitResponse {
 
 const PARALLEL = 4;
 const PART_RETRIES = 3;
-
-/**
- * Đọc JSON mà KHÔNG bao giờ ném "Unexpected end of JSON input".
- *
- * Trước đây mọi bước upload đều gọi thẳng `res.json()`. Khi một route chết vì
- * lỗi không bắt được, Next trả về thân rỗng (hoặc HTML), `res.json()` ném, và
- * người dùng nhận đúng câu vô nghĩa "Failed to execute 'json' on 'Response'" —
- * lỗi THẬT bị nuốt sạch, không biết bước nào hỏng, mã lỗi bao nhiêu.
- * Giờ luôn kèm mã HTTP + đoạn đầu thân phản hồi để lần sau lỗi tự khai báo.
- */
-async function readJson<T>(res: Response, what: string): Promise<T> {
-  const raw = await res.text();
-  if (!raw.trim()) {
-    throw new Error(`${what}: máy chủ trả về rỗng (HTTP ${res.status})`);
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    throw new Error(`${what}: phản hồi không hợp lệ (HTTP ${res.status}) — ${raw.slice(0, 120)}`);
-  }
-}
-
-/** Dựng Error từ phản hồi lỗi, ưu tiên `error` do server gửi. */
-async function httpError(res: Response, fallback: string): Promise<Error> {
-  const raw = await res.text().catch(() => "");
-  if (raw.trim()) {
-    try {
-      const data = JSON.parse(raw) as { error?: string };
-      if (data.error) return new Error(data.error);
-    } catch {
-      // không phải JSON → dùng nguyên văn bên dưới
-    }
-    return new Error(`${fallback} (HTTP ${res.status}) — ${raw.slice(0, 120)}`);
-  }
-  return new Error(`${fallback} (HTTP ${res.status})`);
-}
 
 async function putPartWithRetry(
   url: string,
