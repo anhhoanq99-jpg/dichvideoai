@@ -1,122 +1,115 @@
 # HANDOFF — Dịch Video AI
 
-> Cập nhật: 2026-07-16. Đọc file này + `PROGRESS.md` trước khi làm việc.
+> Cập nhật: **2026-07-23**. Đọc file này + `CLAUDE.md` + `PROGRESS.md` trước khi làm.
 > Bàn giao cho AI/dev tiếp theo — đủ để tiếp tục ngay.
+
+## 0. ĐỌC TRƯỚC TIÊN — web đang KHÔNG xử lý được video
+
+**Upstash Redis đã cạn hạn mức gói free** (`ERR max requests limit exceeded. Limit: 500000`).
+Redis từ chối mọi lệnh → không đẩy được job → mọi upload/dịch/lồng tiếng đều chết.
+Đây là **hạ tầng, code không cứu được**. User phải nâng gói ở console.upstash.com.
+
+Kiểm tra nhanh: `cd apps/worker && npx tsx --env-file=../../.env scripts/check-queue-health.ts`
 
 ## 1. Mục tiêu tổng thể
 
-SaaS **Việt hóa & lồng tiếng video bằng AI** (cạnh tranh gensubai.com). Luồng chính:
-upload/dán link video → trích phụ đề (OCR/STT) → dịch chuẩn văn nói → trình chỉnh sửa
-(xem trước, che chữ gốc, kiểu phụ đề, lồng tiếng) → xuất MP4. Ngoài ra: nhân bản/đọc
-giọng nói, cộng đồng, nạp xu. **ĐÃ LÊN PRODUCTION và thu tiền được.**
+SaaS **Việt hóa & lồng tiếng video bằng AI** (cạnh tranh gensubai.com). Luồng:
+upload/dán link → trích phụ đề (OCR/STT) → dịch văn nói → studio chỉnh sửa → xuất MP4.
+Kèm: nhân bản giọng, cộng đồng, nạp xu. **ĐÃ LÊN PRODUCTION và thu tiền thật.**
+
+Giai đoạn hiện tại: **chuẩn bị thương mại hóa** — vá lỗ hổng tiền bạc, gỡ trần hạn mức,
+làm giao diện đủ chuyên nghiệp để quảng cáo rộng.
 
 ## 2. Hạ tầng (ĐANG CHẠY THẬT)
 
-- **Web**: https://dichvideoai-web.vercel.app — Vercel project `dichvideoai-web`, Root Directory `apps/web`.
-- **Repo**: GitHub `anhhoanq99-jpg/dichvideoai`, push `main` → Vercel tự deploy.
-- **Worker** (render/lồng tiếng, cần ffmpeg): chạy **trên máy Windows của user qua pm2**
-  (`pm2 status`, name `dichvideo-worker`, tự khởi động cùng Windows). User chọn chi phí 0đ thay VPS.
-  → **Dev local PHẢI dùng `pnpm dev:web`** (KHÔNG `pnpm dev` — sẽ sinh worker thứ 2 tranh job).
-  → Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
-- **DB** Neon Postgres, **Redis** Upstash, **R2** Cloudflare (bucket `dichvideo-prod`) — tất cả cloud, không cần Docker.
-- **Env prod** = `.env` gốc repo (đã xoay key), đẩy Vercel bằng `vercel env add <K> production --force`
-  (đã login CLI). Đổi env xong PHẢI redeploy (`vercel --prod --yes`) mới có tác dụng.
-- **Deploy verify**: sau `git push`, chờ ~2.5 phút build; kiểm bằng route công khai (vd `/robots.txt`, `/api/demo/goc`).
+- **Web**: https://dichvideoai-web.vercel.app — Vercel `dichvideoai-web`, root `apps/web`.
+- **Repo**: GitHub `anhhoanq99-jpg/dichvideoai`, push `main` → Vercel tự deploy (~2.5 phút).
+- **Worker**: pm2 `dichvideo-worker` trên máy Windows của user. Dev local dùng `pnpm dev:web`
+  (KHÔNG `pnpm dev`). Sửa code worker xong: `pm2 restart dichvideo-worker`.
+- **DB** Neon · **Redis** Upstash · **R2** Cloudflare (`dichvideo-prod`).
+- Env prod = `.env` gốc repo. Đổi env Vercel phải redeploy mới có tác dụng.
 
-## 3. ĐÃ HOÀN THÀNH trong session này (mới → cũ)
+Quy mô thật (đo 2026-07-23): **7 user · 103 video · 4,4 video/ngày · 2 lượt nạp (320.000 xu)**.
+Mỗi video ≈ 125 giây CPU worker → máy rảnh 99,4% thời gian. **Tốc độ xử lý KHÔNG phải nút thắt** —
+nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
+
+## 3. ĐÃ HOÀN THÀNH session này (mới → cũ)
 
 | Commit | Nội dung | File chính |
 |---|---|---|
-| 9b8ffbb | Icon + video hướng dẫn (admin) ở trang upload | `upload-page-client.tsx`, `api/demo/[slot]/route.ts`, `api/admin/demo/route.ts`, `admin-demo-client.tsx` |
-| ca961b6 | Màn cảm ơn khi nạp tiền thành công | `credits/topup-panel.tsx` |
-| c5fe4ac | Nền dark xám than mềm (#16171c) thay đen tuyền | `app/globals.css` (override `--color-neutral-*` trong `.dark`) |
-| 6c54b4e | Chặn kéo ngang mobile (`overflow-x: clip`) + header vừa màn hình | `globals.css`, `(app)/layout.tsx` |
-| a591d79 | Admin tự đổi 2 video demo trang chủ; bỏ avatar TMH hero | `api/demo/*`, `api/admin/demo/*`, `(app)/admin/*`, `hero-section.tsx`, `results-section.tsx`, `app-sidebar.tsx` |
-| 17f31fb | Voice-clone: hàng trăm giọng free (VoicePicker đầy đủ) + sửa lỗi nhân bản | `voice-clone-client.tsx`, `api/voice-clone/speak`, `lib/tts-web.ts` |
-| 51f0231 | Lồng tiếng: tổng hợp giọng SONG SONG (nhanh 5-6x) | `worker/src/processors/dub.ts` (`mapPool`) |
-| ad07ec2 | Import: ép tải H.264 (không AV1) — preview không đen; render `-pix_fmt yuv420p` | `worker/src/processors/import.ts`, `render.ts` |
-| d8bb659, 2039202 | Giữ đăng nhập 30 ngày; `/login` redirect nếu đã có phiên; ép về 1 domain | `lib/auth.ts`, `login-card.tsx`, `login/page.tsx`, `proxy.ts` |
-| 342e069 | Kéo góc đổi cỡ vùng làm mờ + 40 giọng Google (30 Chirp3-HD) | `render-preview.tsx`, `shared/dub-presets.ts` |
-| e49b7fc, 2d8be0c | Hiệu ứng phụ đề (fade/pop/reveal/karaoke) + màu nhấn `*từ khóa*` + 6 font mới + 23 ngôn ngữ gốc; fix tiếng gốc iPhone | `shared/ass-builder.ts`, `render-presets.ts`, `subtitle-style-fields.tsx`, `render-preview.tsx`, `lib/source-langs.ts`, `worker/fonts/*` |
-| ac66680, 5146438, efc22e0 | Seeding trang chủ (badge + section "Xem kết quả thực tế"); studio preview vừa màn hình | `results-section.tsx`, `hero-section.tsx`, `render-preview.tsx`, `studio-shell.tsx` |
-| 48bbfce | Công cụ Nhân bản giọng nói; bỏ 2 mục sidebar ít dùng | `(app)/voice-clone/*`, `api/voice-clone/*`, `app-sidebar.tsx` |
-| 2297b68, d5fd2b6 | Chat: diễn đàn Cộng đồng (post+comment) + chat hỗ trợ user↔admin | `(app)/chat/*`, `api/chat/*`, `api/community/*`, `lib/admin.ts` |
-| ecf45ce, 27b96fc | Trang "Video đã xuất"; bỏ 2 panel trùng ở trang chi tiết | `(app)/exports/page.tsx` |
+| `b971bf8` | **Gỡ bỏ VieNeu, Kokoro, Viettel AI, FPT.AI** (chất lượng kém, không có key) | `shared/dub-presets.ts`, `worker/lib/tts.ts`, `worker/lib/usage.ts`, `worker/processors/dub.ts`, `web/lib/tts-web.ts`, `api/tts-preview`, `voice-picker.tsx`, xoá `services/tts-local/`, `.venv-tts` |
+| `04f2d4f` | Trang Quản trị chia **4 tab** | `admin/admin-tabs.tsx` (mới), `admin/page.tsx` |
+| `628d2f3` | **Bảng theo dõi tiêu thụ API** + cảnh báo sắp chạm trần | `admin/admin-usage-panel.tsx` (mới) |
+| `32b1491` | **Tìm ra gốc rễ lỗi upload** = Redis cạn; giảm ~12× lệnh Redis worker đốt lúc rảnh | `worker/src/index.ts` (`drainDelay` 5s→60s), `web/lib/queue.ts` (timeout 8s), `api/videos/[id]/complete` |
+| `0160178` | Không nuốt lỗi thật sau "Unexpected end of JSON input" | `web/lib/http-json.ts` + `.test.ts` (mới, 7 test), `hooks/use-multipart-upload.ts`, `api/videos/route.ts`, `link-import-card.tsx` |
+| `25c4099` | Báo thiếu xu TRƯỚC khi xuất; sửa giá giọng trả phí; chặn farm tài khoản; onboarding | `lib/api-helpers.ts` (`requireCredits`), `export-modal.tsx`, `shared/dub-presets.ts` (`isPremiumVoice`), `api/auth/[...all]/route.ts`, `videos/upload/page.tsx`, `upload-page-client.tsx` |
+| `c261840` | Video kẹt "processing"; studio trên điện thoại; tương phản nút tiền đạt WCAG AA | `worker/src/index.ts`, `studio-shell.tsx`, `segment-table.tsx`, `ui/button.tsx`, `login-card.tsx`, `web/scripts/check-contrast.ts` |
+| `9f3e7bb` | Bảng công cụ studio **neo cạnh** (không che video); thêm Zalo hỗ trợ | `ui/modal.tsx` (`dock`), `shared/src/support.ts` (mới), `site-footer.tsx`, `topup-panel.tsx` |
+| `b119a9f` | **Vá 2 lỗ hổng tiền bạc** + job báo thất bại sai | `packages/db/src/credits.ts`, `db/schema/app.ts` (unique index), `api/webhooks/sepay`, `api/voice-clone/speak`, `worker/src/index.ts`, `app/error.tsx` + `not-found.tsx` (mới) |
 
-**SePay nạp tiền = HOÀN CHỈNH**: code sẵn từ trước (QR VietQR, poll số dư, webhook idempotent,
-gói thưởng, màn cảm ơn). Đã cấu hình MB Bank `999628999999` / PHAM ANH HOANG + webhook key,
-đã redeploy. Đã verify QR sinh đúng. **User cần tự đăng ký webhook trên sepay.vn** (URL
-`/api/webhooks/sepay`, kiểu API Key = `SEPAY_WEBHOOK_KEY`, sự kiện tiền vào) rồi test nạp thật.
+**Script chẩn đoán mới** (`apps/worker/scripts/`, chạy bằng `npx tsx --env-file=../../.env`):
+`check-queue-health.ts` · `check-capacity.ts` · `check-cost-projection.ts` · `check-money-fixes.ts` ·
+`check-ledger-dups.ts` · `add-ledger-unique-index.ts` · `check-usage-query.ts` · `check-removed-voices.ts` ·
+`check-edge-fallback.ts`. Bên web: `check-pricing.ts`, `check-contrast.ts`, `check-default-voice.ts`.
 
-## 4. QUYẾT ĐỊNH / CONVENTION quan trọng
+## 4. QUYẾT ĐỊNH quan trọng session này
 
-- **Màu thương hiệu = CAM SAN HÔ** (`#ee5631`, `--color-primary-*` trong `globals.css`). User đã
-  TỪ CHỐI màu xanh veed.io — chỉ mượn bố cục, KHÔNG đổi màu. (memory: brand-color-coral-keep)
-- **Đơn vị hiển thị = "xu"** trong mọi chuỗi tiếng Việt (KHÔNG "credits"); bản `en` giữ "credits".
-  Xu KHÔNG hết hạn (lợi thế cạnh tranh). Code identifier vẫn `credit*` (creditBalance, estimateJobCredits…).
-- **i18n**: mỗi component có `const T = { vi: {...}, en: {...} }`; ngôn ngữ qua cookie `lang`, hàm `getLang()`.
-- **Admin** nhận diện qua env `ADMIN_EMAILS` (hiện = `anhhoanq.99@gmail.com`), helper `lib/admin.ts` `isAdminEmail()`.
-  Dùng cho: chat hỗ trợ, trang `/admin` (quản lý video demo + video hướng dẫn).
-- **Video admin quản lý** (demo trang chủ + hướng dẫn): lưu R2 khe cố định `demo/{slot}.mp4`,
-  phục vụ qua `/api/demo/:slot` (redirect R2 presigned, hỗ trợ tua; `?check=1` trả `{exists}`);
-  slot: `goc`, `ban-viet` (có file bundled dự phòng trong `public/demo/`), `huong-dan` (không fallback).
-- **Giọng nói**: catalog trong `shared/dub-presets.ts` — Edge (322, free), Google Cloud (40, có Chirp3-HD),
-  ElevenLabs (14 preset), Gemini (premium). `VoicePicker` (components/dub) là bộ chọn dùng chung.
-  Web TTS tổng hợp qua `lib/tts-web.ts`; nghe thử qua `/api/tts-preview`.
-- **Render/ASS**: `shared/ass-builder.ts` sinh file .ass; hiệu ứng chữ + màu nhấn `*từ*` xử lý ở đây,
-  worker `render.ts` burn bằng ffmpeg libx264 (KHÔNG dùng GPU — đã đo, không nhanh hơn).
-- **YouTube tải H.264** (avc1) ưu tiên trong `import.ts` (AV1 không phát trên Safari/iPhone → preview đен).
-- **Bẫy môi trường**: hook `scout-block` chặn lệnh shell chứa `node_modules`/`dist`. Lint repo NGHIÊM:
-  cấm `setState` đồng bộ trong effect (dùng `setTimeout(0)` hoặc promise callback), cấm reassign biến
-  trong render (dùng prefix-sum thay vì `let x += …`). PowerShell pipe here-string vào git commit
-  bị hỏng nếu message chứa dấu `"` → viết message KHÔNG có ngoặc kép, hoặc dùng `node spawnSync` input.
-
-## 4b. CHE CHỮ GỐC THEO TỪNG DÒNG (mới)
-
-Video có chữ nước ngoài xuất hiện rải rác → mỗi dòng phụ đề gắn được 1 ô che riêng
-(`SubtitleSegment.box`, toạ độ 0..1 hệ video NGUỒN), **chỉ che đúng lúc dòng đó chạy**.
-- Worker: `filtergraph.ts` `lineCovers` → `drawbox`/`overlay` kèm `enable='between(t,s,e)'`.
-  Chế độ mờ: blur TOÀN khung **1 lần** rồi dán lại từng ô (blur riêng từng ô = N lượt boxblur, rất chậm).
-  Trần `MAX_LINE_COVERS = 120`, vượt thì `render.ts` cắt bớt **và ghi log** (không cắt âm thầm).
-- Web: nút ô vuông nét đứt ở mỗi dòng trong `segment-table` bật/tắt che; ô cam hiện trên
-  `render-preview` khi câu đó chạy, kéo/co giãn được. Bật che lúc `coverMode="none"` → tự bật `blur`
-  (nếu không thì ô bị bỏ qua ở cả preview lẫn render — bấm mà không thấy gì).
-- **`box` do OCR sinh ra: CHƯA CÓ** — `gemini-video-ocr.ts` không trả toạ độ, nên `hasOnScreenText`
-  ở `editor/page.tsx` luôn false. Muốn tự động che thì phải sửa prompt OCR cho Gemini trả bounding box.
-- Đã verify: 43 test pass (7 test filtergraph mới) + chạy **ffmpeg thật** 4 tổ hợp (box/blur × keep/9:16).
+- **Chống cộng xu trùng bằng RÀNG BUỘC DB**, không bằng SELECT trước giao dịch.
+  Index `credit_ledger_ref_uidx UNIQUE (ref_type, ref_id, reason)` + `onConflictDoNothing`.
+  `reason` PHẢI nằm trong khoá — một job ghi cả `job_charge` lẫn `job_refund` dưới cùng
+  `(ref_type='job', ref_id=jobId)`; thiếu nó là **chặn mất hoàn xu**.
+  Trong `applyCreditDelta`: ghi ledger TRƯỚC, đổi số dư SAU; trùng thì trả `null`.
+- **Một nguồn sự thật cho phân loại giọng** (`shared/dub-presets.ts`):
+  `isPremiumVoice()` (gemini + eleven → giá cao cấp) và `hasWideTtsQuota()` (edge + gcloud →
+  được đọc văn bản tuỳ ý miễn phí). Trước đây định nghĩa bị chép ở 4 nơi và lệch nhau.
+- **Job chưa hết lượt retry thì KHÔNG ghi `status='failed'`** — web coi `failed` là kết thúc,
+  SSE đóng, studio dừng theo dõi. Ghi sớm = khách thấy "thất bại" trong khi job sắp xong.
+- **Giọng mặc định = `gcloud`** (SubdubAI/Chirp3-HD). Hết hạn mức Google → **cả job** hạ xuống
+  Edge (`edgeFallbackVoice`), quyết định MỘT LẦN trước khi sinh câu nào để video không lẫn 2 giọng.
+- **Nhãn nguồn giọng theo thương hiệu mình**, không lộ nhà cung cấp: Google → "SubdubAI",
+  Gemini → "Cao cấp", Edge → "Cơ bản", ElevenLabs → "Eleven".
+- **Modal studio có chế độ `dock`**: từ `lg` neo mép phải, bỏ nền mờ, click xuyên qua để vẫn
+  xem/tua video. Dùng `hidden` (không bỏ khỏi cây React) để giữ trạng thái khi đổi tab.
+- **Tương phản**: chữ nhỏ trên nền thương hiệu dùng `primary-700`/`success-700` (≥4.5:1).
+  KHÔNG đổi bảng màu — `primary-600` đo được 4,41:1, vẫn trượt chuẩn.
+- **Trang Quản trị**: nội dung do server render, truyền vào `AdminTabs` (client) làm children —
+  giữ mọi truy vấn DB phía máy chủ.
 
 ## 5. LỖI/VẤN ĐỀ đã biết, CHƯA xử lý
 
-- **Nhân bản giọng riêng KHÔNG hoạt động** — key ElevenLabs là gói free, thiếu quyền
-  `create_instant_voice_clone`. Đây là giới hạn gói, KHÔNG phải bug. Đã báo user; cần nâng
-  ElevenLabs Starter (~5$/tháng) + tạo key có quyền cloning, hoặc dựng model open-source (XTTS…) trên máy worker.
-- **Gemini** đã paid tier (`GEMINI_TTS_RPM=60`). **Groq** dùng làm fallback dịch khi Gemini nghẽn.
-- Lint còn **1 warning** cố hữu (`segment-table.tsx` — "incompatible library" của TanStack Virtual, vô hại).
-- Cảnh báo git "LF will be replaced by CRLF" trên Windows — bình thường, bỏ qua.
-- File kết quả R2 nói "tự xóa sau 7 ngày" nhưng **CHƯA có cron dọn thật** — cần job dọn `outputs/` quá 7 ngày.
+- 🔴 **Upstash Redis cạn hạn mức** — xem mục 0. Web không xử lý được video.
+- 🔴 **Gemini vẫn gói free** — 20 lượt/ngày/key/model ≈ **1–2 video/ngày/key**. Đây là trần cứng
+  của sản phẩm lõi. Chi phí bật billing rất nhỏ (đo thật: **$0,64/tháng ở 20 video/ngày**,
+  **$3,18 ở 100 video/ngày** với 2.5-flash). User chưa bật.
+- 🟠 **`migrations/` LỆCH thực tế** — `chat_messages`, `community_*`, `cloned_voices`,
+  `videos.target_lang` được đưa lên bằng `drizzle-kit push`, không có file migration.
+  **ĐỪNG chạy `drizzle-kit migrate`** — nó sẽ cố tạo lại bảng đã tồn tại và hỏng DB.
+  Index unique vừa thêm đã áp bằng script riêng (idempotent).
+- 🟠 **Worker nằm trên máy cá nhân** — máy tắt = dịch vụ chết. VPS 4 nhân (~$7–20/tháng) dư sức.
+- 🟡 Giá lồng tiếng ElevenLabs đã nâng lên bậc cao cấp (700 xu/phút) nhưng **có thể vẫn lỗ** —
+  giá ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại. Cần đối chiếu hoá đơn thật.
+- 🟡 **Chưa có thông tin pháp lý/công ty** (NĐ 52/2013, 85/2021) — user chủ động bỏ qua.
+- 🟡 Chưa có bằng chứng xã hội thật (đánh giá, video khách). Con số "1.500+" là tự đặt.
+- 🟡 Nhân bản giọng riêng không chạy — key ElevenLabs free thiếu quyền `create_instant_voice_clone`.
+- 🟡 File R2 `outputs/` nói "xoá sau 7 ngày" nhưng **lifecycle rule chưa bật** (token object-scoped).
+- ⚪ Lint còn 1 warning cố hữu (TanStack Virtual ở `segment-table.tsx`) — vô hại.
 
 ## 6. VIỆC TIẾP THEO (ưu tiên cao → thấp)
 
-1. **User đăng ký webhook SePay** trên sepay.vn + test nạp thật 10k (mảnh cuối để thu tiền tự động).
-2. ~~**Cron dọn R2** file `outputs/` quá 7 ngày~~ → **ĐÃ VIẾT script lifecycle** `apps/worker/scripts/set-r2-lifecycle.ts`
-   (Cloudflare tự xóa server-side, không cần cron chạy trên máy user). **CHẶN**: token R2 trong `.env` object-scoped,
-   thiếu quyền cấu hình bucket → `Access Denied`. **User cần làm 1 trong 2**: (a) dashboard Cloudflare → R2 → bucket
-   `dichvideo-prod` → Settings → Object lifecycle rules → Add: prefix `outputs/` xóa sau 7 ngày + abort multipart dở sau 7 ngày;
-   hoặc (b) tạo R2 API token quyền Admin, đặt tạm vào env rồi `cd apps/worker && npx tsx scripts/set-r2-lifecycle.ts`.
-3. ~~**Rate-limit** các API công khai~~ → **XONG**. Helper `apps/web/lib/rate-limit.ts` (cửa sổ cố định trên
-   Redis Upstash, atomic Lua, **fail-open** khi Redis lỗi). Đã gắn vào: `tts-preview` 30/phút (chỉ khi trượt cache),
-   `voice-clone/speak` 15/phút, `srt/translate` 10/phút, `videos/import` 10/phút, `videos` (tạo upload) 20/phút —
-   đều theo userId. Trả 429 + `Retry-After`. Đã test thật trên Redis prod (chặn đúng ngưỡng). Đổi hạn mức: sửa số ngay tại route.
-4. ~~Trang admin: xem `usage_events` / doanh thu; nút xóa bài/bình luận cộng đồng~~ → **XONG** (`app/(app)/admin/page.tsx`).
-   Thêm khối **Doanh thu & chi phí** (tổng nạp = SUM ledger reason=topup; nạp 30 ngày/hôm nay qua SQL `now()`; số người nạp;
-   xu đang lưu hành = SUM `user.creditBalance`; chi phí AI = SUM `usage_events.costUsdMicros`; bảng 15 lượt nạp gần đây) +
-   khối **Kiểm duyệt cộng đồng** (`admin-moderation-client.tsx`: 25 bài + 25 bình luận mới nhất, nút xóa → `DELETE
-   /api/admin/community/posts/:id` và `/comments/:id`, guard `isAdminEmail`, cascade xóa bình luận theo bài). Đã verify query trên DB prod.
-5. (Tùy chọn) Nhân bản giọng thật: nâng ElevenLabs hoặc model open-source trên worker.
-6. ~~Gom bớt code lặp: `<Dropzone>`, `<Button>`, `<StatusBadge>`~~ → **ĐÃ TẠO primitive** trong `components/ui/`:
-   - `dropzone.tsx` — vùng kéo-thả (state dragOver nội bộ). Đã thay ở `extract-client` + `translate-client` (output class y hệt).
-   - `status-badge.tsx` — nhãn trạng thái, gom bảng màu 1 chỗ. Đã thay 2 chỗ ở `history/page.tsx` (y hệt).
-   - `button.tsx` — Button variant (primary/secondary/ghost/danger) + size (sm/md/lg) + `pill`. Đã thay 2 nút submit y hệt
-     ở extract/translate (Button thêm `shadow-sm`+`transition-colors` → khác biệt thị giác rất nhỏ, coi như đồng bộ hóa).
-   - **CÒN LẠI ~30 nút** dùng class thô đủ biến thể (radius/size khác nhau) — **CHƯA migrate** vì không QA thị giác từng màn
-     được; chuyển dần sang `<Button>` khi sửa từng trang. Đã verify typecheck + lint sạch (0 lỗi, giữ 1 warning cũ).
+1. **USER: nâng Upstash Redis** — web đang chết vì cái này. ~$2–10/tháng.
+2. **USER: bật billing Gemini** (AI Studio → Billing, pay-as-you-go, không phí tối thiểu).
+   Gỡ trần 1 video/ngày/key với chi phí gần như bằng 0.
+3. Chạy 1 tuần, xem **Quản trị → Mức tiêu thụ API** để biết số thật, rồi mới chọn gói.
+4. **Chuyển worker sang VPS** (Hetzner/Contabo). Cần dựng: Node, ffmpeg, yt-dlp.
+   *(VieNeu/Kokoro đã gỡ nên KHÔNG cần Python/torch nữa — việc này giờ nhẹ hơn nhiều.)*
+5. Dựng lại lịch sử migration cho khớp DB thật (gỡ món nợ ở mục 5).
+6. Trang liên hệ riêng + bằng chứng xã hội (đánh giá, video kết quả khách thật).
+7. Bật lifecycle rule R2 cho `outputs/` (dashboard Cloudflare, prefix `outputs/`, 7 ngày).
+8. Đối chiếu hoá đơn ElevenLabs thật → chỉnh lại `dubGeminiPerMin` nếu đang lỗ.
+
+## 7. Việc user cần tự kiểm tra bằng mắt (tôi không kiểm được)
+
+- Bảng công cụ studio **neo cạnh** — mở "Làm mờ"/"Lồng tiếng", xem video còn thấy không.
+- **Studio trên điện thoại thật** — nút thao tác đã nâng 18px → 44px.
+- **Khối chào người dùng mới** — tạo tài khoản mới để xem.
+- Chất lượng 4 nguồn giọng còn lại sau khi gỡ bớt.
