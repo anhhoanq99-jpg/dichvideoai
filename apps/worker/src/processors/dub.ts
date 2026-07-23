@@ -61,11 +61,6 @@ function ttsConcurrency(voice: string): number {
       return 2; // trả phí, RPM giới hạn — nhẹ tay
     case "eleven":
       return 3; // free tier hẹp
-    case "vieneu":
-    case "kokoro":
-      // chạy trên CPU của chính máy này: service lại serialize bằng lock nên
-      // gửi song song nhiều hơn chỉ xếp hàng thêm, mà còn tranh CPU với ffmpeg
-      return 2;
     default:
       return 6; // edge (miễn phí) + google cloud: thoải mái
   }
@@ -151,10 +146,8 @@ export async function dubProcessor(job: Job<JobPayload>) {
    * Provider nào nhận sẵn tham số tốc độ thì khỏi ép lại bằng atempo (đỡ méo
    * tiếng). Phải xét THEO TỪNG CÂU vì mỗi nhân vật có thể dùng nguồn khác nhau.
    */
-  // kokoro nhận speed trong synthesize(); vieneu KHÔNG có tham số speed nên
-  // vẫn phải để atempo kéo giãn (đã kiểm tra chữ ký infer của engine)
   const speedBakedFor = (v: string) =>
-    ["edge", "gcloud", "viettel", "fpt", "kokoro"].includes(voiceProvider(v));
+    ["edge", "gcloud"].includes(voiceProvider(v));
   const speed = clamp(params.speed ?? 1, 0.8, 1.3);
   const pitch = clamp(params.pitch ?? 0, -10, 10);
   const aiVol = clamp(params.aiVolume ?? 100, 0, 200) / 100;

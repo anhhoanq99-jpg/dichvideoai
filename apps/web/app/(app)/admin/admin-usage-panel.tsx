@@ -24,7 +24,7 @@ const T = {
     redisNote:
       "Upstash Redis không ghi vào bảng này — xem trực tiếp ở console.upstash.com. Gói free 500.000 lệnh/tháng; worker poll liên tục nên đây là thứ hay cạn trước nhất.",
     costNote:
-      "Chi phí là ƯỚC LƯỢNG theo đơn giá ghi trong worker, không phải hóa đơn thật. Nguồn miễn phí (Groq, Edge, Viettel, FPT, VieNeu, Kokoro) ghi 0.",
+      "Chi phí là ƯỚC LƯỢNG theo đơn giá ghi trong worker, không phải hóa đơn thật. Nguồn miễn phí (Groq, giọng Cơ bản) ghi 0.",
   },
   en: {
     subtitle:
@@ -44,7 +44,7 @@ const T = {
     redisNote:
       "Upstash Redis does not write to this table — check console.upstash.com. Free tier is 500,000 commands/month; the worker polls constantly, so this is usually the first thing to run out.",
     costNote:
-      "Cost is an ESTIMATE from the unit prices in the worker, not a real invoice. Free providers (Groq, Edge, Viettel, FPT, VieNeu, Kokoro) record 0.",
+      "Cost is an ESTIMATE from the unit prices in the worker, not a real invoice. Free providers (Groq, Basic voices) record 0.",
   },
 } as const;
 
@@ -63,17 +63,19 @@ const DAILY_CALL_LIMIT: Record<string, { perKey: number; label: string }> = {
 };
 
 /** Nguồn không tốn tiền — hiện cho đủ nhưng không cần cảnh báo. */
-const FREE_PROVIDERS = new Set(["groq", "viettel", "fpt", "vieneu", "kokoro", "azure-tts"]);
+const FREE_PROVIDERS = new Set(["groq", "azure-tts"]);
 
 const PROVIDER_LABEL: Record<string, string> = {
   gemini: "Gemini (dịch + OCR + giọng cao cấp)",
   groq: "Groq (nghe–chép + dịch dự phòng)",
   gcloud: "SubdubAI / Google TTS",
   eleven: "ElevenLabs",
-  viettel: "Viettel AI",
-  fpt: "FPT.AI",
-  vieneu: "VieNeu (chạy tại chỗ)",
-  kokoro: "Kokoro (chạy tại chỗ)",
+  // 4 nguồn dưới đây ĐÃ GỠ khỏi sản phẩm, nhưng dữ liệu CŨ trong usage_events
+  // vẫn còn — giữ nhãn để bảng không hiện ra chuỗi thô khó hiểu.
+  viettel: "Viettel AI (đã gỡ)",
+  fpt: "FPT.AI (đã gỡ)",
+  vieneu: "VieNeu (đã gỡ)",
+  kokoro: "Kokoro (đã gỡ)",
   "azure-tts": "Giọng cơ bản (Edge)",
   r2: "Lưu trữ R2",
 };

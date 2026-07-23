@@ -70,8 +70,6 @@ async function main() {
     ["gemini:Kore", false],
     ["gcloud:vi-VN-Chirp3-HD-Aoede", true],
     ["vi-VN-HoaiMyNeural", true],
-    ["vieneu:minh-duc", true],
-    ["kokoro:diem_trinh", true],
   ];
   for (const [id, expect] of cases) {
     const got = hasWideTtsQuota(id);

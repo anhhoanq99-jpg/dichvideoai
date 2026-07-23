@@ -5,18 +5,15 @@ import { GoogleGenAI } from "@google/genai";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import {
   elevenVoiceId,
-  fptVoiceName,
   gcloudVoiceName,
   geminiVoiceName,
   pcmToWav,
-  viettelVoiceName,
 } from "@dichvideo/shared";
 
 /**
  * Tổng hợp giọng nói phía WEB (dùng cho nghe thử + công cụ Nhân bản giọng nói).
- * Định tuyến theo tiền tố id giọng: gemini / eleven / gcloud / viettel / fpt /
- * (còn lại) edge. Đây là bản dùng chung cho /api/tts-preview và
- * /api/voice-clone/speak.
+ * Định tuyến theo tiền tố id giọng: gemini / eleven / gcloud / (còn lại) edge.
+ * Dùng chung cho /api/tts-preview và /api/voice-clone/speak.
  */
 export interface Synthesized {
   body: Buffer;
@@ -107,95 +104,17 @@ export async function synthGCloud(voiceName: string, text: string): Promise<Buff
   return Buffer.from(data.audioContent, "base64");
 }
 
-/** Viettel AI TTS — giọng Việt bản địa, trả thẳng wav (tts_return_option: 3). */
-export async function synthViettel(voiceName: string, text: string): Promise<Buffer> {
-  const token = process.env.VIETTEL_TTS_TOKEN;
-  if (!token) {
-    throw new Error(
-      "Giọng Viettel AI cần VIETTEL_TTS_TOKEN — đăng ký tại viettelgroup.ai rồi thêm vào .env",
-    );
-  }
-  const res = await fetch("https://viettelgroup.ai/voice/api/tts/v1/rest/syn", {
-    method: "POST",
-    headers: { "content-type": "application/json", token },
-    body: JSON.stringify({
-      text,
-      voice: voiceName,
-      id: "2",
-      without_filter: false,
-      speed: 1,
-      tts_return_option: 3, // 3 = wav
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Viettel TTS ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  }
-  return Buffer.from(await res.arrayBuffer());
-}
-
-/**
- * FPT.AI TTS — giọng Việt đủ 3 miền.
- * FPT trả về LINK mp3 CHƯA tồn tại ngay, phải poll tới khi tải được. Bản web
- * dùng hạn chờ NGẮN hơn worker (mặc định 45s thay vì 120s) vì đây là nghe thử:
- * người dùng đang đứng đợi, và route serverless cũng có trần thời gian.
- */
-export async function synthFpt(
-  voiceName: string,
-  text: string,
-  timeoutMs = 45_000,
-): Promise<Buffer> {
-  const apiKey = process.env.FPT_TTS_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "Giọng FPT.AI cần FPT_TTS_API_KEY — đăng ký tại console.fpt.ai rồi thêm vào .env",
-    );
-  }
-  const res = await fetch("https://api.fpt.ai/hmi/tts/v5", {
-    method: "POST",
-    headers: {
-      api_key: apiKey,
-      voice: voiceName,
-      speed: "0",
-      format: "mp3",
-      "content-type": "text/plain; charset=utf-8",
-    },
-    body: text.slice(0, 5000), // FPT giới hạn 5.000 ký tự/lượt
-  });
-  const data = (await res.json().catch(() => null)) as {
-    async?: string;
-    message?: string;
-  } | null;
-  if (!res.ok || !data?.async) {
-    throw new Error(`FPT TTS ${res.status}: ${data?.message ?? "không có link audio"}`);
-  }
-
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const got = await fetch(data.async);
-    if (got.ok) {
-      const buf = await got.arrayBuffer();
-      if (buf.byteLength > 1024) return Buffer.from(buf);
-    }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  throw new Error("FPT TTS: chờ quá lâu mà file mp3 chưa sẵn sàng — thử lại");
-}
-
 /**
  * Đọc `text` bằng bất kỳ id giọng nào trong catalog
- * (edge/gemini/eleven/gcloud/viettel/fpt).
+ * (edge/gemini/eleven/gcloud).
  * KHÔNG xử lý giọng nhân bản "mine:" — nơi gọi tự resolve rồi dùng synthEleven.
  */
 export async function synthesizeVoice(voice: string, text: string): Promise<Synthesized> {
   const gemini = geminiVoiceName(voice);
   const eleven = elevenVoiceId(voice);
   const gcloud = gcloudVoiceName(voice);
-  const viettel = viettelVoiceName(voice);
-  const fpt = fptVoiceName(voice);
   if (gemini) return { body: await synthGemini(gemini, text), type: "audio/wav" };
   if (eleven) return { body: await synthEleven(eleven, text), type: "audio/mpeg" };
   if (gcloud) return { body: await synthGCloud(gcloud, text), type: "audio/mpeg" };
-  if (viettel) return { body: await synthViettel(viettel, text), type: "audio/wav" };
-  if (fpt) return { body: await synthFpt(fpt, text), type: "audio/mpeg" };
   return { body: await synthEdge(voice, text), type: "audio/mpeg" };
 }

@@ -5,12 +5,8 @@ import { UnrecoverableError } from "bullmq";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import {
   elevenVoiceId,
-  fptVoiceName,
   gcloudVoiceName,
   geminiVoiceName,
-  kokoroVoiceName,
-  vieneuVoiceName,
-  viettelVoiceName,
   pcmToWav,
 } from "@dichvideo/shared";
 import {
@@ -231,141 +227,6 @@ export async function synthesizeGCloudClip(input: {
 const MAX_TTS_RETRIES = 6;
 
 /**
- * Sinh clip theo id giọng bất kỳ: "gemini:Xxx" → Gemini TTS (trả phí),
- * "eleven:Xxx" → ElevenLabs, "gcloud:Xxx" → Google Cloud TTS,
- * còn lại → Edge TTS (miễn phí). Retry quanh lỗi mạng; gặp 429 thì chờ
- * đúng thời gian provider yêu cầu rồi thử lại.
- */
-/**
- * Sinh 1 clip bằng Viettel AI TTS (giọng Việt bản địa, free ~500k ký tự/ngày).
- * Cần VIETTEL_TTS_TOKEN. API trả THẲNG file wav nên gọn hơn FPT.
- */
-export async function synthesizeViettelClip(input: {
-  text: string;
-  /** tên voice thật, vd "hn-thanhtung" */
-  voiceName: string;
-  /** 0.8 .. 1.3 — Viettel nhận speed nên bake luôn, khỏi atempo */
-  speed: number;
-  dir: string;
-  name: string;
-}): Promise<{ file: string; usage: UsageRecord[] }> {
-  const token = process.env.VIETTEL_TTS_TOKEN;
-  if (!token) {
-    throw new UnrecoverableError(
-      "Giọng Viettel AI cần VIETTEL_TTS_TOKEN — đăng ký tại viettelgroup.ai, tạo token rồi thêm vào .env.",
-    );
-  }
-  const res = await fetch("https://viettelgroup.ai/voice/api/tts/v1/rest/syn", {
-    method: "POST",
-    headers: { "content-type": "application/json", token },
-    body: JSON.stringify({
-      text: input.text,
-      voice: input.voiceName,
-      id: "2",
-      without_filter: false,
-      speed: input.speed,
-      tts_return_option: 3, // 3 = wav
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Viettel TTS ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  }
-  const file = path.join(input.dir, `${input.name}.wav`);
-  await mkdir(input.dir, { recursive: true });
-  await writeFile(file, Buffer.from(await res.arrayBuffer()));
-  return {
-    file,
-    // gói miễn phí — không tính chi phí, vẫn ghi số ký tự để theo dõi hạn mức
-    usage: [
-      {
-        provider: "viettel",
-        metric: "chars",
-        quantity: input.text.length,
-        costUsdMicros: 0,
-      },
-    ],
-  };
-}
-
-/**
- * Sinh 1 clip bằng FPT.AI TTS (7 giọng Việt đủ 3 miền). Cần FPT_TTS_API_KEY.
- *
- * FPT trả về LINK mp3 CHƯA tồn tại ngay — tài liệu ghi phải chờ 5 giây tới
- * 2 phút. Nên phải poll link tới khi tải được, khác hẳn các provider trả
- * thẳng audio. Đây cũng là lý do FPT chậm hơn Viettel khi đọc nhiều câu.
- */
-export async function synthesizeFptClip(input: {
-  text: string;
-  /** tên voice thật, vd "banmai" */
-  voiceName: string;
-  /** 0.8 .. 1.3 → FPT nhận -3..3, 0 là bình thường */
-  speed: number;
-  dir: string;
-  name: string;
-}): Promise<{ file: string; usage: UsageRecord[] }> {
-  const apiKey = process.env.FPT_TTS_API_KEY;
-  if (!apiKey) {
-    throw new UnrecoverableError(
-      "Giọng FPT.AI cần FPT_TTS_API_KEY — đăng ký tại console.fpt.ai rồi thêm vào .env.",
-    );
-  }
-  // 0.8..1.3 → khoảng -1..1 của FPT (thang -3..3), làm tròn cho an toàn
-  const fptSpeed = Math.max(-3, Math.min(3, Math.round((input.speed - 1) * 4)));
-  const res = await fetch("https://api.fpt.ai/hmi/tts/v5", {
-    method: "POST",
-    headers: {
-      api_key: apiKey,
-      voice: input.voiceName,
-      speed: String(fptSpeed),
-      format: "mp3",
-      "content-type": "text/plain; charset=utf-8",
-    },
-    body: input.text.slice(0, 5000), // FPT giới hạn 5.000 ký tự/lượt
-  });
-  const data = (await res.json().catch(() => null)) as {
-    async?: string;
-    error?: number;
-    message?: string;
-  } | null;
-  if (!res.ok || !data?.async) {
-    throw new Error(
-      `FPT TTS lỗi ${res.status}: ${data?.message ?? "không có link audio"}`,
-    );
-  }
-
-  // Chờ file xuất hiện — tài liệu nói 5s..2 phút
-  const deadline = Date.now() + 120_000;
-  let audio: ArrayBuffer | null = null;
-  while (Date.now() < deadline) {
-    const got = await fetch(data.async);
-    if (got.ok) {
-      const buf = await got.arrayBuffer();
-      if (buf.byteLength > 1024) {
-        audio = buf;
-        break;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  if (!audio) throw new Error("FPT TTS: chờ quá lâu mà file mp3 chưa sẵn sàng");
-
-  const file = path.join(input.dir, `${input.name}.mp3`);
-  await mkdir(input.dir, { recursive: true });
-  await writeFile(file, Buffer.from(audio));
-  return {
-    file,
-    usage: [
-      {
-        provider: "fpt",
-        metric: "chars",
-        quantity: input.text.length,
-        costUsdMicros: 0,
-      },
-    ],
-  };
-}
-
-/**
  * Google Cloud TTS hết hạn mức THẬT (hết free tier tháng, chưa bật billing,
  * API bị tắt) → hạ xuống Edge miễn phí thay vì để job fail.
  *
@@ -383,71 +244,6 @@ export function isGCloudQuotaError(err: unknown): boolean {
   );
 }
 
-/**
- * Sinh 1 clip bằng service TTS CHẠY TẠI CHỖ (`services/tts-local`, pm2
- * `dichvideo-tts`) — VieNeu v3-turbo hoặc Kokoro-Vietnamese.
- *
- * Khác mọi provider còn lại: không gọi ra Internet, không key, không hạn mức.
- * Đổi lại nó chỉ sống khi service pm2 đang chạy trên CÙNG máy với worker, nên
- * service chết là phải báo lỗi rõ ràng thay vì để retry 6 lần vô ích.
- *
- * Kokoro nhận `speed` nên bake luôn; VieNeu KHÔNG có tham số speed (đã kiểm tra
- * chữ ký infer) nên để worker kéo giãn bằng ffmpeg — xem `speedBakedFor` ở dub.ts.
- */
-export async function synthesizeLocalClip(input: {
-  text: string;
-  engine: "vieneu" | "kokoro";
-  /** slug đã bỏ tiền tố, vd "minh-duc" hoặc "diem_trinh" */
-  voiceName: string;
-  speed: number;
-  dir: string;
-  name: string;
-}): Promise<{ file: string; usage: UsageRecord[] }> {
-  const base = process.env.TTS_LOCAL_URL ?? "http://127.0.0.1:8123";
-  let res: Response;
-  try {
-    res = await fetch(`${base}/tts`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        engine: input.engine,
-        voice: input.voiceName,
-        text: input.text,
-        speed: input.speed,
-      }),
-    });
-  } catch (err) {
-    throw new UnrecoverableError(
-      `Không kết nối được service giọng nội bộ (${base}). Giọng VieNeu/Kokoro chạy ` +
-        `trên chính máy cài worker — kiểm tra "pm2 status dichvideo-tts". ` +
-        `Chi tiết: ${err instanceof Error ? err.message : err}`,
-    );
-  }
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 200);
-    // 400 = sai id giọng → retry vô nghĩa
-    if (res.status === 400) {
-      throw new UnrecoverableError(`Giọng không hợp lệ với ${input.engine}: ${detail}`);
-    }
-    throw new Error(`Service giọng nội bộ ${res.status}: ${detail}`);
-  }
-
-  const file = path.join(input.dir, `${input.name}.wav`);
-  await mkdir(input.dir, { recursive: true });
-  await writeFile(file, Buffer.from(await res.arrayBuffer()));
-  return {
-    file,
-    usage: [
-      {
-        provider: input.engine,
-        metric: "chars",
-        quantity: input.text.length,
-        costUsdMicros: 0, // chạy tại chỗ — không mất tiền
-      },
-    ],
-  };
-}
-
 export async function synthesizeClipWithRetry(input: {
   text: string;
   voice: string;
@@ -460,10 +256,6 @@ export async function synthesizeClipWithRetry(input: {
   const gemini = geminiVoiceName(input.voice);
   const eleven = elevenVoiceId(input.voice);
   const gcloud = gcloudVoiceName(input.voice);
-  const fpt = fptVoiceName(input.voice);
-  const viettel = viettelVoiceName(input.voice);
-  const vieneu = vieneuVoiceName(input.voice);
-  const kokoro = kokoroVoiceName(input.voice);
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
@@ -489,34 +281,6 @@ export async function synthesizeClipWithRetry(input: {
           voiceName: gcloud,
           speed: input.speed,
           pitch: input.pitch,
-          dir: input.dir,
-          name: input.name,
-        });
-      }
-      if (viettel) {
-        return await synthesizeViettelClip({
-          text: input.text,
-          voiceName: viettel,
-          speed: input.speed,
-          dir: input.dir,
-          name: input.name,
-        });
-      }
-      if (fpt) {
-        return await synthesizeFptClip({
-          text: input.text,
-          voiceName: fpt,
-          speed: input.speed,
-          dir: input.dir,
-          name: input.name,
-        });
-      }
-      if (vieneu || kokoro) {
-        return await synthesizeLocalClip({
-          text: input.text,
-          engine: vieneu ? "vieneu" : "kokoro",
-          voiceName: (vieneu ?? kokoro)!,
-          speed: input.speed,
           dir: input.dir,
           name: input.name,
         });

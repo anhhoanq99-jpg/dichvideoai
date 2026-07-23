@@ -22,10 +22,6 @@ check("Gemini", isPremiumVoice("gemini:Kore"), true);
 check("ElevenLabs (truoc day bi tinh gia Edge)", isPremiumVoice("eleven:pNInz6obpgDQGcFmaJgB"), true);
 check("Edge mien phi", isPremiumVoice("vi-VN-HoaiMyNeural"), false);
 check("SubdubAI/Google", isPremiumVoice("gcloud:vi-VN-Chirp3-HD-Aoede"), false);
-check("Viettel (free tier rong)", isPremiumVoice("viettel:doanngocle"), false);
-check("FPT (free tier rong)", isPremiumVoice("fpt:banmai"), false);
-check("VieNeu chay tai cho", isPremiumVoice("vieneu:minh-duc"), false);
-check("Kokoro chay tai cho", isPremiumVoice("kokoro:diem_trinh"), false);
 
 console.log("\n=== Gia long tieng 10 phut ===");
 const tenMin = { durationSec: 600 };

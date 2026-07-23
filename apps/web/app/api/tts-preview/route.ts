@@ -2,32 +2,19 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { GoogleGenAI } from "@google/genai";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import {
   EDGE_VOICE_IDS,
   elevenVoiceId,
-  fptVoiceName,
   gcloudVoiceName,
   geminiVoiceName,
   isValidVoiceId,
-  kokoroVoiceName,
   pcmToWav,
-  vieneuVoiceName,
-  viettelVoiceName,
 } from "@dichvideo/shared";
-import { getR2, r2Bucket } from "@/lib/r2";
 import { getSession } from "@/lib/session";
 import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
-// Viettel/FPT dùng lại hàm trong lib/tts-web thay vì chép lần nữa — route này
-// vốn đã lặp lại 4 hàm synth của tts-web, đừng nhân thêm chỗ phải sửa.
-import { synthFpt, synthViettel } from "@/lib/tts-web";
-
-// FPT trả link mp3 phải chờ (poll) nên cần trần thời gian rộng hơn mặc định
-export const maxDuration = 60;
 
 const VI_SAMPLE = "Xin chào! Đây là giọng đọc thử của mình, rất vui được đồng hành cùng video của bạn.";
 const EN_SAMPLE = "Hello! This is a short preview of my voice.";
@@ -40,59 +27,12 @@ declare global {
 }
 const cache = (globalThis.__ttsPreviewCache ??= new Map());
 
-/** URL ký sẵn tới mẫu giọng đã sinh sẵn trên R2; null nếu chưa upload. */
-async function presignedVoiceSample(voice: string): Promise<string | null> {
-  const key = `voice-samples/${voice}.wav`;
-  try {
-    await getR2().send(new HeadObjectCommand({ Bucket: r2Bucket(), Key: key }));
-  } catch {
-    return null;
-  }
-  return getSignedUrl(getR2(), new GetObjectCommand({ Bucket: r2Bucket(), Key: key }), {
-    expiresIn: 3600,
-  });
-}
-
 /**
- * Nghe thử theo câu tùy ý: chỉ nguồn có hạn mức rộng — Edge (free),
- * GCloud (1-4tr ký tự), và VieNeu/Kokoro (chạy tại chỗ, hoàn toàn không tốn phí).
+ * Nghe thử theo câu tùy ý: chỉ nguồn có hạn mức rộng — Edge (free) và
+ * GCloud (1-4tr ký tự/tháng).
  */
 function allowsCustomText(voice: string): boolean {
-  return (
-    EDGE_VOICE_IDS.has(voice) ||
-    gcloudVoiceName(voice) !== null ||
-    vieneuVoiceName(voice) !== null ||
-    kokoroVoiceName(voice) !== null
-  );
-}
-
-/**
- * Gọi service giọng chạy tại chỗ (pm2 `dichvideo-tts`).
- * CHỈ tới được khi web chạy CÙNG máy với service (pnpm dev:web). Trên Vercel
- * thì không — nên lỗi kết nối phải nói rõ điều đó thay vì báo chung chung.
- */
-async function synthesizeLocalSample(
-  engine: "vieneu" | "kokoro",
-  voiceName: string,
-  text: string,
-): Promise<Buffer> {
-  const base = process.env.TTS_LOCAL_URL ?? "http://127.0.0.1:8123";
-  let res: Response;
-  try {
-    res = await fetch(`${base}/tts`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ engine, voice: voiceName, text, speed: 1 }),
-    });
-  } catch {
-    throw new Error(
-      "Nghe thử theo câu cho giọng VieNeu/Kokoro chỉ chạy khi web mở trên chính " +
-        "máy cài worker (pnpm dev:web). Lồng tiếng cả video thì vẫn chạy bình thường " +
-        "vì worker nằm sẵn trên máy đó.",
-    );
-  }
-  if (!res.ok) throw new Error(`Service giọng nội bộ ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  return EDGE_VOICE_IDS.has(voice) || gcloudVoiceName(voice) !== null;
 }
 
 async function synthesizeEdge(voice: string, text: string): Promise<Buffer> {
@@ -183,30 +123,9 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("text")?.trim().slice(0, MAX_PREVIEW_TEXT) || null;
   if (customText && !allowsCustomText(voice)) {
     return NextResponse.json(
-      { error: "Nghe thử theo câu chỉ hỗ trợ giọng thường / Google Cloud / VieNeu / Kokoro" },
+      { error: "Nghe thử theo câu chỉ hỗ trợ giọng Cơ bản / SubdubAI" },
       { status: 400 },
     );
-  }
-
-  const vieneu = vieneuVoiceName(voice);
-  const kokoro = kokoroVoiceName(voice);
-  // Nghe thử GIỌNG (không kèm câu) → mẫu sinh sẵn trên R2: luôn có, không phụ
-  // thuộc máy user bật hay không.
-  // CÓ kèm câu (studio đọc từng dòng phụ đề) thì BẮT BUỘC tổng hợp thật — trước
-  // đây chỗ này trả mẫu R2 nên mọi dòng đều phát cùng một câu "Xin chào…",
-  // trông như lồng tiếng không đọc theo video.
-  if ((vieneu || kokoro) && !customText) {
-    const url = await presignedVoiceSample(voice);
-    if (!url) {
-      return NextResponse.json(
-        { error: "Chưa có mẫu nghe thử cho giọng này — chạy upload-local-voice-samples.ts" },
-        { status: 404 },
-      );
-    }
-    return NextResponse.redirect(url, {
-      status: 302,
-      headers: { "cache-control": "private, max-age=3600" },
-    });
   }
 
   const cacheKey = customText ? `${voice}:${customText}` : voice;
@@ -227,27 +146,13 @@ export async function GET(req: NextRequest) {
     const gemini = geminiVoiceName(voice);
     const eleven = elevenVoiceId(voice);
     const gcloud = gcloudVoiceName(voice);
-    const viettel = viettelVoiceName(voice);
-    const fpt = fptVoiceName(voice);
-    if (vieneu || kokoro) {
-      body = await synthesizeLocalSample(
-        vieneu ? "vieneu" : "kokoro",
-        (vieneu ?? kokoro)!,
-        customText ?? VI_SAMPLE,
-      );
-      type = "audio/wav";
-    } else if (gemini) {
+    if (gemini) {
       body = await synthesizeGeminiSample(gemini);
       type = "audio/wav";
     } else if (eleven) {
       body = await synthesizeElevenSample(eleven);
     } else if (gcloud) {
       body = await synthesizeGCloud(gcloud, customText ?? VI_SAMPLE);
-    } else if (viettel) {
-      body = await synthViettel(viettel, VI_SAMPLE);
-      type = "audio/wav";
-    } else if (fpt) {
-      body = await synthFpt(fpt, VI_SAMPLE);
     } else {
       body = await synthesizeEdge(
         voice,

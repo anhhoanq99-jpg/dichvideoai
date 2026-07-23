@@ -13,10 +13,6 @@ export const workerEnvSchema = z.object({
   GEMINI_API_KEYS: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
   GOOGLE_TTS_API_KEY: z.string().optional(),
-  /** Viettel AI TTS — giọng Việt bản địa, free ~500k ký tự/ngày */
-  VIETTEL_TTS_TOKEN: z.string().optional(),
-  /** FPT.AI TTS — 7 giọng Việt đủ 3 miền */
-  FPT_TTS_API_KEY: z.string().optional(),
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),

@@ -7,11 +7,6 @@ export interface UsageRecord {
     | "azure-tts"
     | "eleven"
     | "gcloud"
-    | "fpt"
-    | "viettel"
-    // chạy tại chỗ trên máy có worker — không tốn tiền, vẫn ghi ký tự để so sánh
-    | "vieneu"
-    | "kokoro"
     | "r2";
   metric: "tokens_in" | "tokens_out" | "audio_sec" | "chars" | "bytes";
   quantity: number;

@@ -45,7 +45,7 @@ test("API bi tat -> ha cap", () => {
 
 test("loi cua nguon KHAC khong dinh vao", () => {
   assert.equal(isGCloudQuotaError(new Error("ElevenLabs 429: quota exceeded")), false);
-  assert.equal(isGCloudQuotaError(new Error("Viettel TTS 500: loi he thong")), false);
+  assert.equal(isGCloudQuotaError(new Error("Gemini TTS 500: loi he thong")), false);
   assert.equal(isGCloudQuotaError(new Error("mat mang")), false);
 });
 
@@ -59,7 +59,7 @@ test("ha cap giu DUNG gioi tinh giong", () => {
   assert.equal(edgeFallbackVoice("gcloud:vi-VN-Chirp3-HD-Aoede"), "vi-VN-HoaiMyNeural");
   assert.equal(edgeFallbackVoice("gcloud:vi-VN-Chirp3-HD-Achird"), "vi-VN-NamMinhNeural");
   assert.equal(edgeFallbackVoice("gemini:Puck"), "vi-VN-NamMinhNeural");
-  assert.equal(edgeFallbackVoice("vieneu:truc-ly"), "vi-VN-HoaiMyNeural");
+  assert.equal(edgeFallbackVoice("gcloud:vi-VN-Chirp3-HD-Leda"), "vi-VN-HoaiMyNeural");
 });
 
 test("giong la khong lam vo, roi ve giong nu", () => {
