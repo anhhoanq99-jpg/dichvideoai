@@ -13,7 +13,11 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "studio": "drizzle-kit studio",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:drift": "tsx --env-file=../../.env scripts/check-db-drift.ts",
+    "db:constraints": "tsx --env-file=../../.env scripts/check-db-constraints.ts",
+    "db:dryrun": "tsx --env-file=../../.env scripts/dryrun-migration.ts",
+    "db:verify-migrations": "tsx --env-file=../../.env scripts/verify-migrations-fresh.ts"
   },
   "dependencies": {
     "@dichvideo/shared": "workspace:*",
@@ -25,6 +29,7 @@
     "@types/pg": "^8.15.6",
     "dotenv": "^17.2.4",
     "drizzle-kit": "^0.31.6",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }

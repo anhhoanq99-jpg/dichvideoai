@@ -54,6 +54,11 @@ Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
   burn bằng ffmpeg libx264 (KHÔNG GPU — đã đo, không nhanh hơn).
 - **Import link**: YouTube ưu tiên tải H.264/avc1 (`import.ts`) — AV1 không phát Safari/iPhone → preview đen.
 - **File kết quả R2**: key `outputs/{userId}/{videoId}/{jobId}.mp4` — tự xóa sau 7 ngày (lifecycle rule; xem HANDOFF việc tiếp theo).
+- **Đổi schema DB đi bằng MIGRATION, KHÔNG `drizzle-kit push`**:
+  `pnpm --filter @dichvideo/db generate` → xem file SQL → `… migrate`. Lịch sử đã được dựng lại
+  khớp DB thật (baseline `0002_drift_baseline.sql`, đã kiểm chứng dựng đúng prod từ con số 0);
+  `push` là thứ làm lệch lần trước. Kiểm tra bất cứ lúc nào: `pnpm --filter @dichvideo/db db:drift`
+  và `… db:verify-migrations` (dựng DB tạm rồi so với prod, tự dọn).
 - **Rate-limit API**: dùng chung `apps/web/lib/rate-limit.ts` — `rateLimit(bucket, callerId(req, userId), limit, windowSec)`
   + `tooManyRequests()`. Redis Upstash, fail-open. Route tốn tiền/băng thông mới cần gắn (TTS/dịch/import/upload đã gắn).
 - **UI primitive dùng chung** trong `apps/web/components/ui/`: `Button` (variant primary/secondary/ghost/danger + size sm/md/lg
