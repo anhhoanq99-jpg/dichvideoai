@@ -37,8 +37,8 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 
 | Commit | Nội dung | File chính |
 |---|---|---|
-| *(mới)* | **Trang liên hệ `/lien-he`** — Zalo + form nhắn thẳng admin | `app/(marketing)/lien-he/page.tsx` (mới), `marketing/support-message-form.tsx` (mới), `site-footer.tsx`, `app/sitemap.ts` |
-| *(mới)* | **Dựng lại lịch sử migration khớp DB thật** — hết món nợ `drizzle-kit push` | `db/migrations/0002_drift_baseline.sql` (mới), `db/scripts/` (4 script mới), `db/package.json`, `db/tsconfig.json` |
+| `7c79539` | **Trang liên hệ `/lien-he`** — Zalo + form nhắn thẳng admin | `app/(marketing)/lien-he/page.tsx` (mới), `marketing/support-message-form.tsx` (mới), `site-footer.tsx`, `app/sitemap.ts` |
+| `da2c514` | **Dựng lại lịch sử migration khớp DB thật** — hết món nợ `drizzle-kit push` | `db/migrations/0002_drift_baseline.sql` (mới), `db/scripts/` (4 script mới), `db/package.json`, `db/tsconfig.json` |
 | `b971bf8` | **Gỡ bỏ VieNeu, Kokoro, Viettel AI, FPT.AI** (chất lượng kém, không có key) | `shared/dub-presets.ts`, `worker/lib/tts.ts`, `worker/lib/usage.ts`, `worker/processors/dub.ts`, `web/lib/tts-web.ts`, `api/tts-preview`, `voice-picker.tsx`, xoá `services/tts-local/`, `.venv-tts` |
 | `04f2d4f` | Trang Quản trị chia **4 tab** | `admin/admin-tabs.tsx` (mới), `admin/page.tsx` |
 | `628d2f3` | **Bảng theo dõi tiêu thụ API** + cảnh báo sắp chạm trần | `admin/admin-usage-panel.tsx` (mới) |
