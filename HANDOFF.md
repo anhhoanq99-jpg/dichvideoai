@@ -37,6 +37,8 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 
 | Commit | Nội dung | File chính |
 |---|---|---|
+| *(mới)* | **Trang liên hệ `/lien-he`** — Zalo + form nhắn thẳng admin | `app/(marketing)/lien-he/page.tsx` (mới), `marketing/support-message-form.tsx` (mới), `site-footer.tsx`, `app/sitemap.ts` |
+| *(mới)* | **Dựng lại lịch sử migration khớp DB thật** — hết món nợ `drizzle-kit push` | `db/migrations/0002_drift_baseline.sql` (mới), `db/scripts/` (4 script mới), `db/package.json`, `db/tsconfig.json` |
 | `b971bf8` | **Gỡ bỏ VieNeu, Kokoro, Viettel AI, FPT.AI** (chất lượng kém, không có key) | `shared/dub-presets.ts`, `worker/lib/tts.ts`, `worker/lib/usage.ts`, `worker/processors/dub.ts`, `web/lib/tts-web.ts`, `api/tts-preview`, `voice-picker.tsx`, xoá `services/tts-local/`, `.venv-tts` |
 | `04f2d4f` | Trang Quản trị chia **4 tab** | `admin/admin-tabs.tsx` (mới), `admin/page.tsx` |
 | `628d2f3` | **Bảng theo dõi tiêu thụ API** + cảnh báo sắp chạm trần | `admin/admin-usage-panel.tsx` (mới) |
@@ -51,6 +53,14 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 `check-queue-health.ts` · `check-capacity.ts` · `check-cost-projection.ts` · `check-money-fixes.ts` ·
 `check-ledger-dups.ts` · `add-ledger-unique-index.ts` · `check-usage-query.ts` · `check-removed-voices.ts` ·
 `check-edge-fallback.ts`. Bên web: `check-pricing.ts`, `check-contrast.ts`, `check-default-voice.ts`.
+
+**Script DB/migration** (`packages/db/scripts/`, chạy qua pnpm script — có sẵn `tsx` + `pg`):
+```bash
+pnpm --filter @dichvideo/db db:drift              # bảng/cột/enum/index thật + lịch sử migration đã ghi nhận
+pnpm --filter @dichvideo/db db:constraints        # tên khoá ngoại thật
+pnpm --filter @dichvideo/db db:dryrun             # chạy thử 0002 trên prod rồi ROLLBACK (chứng minh idempotent)
+pnpm --filter @dichvideo/db db:verify-migrations  # dựng DB tạm từ 0 rồi so với prod, xong tự xoá
+```
 
 ## 4. QUYẾT ĐỊNH quan trọng session này
 
@@ -74,6 +84,16 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
   KHÔNG đổi bảng màu — `primary-600` đo được 4,41:1, vẫn trượt chuẩn.
 - **Trang Quản trị**: nội dung do server render, truyền vào `AdminTabs` (client) làm children —
   giữ mọi truy vấn DB phía máy chủ.
+- **Migration baseline `0002` phải IDEMPOTENT** (`IF NOT EXISTS` + `DO $$ … EXCEPTION WHEN
+  duplicate_object $$`). Nó mô tả những thứ ĐÃ CÓ SẴN trên prod (do `drizzle-kit push` đưa lên),
+  nên vừa phải chạy được như no-op trên prod, vừa phải dựng đúng trên DB trống. Đừng sửa nó về
+  dạng thường. **Từ 0003 trở đi viết bình thường** — lịch sử đã sạch.
+- **Trang liên hệ KHÔNG dựng bảng `contact_submissions` riêng** — form POST thẳng vào
+  `/api/chat` `room="support"`, tức cùng hộp thư với trang Chat. Hai chỗ nhận tin nhắn mà
+  admin chỉ nhớ một chỗ là kiểu bỏ sót khách đã trả tiền.
+- **Kiểm chứng bằng DB thật, không bằng mắt**: `db:dryrun` (chạy thật rồi ROLLBACK) chứng minh
+  không nổ trên prod; `db:verify-migrations` dựng DB tạm từ con số 0 rồi so từng cột/enum/index/
+  ràng buộc với prod. Đã chạy: **112 cột · 5 enum · 26 index · 28 ràng buộc — khớp tuyệt đối.**
 
 ## 5. LỖI/VẤN ĐỀ đã biết, CHƯA xử lý
 
@@ -81,15 +101,13 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 - 🔴 **Gemini vẫn gói free** — 20 lượt/ngày/key/model ≈ **1–2 video/ngày/key**. Đây là trần cứng
   của sản phẩm lõi. Chi phí bật billing rất nhỏ (đo thật: **$0,64/tháng ở 20 video/ngày**,
   **$3,18 ở 100 video/ngày** với 2.5-flash). User chưa bật.
-- 🟠 **`migrations/` LỆCH thực tế** — `chat_messages`, `community_*`, `cloned_voices`,
-  `videos.target_lang` được đưa lên bằng `drizzle-kit push`, không có file migration.
-  **ĐỪNG chạy `drizzle-kit migrate`** — nó sẽ cố tạo lại bảng đã tồn tại và hỏng DB.
-  Index unique vừa thêm đã áp bằng script riêng (idempotent).
 - 🟠 **Worker nằm trên máy cá nhân** — máy tắt = dịch vụ chết. VPS 4 nhân (~$7–20/tháng) dư sức.
 - 🟡 Giá lồng tiếng ElevenLabs đã nâng lên bậc cao cấp (700 xu/phút) nhưng **có thể vẫn lỗ** —
   giá ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại. Cần đối chiếu hoá đơn thật.
 - 🟡 **Chưa có thông tin pháp lý/công ty** (NĐ 52/2013, 85/2021) — user chủ động bỏ qua.
-- 🟡 Chưa có bằng chứng xã hội thật (đánh giá, video khách). Con số "1.500+" là tự đặt.
+- 🟡 Chưa có bằng chứng xã hội thật (đánh giá, video khách). Con số "1.500+" ở
+  `hero-section.tsx` là tự đặt (số thật: 7 user · 103 video) — **user đã quyết GIỮ NGUYÊN
+  (23/07/2026), đừng tự sửa**. Rủi ro đã báo: Luật Quảng cáo + mất niềm tin nếu khách phát hiện.
 - 🟡 Nhân bản giọng riêng không chạy — key ElevenLabs free thiếu quyền `create_instant_voice_clone`.
 - 🟡 File R2 `outputs/` nói "xoá sau 7 ngày" nhưng **lifecycle rule chưa bật** (token object-scoped).
 - ⚪ Lint còn 1 warning cố hữu (TanStack Virtual ở `segment-table.tsx`) — vô hại.
@@ -102,8 +120,9 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 3. Chạy 1 tuần, xem **Quản trị → Mức tiêu thụ API** để biết số thật, rồi mới chọn gói.
 4. **Chuyển worker sang VPS** (Hetzner/Contabo). Cần dựng: Node, ffmpeg, yt-dlp.
    *(VieNeu/Kokoro đã gỡ nên KHÔNG cần Python/torch nữa — việc này giờ nhẹ hơn nhiều.)*
-5. Dựng lại lịch sử migration cho khớp DB thật (gỡ món nợ ở mục 5).
-6. Trang liên hệ riêng + bằng chứng xã hội (đánh giá, video kết quả khách thật).
+5. ~~Dựng lại lịch sử migration cho khớp DB thật~~ — **XONG** (`0002_drift_baseline.sql`).
+6. ~~Trang liên hệ riêng~~ — **XONG** (`/lien-he`). Còn lại: bằng chứng xã hội thật
+   (đánh giá, video kết quả khách) — cần user thu thập, tôi không bịa được.
 7. Bật lifecycle rule R2 cho `outputs/` (dashboard Cloudflare, prefix `outputs/`, 7 ngày).
 8. Đối chiếu hoá đơn ElevenLabs thật → chỉnh lại `dubGeminiPerMin` nếu đang lỗ.
 
@@ -113,3 +132,6 @@ nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
 - **Studio trên điện thoại thật** — nút thao tác đã nâng 18px → 44px.
 - **Khối chào người dùng mới** — tạo tài khoản mới để xem.
 - Chất lượng 4 nguồn giọng còn lại sau khi gỡ bớt.
+- **Trang `/lien-he` khi ĐÃ đăng nhập**: gõ tin rồi bấm "Gửi cho admin" → phải hiện xác nhận
+  xanh và tin nhắn xuất hiện trong `/chat` tab Hỗ trợ. *(Tôi đã kiểm được nhánh chưa đăng nhập,
+  render VI/EN, link footer, sitemap; nhánh gửi thật cần một phiên đăng nhập.)*

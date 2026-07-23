@@ -15,6 +15,7 @@ const T = {
     navFaq: "Hỏi đáp",
     navTerms: "Điều khoản",
     navPrivacy: "Bảo mật",
+    navContact: "Liên hệ",
     navLogin: "Đăng nhập",
     support: "Hỗ trợ",
     zalo: "Zalo",
@@ -30,6 +31,7 @@ const T = {
     navFaq: "FAQ",
     navTerms: "Terms",
     navPrivacy: "Privacy",
+    navContact: "Contact",
     navLogin: "Sign in",
     support: "Support",
     zalo: "Zalo",
@@ -75,6 +77,7 @@ export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
           <Link href={`${home}#faq`} className="hover:text-white">{t.navFaq}</Link>
           <Link href="/dieu-khoan" className="hover:text-white">{t.navTerms}</Link>
           <Link href="/bao-mat" className="hover:text-white">{t.navPrivacy}</Link>
+          <Link href="/lien-he" className="hover:text-white">{t.navContact}</Link>
           <Link href="/login" className="hover:text-white">{t.navLogin}</Link>
           {/* Bán qua chuyển khoản mà không có kênh liên hệ nào là rào cản
               chuyển đổi lớn nhất — khách cần biết gọi ai khi tiền đã chuyển. */}
