@@ -13,6 +13,7 @@ import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
 import { isAdminEmail } from "@/lib/admin";
 import { AdminDemoClient } from "./admin-demo-client";
+import { AdminUsagePanel } from "./admin-usage-panel";
 import {
   AdminModerationClient,
   type ModComment,
@@ -34,6 +35,7 @@ const T = {
     recent: "Lượt nạp gần đây",
     noTopups: "Chưa có lượt nạp nào.",
     demoTitle: "Video demo trang chủ",
+    usageTitle: "Mức tiêu thụ API & hạn mức",
     modTitle: "Kiểm duyệt cộng đồng",
     xu: "xu",
   },
@@ -49,6 +51,7 @@ const T = {
     recent: "Recent top-ups",
     noTopups: "No top-ups yet.",
     demoTitle: "Homepage demo videos",
+    usageTitle: "API usage & quotas",
     modTitle: "Community moderation",
     xu: "credits",
   },
@@ -261,6 +264,15 @@ export default async function AdminPage() {
             </table>
           </div>
         )}
+      </section>
+
+      {/* Mức tiêu thụ API — đặt trên cùng nhóm vì đây là thứ chết trước:
+          hết hạn mức là job dừng giữa chừng, khách trả tiền chịu trận. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+          {t.usageTitle}
+        </h2>
+        <AdminUsagePanel lang={lang} />
       </section>
 
       {/* Kiểm duyệt cộng đồng */}
