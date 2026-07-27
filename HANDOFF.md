@@ -1,15 +1,24 @@
 # HANDOFF — Dịch Video AI
 
-> Cập nhật: **2026-07-23**. Đọc file này + `CLAUDE.md` + `PROGRESS.md` trước khi làm.
+> Cập nhật: **2026-07-27**. Đọc file này + `CLAUDE.md` + `PROGRESS.md` trước khi làm.
 > Bàn giao cho AI/dev tiếp theo — đủ để tiếp tục ngay.
 
-## 0. ĐỌC TRƯỚC TIÊN — web đang KHÔNG xử lý được video
+## 0. ĐỌC TRƯỚC TIÊN — 3 nút thắt hạ tầng ĐÃ GỠ (27/07/2026)
 
-**Upstash Redis đã cạn hạn mức gói free** (`ERR max requests limit exceeded. Limit: 500000`).
-Redis từ chối mọi lệnh → không đẩy được job → mọi upload/dịch/lồng tiếng đều chết.
-Đây là **hạ tầng, code không cứu được**. User phải nâng gói ở console.upstash.com.
+Phiên 27/07 đã xử xong cả 3 chặn cứng của phiên trước:
+- ✅ **Upstash Redis** đã nâng **pay-as-you-go** (trước cạn hạn free 500k → web chết). Đã test lại OK.
+- ✅ **Gemini** đã bật **billing pay-as-you-go** (credit đ300.000, auto-reload user chưa bật — nhắc).
+  Trần 20 lượt/ngày/key không còn.
+- ✅ **Worker đã chuyển sang VPS** `103.249.201.118` (Windows Server 2022, 3 nhân/6GB, hãng trumvps).
+  Chạy pm2 `dichvideo-worker` (`node --import tsx src/index.ts`), tự sống lại sau reboot bằng
+  Scheduled Task `pm2-resurrect`. Worker máy cá nhân đã `pm2 stop` (giữ làm đường lùi, chưa xoá).
+  Chi tiết dựng: `apps/worker/DEPLOY-VPS-WINDOWS.md`.
 
-Kiểm tra nhanh: `cd apps/worker && npx tsx --env-file=../../.env scripts/check-queue-health.ts`
+Kiểm tra queue bất cứ lúc nào: `cd apps/worker && npx tsx --env-file=../../.env scripts/check-queue-health.ts`
+
+**⚠️ Nếu ĐỔI mật khẩu Administrator VPS** (mật khẩu `Q8SSi7wt` đã lộ qua ảnh chat) → phải chạy lại
+Scheduled Task với mật khẩu mới, nếu không reboot worker sẽ không tự lên:
+`schtasks /Create /TN "pm2-resurrect" /TR "C:\tools\pm2-resurrect.cmd" /SC ONSTART /RU Administrator /RP * /RL HIGHEST /F`
 
 ## 1. Mục tiêu tổng thể
 
@@ -97,11 +106,11 @@ pnpm --filter @dichvideo/db db:verify-migrations  # dựng DB tạm từ 0 rồi
 
 ## 5. LỖI/VẤN ĐỀ đã biết, CHƯA xử lý
 
-- 🔴 **Upstash Redis cạn hạn mức** — xem mục 0. Web không xử lý được video.
-- 🔴 **Gemini vẫn gói free** — 20 lượt/ngày/key/model ≈ **1–2 video/ngày/key**. Đây là trần cứng
-  của sản phẩm lõi. Chi phí bật billing rất nhỏ (đo thật: **$0,64/tháng ở 20 video/ngày**,
-  **$3,18 ở 100 video/ngày** với 2.5-flash). User chưa bật.
-- 🟠 **Worker nằm trên máy cá nhân** — máy tắt = dịch vụ chết. VPS 4 nhân (~$7–20/tháng) dư sức.
+- ✅ ~~Upstash Redis cạn~~ · ~~Gemini gói free~~ · ~~Worker trên máy cá nhân~~ — **ĐÃ XỬ (mục 0)**.
+- 🟠 **Auto-reload Gemini chưa bật** — credit đ300.000 dùng lâu nhưng hết là Gemini chết âm thầm.
+  User cần bấm `Set up auto reload` ở AI Studio → Billing.
+- 🟠 **VPS 3 nhân, ffmpeg render đa luồng** — giữ `concurrency: 2` (đừng tăng ở 3 nhân). Đông
+  khách thì nâng VPS nhiều nhân rồi mới tăng concurrency, hoặc thêm worker thứ 2 (cùng code).
 - 🟡 Giá lồng tiếng ElevenLabs đã nâng lên bậc cao cấp (700 xu/phút) nhưng **có thể vẫn lỗ** —
   giá ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại. Cần đối chiếu hoá đơn thật.
 - 🟡 **Chưa có thông tin pháp lý/công ty** (NĐ 52/2013, 85/2021) — user chủ động bỏ qua.
@@ -114,17 +123,17 @@ pnpm --filter @dichvideo/db db:verify-migrations  # dựng DB tạm từ 0 rồi
 
 ## 6. VIỆC TIẾP THEO (ưu tiên cao → thấp)
 
-1. **USER: nâng Upstash Redis** — web đang chết vì cái này. ~$2–10/tháng.
-2. **USER: bật billing Gemini** (AI Studio → Billing, pay-as-you-go, không phí tối thiểu).
-   Gỡ trần 1 video/ngày/key với chi phí gần như bằng 0.
-3. Chạy 1 tuần, xem **Quản trị → Mức tiêu thụ API** để biết số thật, rồi mới chọn gói.
-4. **Chuyển worker sang VPS** (Hetzner/Contabo). Cần dựng: Node, ffmpeg, yt-dlp.
-   *(VieNeu/Kokoro đã gỡ nên KHÔNG cần Python/torch nữa — việc này giờ nhẹ hơn nhiều.)*
-5. ~~Dựng lại lịch sử migration cho khớp DB thật~~ — **XONG** (`0002_drift_baseline.sql`).
-6. ~~Trang liên hệ riêng~~ — **XONG** (`/lien-he`). Còn lại: bằng chứng xã hội thật
+0. ⚠️ **CHƯA PUSH** — có ~9 commit local (migration, /lien-he, docs VPS, ecosystem, bảng tiêu thụ
+   API cập nhật). Push `main` → Vercel deploy web (trang liên hệ + bảng Quản trị mới chỉ hiện SAU
+   khi deploy). An toàn: không đụng luồng xử lý video.
+1. ~~USER: nâng Upstash Redis~~ · ~~bật billing Gemini~~ · ~~chuyển worker sang VPS~~ — **XONG (27/07)**.
+2. **USER: bật auto-reload Gemini** (AI Studio → Billing → Set up auto reload) — kẻo hết credit chết ngầm.
+3. Chạy 1 tuần, xem **Quản trị → Mức tiêu thụ API** để biết số thật.
+4. ~~Dựng lại lịch sử migration~~ — **XONG** (`0002_drift_baseline.sql`).
+5. ~~Trang liên hệ riêng~~ — **XONG** (`/lien-he`). Còn lại: bằng chứng xã hội thật
    (đánh giá, video kết quả khách) — cần user thu thập, tôi không bịa được.
-7. Bật lifecycle rule R2 cho `outputs/` (dashboard Cloudflare, prefix `outputs/`, 7 ngày).
-8. Đối chiếu hoá đơn ElevenLabs thật → chỉnh lại `dubGeminiPerMin` nếu đang lỗ.
+6. Bật lifecycle rule R2 cho `outputs/` (dashboard Cloudflare, prefix `outputs/`, 7 ngày).
+7. Đối chiếu hoá đơn ElevenLabs thật → chỉnh lại `dubGeminiPerMin` nếu đang lỗ.
 
 ## 7. Việc user cần tự kiểm tra bằng mắt (tôi không kiểm được)
 
