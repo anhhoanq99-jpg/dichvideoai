@@ -10,12 +10,15 @@
 >
 > Mọi lệnh chạy trong **PowerShell** trên VPS (Start → gõ `powershell`).
 
-## 1. Node 20 + Git
+## 1. Node 24 + Git
+
+> ⚠️ Dùng **Node 24** (khớp máy dev), KHÔNG phải Node 20. pnpm 11.10.0 cần Node
+> ≥ 22.13 (dùng built-in `node:sqlite`) — cài Node 20 sẽ lỗi `ERR_UNKNOWN_BUILTIN_MODULE`.
 
 ```powershell
 cd $env:TEMP
-# Node 20 LTS
-Invoke-WebRequest https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi -OutFile node.msi
+# Node 24 (đúng phiên bản máy dev: v24.16.0)
+Invoke-WebRequest https://nodejs.org/dist/v24.16.0/node-v24.16.0-x64.msi -OutFile node.msi
 Start-Process msiexec.exe -ArgumentList '/i','node.msi','/qn' -Wait
 # Git for Windows
 Invoke-WebRequest https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe -OutFile git-setup.exe
@@ -25,15 +28,19 @@ Start-Process .\git-setup.exe -ArgumentList '/VERYSILENT','/NORESTART' -Wait
 **Đóng PowerShell, mở lại** (để nhận PATH mới) rồi kiểm:
 
 ```powershell
-node -v   # v20.18.1
+node -v   # v24.16.0
 git --version
 ```
 
 ## 2. pnpm + tải mã nguồn
 
+> ⚠️ ĐỪNG dùng `corepack` — corepack đi kèm Node hiện bị lỗi xác thực chữ ký
+> (`Cannot find matching keyid`). Cài pnpm thẳng bằng npm.
+
 ```powershell
-corepack enable
-corepack prepare pnpm@11.10.0 --activate
+# Cho phép PowerShell chạy script (pnpm.ps1) — mặc định Windows Server chặn
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
+npm install -g pnpm@11.10.0
 pnpm -v   # 11.10.0
 
 cd $env:USERPROFILE
@@ -41,6 +48,9 @@ git clone https://github.com/anhhoanq99-jpg/dichvideoai.git
 cd dichvideoai
 pnpm install
 ```
+
+> Nếu trước đó đã lỡ chạy `corepack enable`, gỡ vỏ pnpm giả bằng `corepack disable`
+> trước khi cài pnpm qua npm.
 
 ## 3. ffmpeg + yt-dlp
 
