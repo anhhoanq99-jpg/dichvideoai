@@ -7,3 +7,9 @@ export const SUPPORT_ZALO = "0365797631";
 
 /** Link mở chat Zalo (chỉ giữ chữ số — zalo.me không nhận dấu cách/gạch). */
 export const SUPPORT_ZALO_URL = `https://zalo.me/${SUPPORT_ZALO.replace(/\D/g, "")}`;
+
+/** Email hỗ trợ (thương hiệu, không phải cá nhân). */
+export const SUPPORT_EMAIL = "subdubaiglobal@gmail.com";
+
+/** Link soạn mail. */
+export const SUPPORT_EMAIL_URL = `mailto:${SUPPORT_EMAIL}`;

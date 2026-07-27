@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
-import { Clock, MessageCircle, ShieldCheck } from "lucide-react";
-import { SUPPORT_ZALO, SUPPORT_ZALO_URL } from "@dichvideo/shared";
+import { Clock, Mail, MessageCircle, ShieldCheck } from "lucide-react";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_EMAIL_URL,
+  SUPPORT_ZALO,
+  SUPPORT_ZALO_URL,
+} from "@dichvideo/shared";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SupportMessageForm } from "@/components/marketing/support-message-form";
@@ -10,17 +15,20 @@ import { getSession } from "@/lib/session";
 export const metadata: Metadata = {
   title: "Liên hệ hỗ trợ — Dịch Video AI",
   description:
-    "Cần hỗ trợ về dịch video, lồng tiếng hoặc nạp xu? Nhắn Zalo 0365797631 hoặc gửi tin trực tiếp cho admin trong ứng dụng.",
+    "Cần hỗ trợ về dịch video, lồng tiếng hoặc nạp xu? Nhắn Zalo 0365797631, email subdubaiglobal@gmail.com, hoặc gửi tin trực tiếp cho admin trong ứng dụng.",
   alternates: { canonical: "/lien-he" },
 };
 
 const T = {
   vi: {
     heading: "Liên hệ hỗ trợ",
-    lede: "Có vướng mắc khi dịch video, lồng tiếng hay nạp xu? Nhắn cho chúng tôi theo một trong hai cách dưới đây.",
+    lede: "Có vướng mắc khi dịch video, lồng tiếng hay nạp xu? Nhắn cho chúng tôi theo một trong các cách dưới đây.",
     zaloTitle: "Nhắn Zalo",
     zaloDesc: "Nhanh nhất — hỗ trợ trực tiếp, xử lý được cả việc nạp xu chưa vào.",
     zaloCta: "Mở Zalo",
+    emailTitle: "Gửi email",
+    emailDesc: "Phù hợp cho yêu cầu chi tiết, gửi kèm ảnh/hoá đơn hoặc hợp tác.",
+    emailCta: "Soạn email",
     formTitle: "Nhắn trong ứng dụng",
     formDesc:
       "Tin nhắn vào thẳng kênh hỗ trợ riêng giữa bạn và admin, có lưu lại để đối chiếu sau.",
@@ -34,10 +42,13 @@ const T = {
   },
   en: {
     heading: "Contact support",
-    lede: "Stuck on a translation, a dub, or a credit top-up? Reach us either way below.",
+    lede: "Stuck on a translation, a dub, or a credit top-up? Reach us any way below.",
     zaloTitle: "Message on Zalo",
     zaloDesc: "Fastest route — direct support, including top-ups that haven't landed.",
     zaloCta: "Open Zalo",
+    emailTitle: "Send an email",
+    emailDesc: "Best for detailed requests, attaching screenshots/receipts, or partnerships.",
+    emailCta: "Compose email",
     formTitle: "Message in the app",
     formDesc:
       "Goes straight to your private support channel with the admin, and is kept on record.",
@@ -73,6 +84,18 @@ export default async function ContactPage() {
           >
             <MessageCircle className="h-4 w-4" />
             {t.zaloCta} — {SUPPORT_ZALO}
+          </a>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-lg font-semibold text-white">{t.emailTitle}</h2>
+          <p className="mt-1 text-sm text-neutral-400">{t.emailDesc}</p>
+          <a
+            href={SUPPORT_EMAIL_URL}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/15 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:border-white/30"
+          >
+            <Mail className="h-4 w-4" />
+            {SUPPORT_EMAIL}
           </a>
         </section>
 
