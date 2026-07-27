@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const T = {
   vi: {
     subtitle:
-      "Đo từ nhật ký sử dụng thật của worker. Cột “Hôm nay” là cột cần nhìn — hạn mức gói miễn phí tính theo NGÀY, hết là job dừng giữa chừng.",
+      "Đo từ nhật ký sử dụng thật của worker. Theo dõi cột “Hôm nay” (nhịp dùng trong ngày) và “Chi phí 30 ngày”.",
     provider: "Nguồn",
     today: "Hôm nay",
     d7: "7 ngày",
@@ -21,14 +21,18 @@ const T = {
     warn: "Sắp chạm trần",
     over: "ĐÃ CHẠM TRẦN",
     notMeasured: "Không đo được từ đây",
+    billingOn: "Đã bật thanh toán",
+    billingNote: "trả theo dùng, không còn trần ngày",
     redisNote:
       "Upstash Redis không ghi vào bảng này — xem trực tiếp ở console.upstash.com. Gói free 500.000 lệnh/tháng; worker poll liên tục nên đây là thứ hay cạn trước nhất.",
+    redisNotePaid:
+      "Upstash Redis không ghi vào bảng này — xem trực tiếp ở console.upstash.com. Đã nâng pay-as-you-go: không còn trần 500.000 lệnh/tháng, tính tiền theo lượng dùng thật.",
     costNote:
       "Chi phí là ƯỚC LƯỢNG theo đơn giá ghi trong worker, không phải hóa đơn thật. Nguồn miễn phí (Groq, giọng Cơ bản) ghi 0.",
   },
   en: {
     subtitle:
-      "Measured from the worker's real usage log. Watch the “Today” column — free-tier limits are per DAY, and hitting one stops jobs mid-run.",
+      "Measured from the worker's real usage log. Watch the “Today” column (daily pace) and “Cost, 30 days”.",
     provider: "Provider",
     today: "Today",
     d7: "7 days",
@@ -41,12 +45,24 @@ const T = {
     warn: "Near the cap",
     over: "CAP REACHED",
     notMeasured: "Not measurable here",
+    billingOn: "Billing enabled",
+    billingNote: "pay-as-you-go, no daily cap",
     redisNote:
       "Upstash Redis does not write to this table — check console.upstash.com. Free tier is 500,000 commands/month; the worker polls constantly, so this is usually the first thing to run out.",
+    redisNotePaid:
+      "Upstash Redis does not write to this table — check console.upstash.com. Upgraded to pay-as-you-go: no more 500,000-command monthly cap, billed by actual usage.",
     costNote:
       "Cost is an ESTIMATE from the unit prices in the worker, not a real invoice. Free providers (Groq, Basic voices) record 0.",
   },
 } as const;
+
+/**
+ * Trạng thái NÂNG CẤP hạ tầng (bật 27/07/2026). Đổi về false nếu quay lại gói free.
+ * - Gemini đã bật billing pay-as-you-go → trần 20 lượt/ngày/key KHÔNG còn áp dụng.
+ * - Upstash Redis đã nâng pay-as-you-go → không còn trần 500.000 lệnh/tháng.
+ */
+const GEMINI_BILLING_ON = true;
+const UPSTASH_PAID = true;
 
 /**
  * Trần hạn mức MIỄN PHÍ theo NGÀY, tính theo số LƯỢT GỌI.
@@ -160,7 +176,9 @@ export async function AdminUsagePanel({ lang = "vi" }: { lang?: Lang }) {
             </thead>
             <tbody>
               {data.map((r) => {
-                const cap = DAILY_CALL_LIMIT[r.provider];
+                // Gemini đã bật billing → bỏ khung trần ngày, hiện nhãn "đã thanh toán".
+                const geminiPaid = r.provider === "gemini" && GEMINI_BILLING_ON;
+                const cap = geminiPaid ? undefined : DAILY_CALL_LIMIT[r.provider];
                 const total = cap ? cap.perKey * keys : 0;
                 const pct = total > 0 ? r.callsToday / total : 0;
                 const level = !cap ? null : pct >= 1 ? "over" : pct >= 0.7 ? "warn" : "ok";
@@ -192,7 +210,13 @@ export async function AdminUsagePanel({ lang = "vi" }: { lang?: Lang }) {
                       {FREE_PROVIDERS.has(r.provider) ? "—" : usd(r.costMicros30d)}
                     </td>
                     <td className="px-4 py-2.5 text-xs">
-                      {cap ? (
+                      {geminiPaid ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success-100 px-2 py-0.5 font-medium text-success-800 dark:bg-success-950/50 dark:text-success-300">
+                          <Check className="h-3 w-3" />
+                          {t.billingOn}
+                          <span className="font-normal opacity-70">({t.billingNote})</span>
+                        </span>
+                      ) : cap ? (
                         <span
                           className={cn(
                             "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium",
@@ -224,12 +248,24 @@ export async function AdminUsagePanel({ lang = "vi" }: { lang?: Lang }) {
         </div>
       )}
 
-      {/* Redis không đi qua usage_events nên phải nói rõ, đừng để tưởng là đã theo dõi đủ */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+      {/* Redis không đi qua usage_events nên phải nói rõ, đừng để tưởng là đã theo dõi đủ.
+          Đã trả phí → nhắc cho biết, không còn là cảnh báo (màu trung tính + icon tick). */}
+      <div
+        className={cn(
+          "rounded-xl border p-3 text-xs",
+          UPSTASH_PAID
+            ? "border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400"
+            : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200",
+        )}
+      >
         <p className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {UPSTASH_PAID ? (
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          )}
           <span>
-            {t.redisNote}{" "}
+            {UPSTASH_PAID ? t.redisNotePaid : t.redisNote}{" "}
             <a
               href="https://console.upstash.com"
               target="_blank"
