@@ -14,10 +14,11 @@ test("slotMs: khe = start câu kế - start câu này; câu cuối chạy tới 
   assert.equal(slotMs(SEGS, 2, 10_000), 5000); // 10000 - 5000
 });
 
-test("atempoChain: không chỉnh khi lệch nhỏ, 1 tầng khi ≤2, xâu chuỗi khi >2", () => {
+test("atempoChain: không chỉnh khi lệch nhỏ, chặn trần ở 1.5× cho giọng tự nhiên", () => {
   assert.equal(atempoChain(1.0), null);
   assert.equal(atempoChain(1.02), null);
+  assert.equal(atempoChain(1.3), "atempo=1.3");
   assert.equal(atempoChain(1.5), "atempo=1.5");
-  assert.equal(atempoChain(3), "atempo=2,atempo=1.5");
-  assert.equal(atempoChain(10), "atempo=2,atempo=2"); // cap 4x
+  assert.equal(atempoChain(3), "atempo=1.5"); // chặn trần 1.5x thay vì tua nhanh
+  assert.equal(atempoChain(10), "atempo=1.5"); // phần dư sẽ bị -t slot cắt ở dub.ts
 });

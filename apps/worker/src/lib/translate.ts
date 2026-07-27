@@ -27,6 +27,21 @@ const CONTEXT_LINES = 5;
 const MAX_RETRIES = 2;
 const GROQ_MAX_RETRIES = 4;
 
+/**
+ * Ngân sách ký tự mỗi dòng để phụ đề đọc kịp VÀ giọng lồng tiếng không bị ép nhanh.
+ * Tiếng nguồn (nhất là tiếng Trung) rất gọn — dịch sát chữ ra tiếng Việt dài gấp
+ * 2-4× thời lượng, khiến TTS phải tăng tốc 2-4× nghe gấp gáp. UI cảnh báo đỏ ở
+ * 20 ký tự/giây (không tính dấu cách); nhắm 15 để vừa dưới ngưỡng, vừa chừa chỗ
+ * thở cho lồng tiếng. Câu quá ngắn vẫn cho tối thiểu vài ký tự để không bí.
+ */
+const TARGET_CPS = 15;
+const MIN_CHAR_BUDGET = 10;
+function charBudget(seg: SubtitleSegment): number {
+  const durS = (seg.endMs - seg.startMs) / 1000;
+  if (durS <= 0) return MIN_CHAR_BUDGET;
+  return Math.max(MIN_CHAR_BUDGET, Math.round(durS * TARGET_CPS));
+}
+
 const RESPONSE_SCHEMA = {
   type: "array",
   items: {
@@ -354,7 +369,11 @@ export async function translateSegments(
     styleInstruction +
     "\nQuy tắc bắt buộc:\n" +
     "- Trả về đúng số dòng với đúng chỉ số i như đầu vào, không gộp, không tách, không bỏ dòng.\n" +
-    "- Giữ độ dài mỗi dòng tương đương bản gốc (phụ đề phải đọc kịp).\n" +
+    "- NGÂN SÁCH ĐỘ DÀI: mỗi dòng đầu vào có `max` = SỐ KÝ TỰ TỐI ĐA (không tính dấu cách). " +
+    "Bản dịch của dòng đó phải NGẮN GỌN trong ngân sách, vì phụ đề phải đọc kịp và giọng lồng " +
+    "tiếng sẽ bị ép đọc nhanh nghe gấp gáp nếu câu dài. Cách đạt: dùng văn nói tự nhiên, cô đọng; " +
+    "bỏ từ đệm/lặp/hô ngữ thừa; chọn từ ngắn nghĩa tương đương. Giữ TRỌN Ý CHÍNH — thà lược chi " +
+    "tiết phụ còn hơn để câu vượt `max`. Đây là ràng buộc ưu tiên cao, chỉ sau việc đúng nghĩa.\n" +
     "- Đồng nhất tên nhân vật và xưng hô xuyên suốt theo bản tóm tắt ngữ cảnh.\n" +
     "- Không thêm ghi chú, giải thích hay ký tự thừa.";
   if (brief) system += `\n\nNGỮ CẢNH TOÀN PHIM:\n${brief}`;
@@ -377,11 +396,13 @@ export async function translateSegments(
             context.map((s) => ({ i: s.i, text: s.text })),
           )}\n\n`
         : "";
-    const payload = JSON.stringify(chunk.map((s) => ({ i: s.i, text: s.text })));
+    const payload = JSON.stringify(
+      chunk.map((s) => ({ i: s.i, text: s.text, max: charBudget(s) })),
+    );
     const textByIndex = await structuredCall(
       ctx,
       system,
-      `${contextBlock}Dịch các dòng phụ đề sau sang ${langName}:\n${payload}`,
+      `${contextBlock}Dịch các dòng phụ đề sau sang ${langName} (giữ mỗi bản dịch trong ngân sách \`max\` ký tự):\n${payload}`,
       chunk,
     );
     for (const seg of chunk) {
@@ -395,13 +416,14 @@ export async function translateSegments(
     const polishSystem =
       `Bạn là biên tập viên phụ đề ${langName} cho phim lồng tiếng. ` +
       "Nhiệm vụ: rà từng dòng bản dịch, dòng nào nghe cứng, máy móc, 'vô tri' hoặc lệch phong cách thì VIẾT LẠI cho tự nhiên như người bản xứ; dòng đã hay thì GIỮ NGUYÊN. " +
-      "Dựa vào câu gốc để không làm sai nghĩa. Giữ nguyên số dòng và chỉ số i. Giữ xưng hô nhất quán.\n" +
+      "Dựa vào câu gốc để không làm sai nghĩa. Giữ nguyên số dòng và chỉ số i. Giữ xưng hô nhất quán. " +
+      "TÔN TRỌNG ngân sách `max` (số ký tự tối đa, không tính dấu cách): bản viết lại KHÔNG được dài hơn `max`; câu `viet` đang vượt `max` thì rút gọn lại cho vừa mà vẫn giữ trọn ý.\n" +
       `Phong cách phải giữ đúng: ${styleInstruction}` +
       (brief ? `\n\nNGỮ CẢNH TOÀN PHIM:\n${brief}` : "");
     for (const [chunkIdx, chunk] of chunks.entries()) {
       const slice = translated.slice(chunkIdx * CHUNK_SIZE, chunkIdx * CHUNK_SIZE + chunk.length);
       const payload = JSON.stringify(
-        slice.map((s, k) => ({ i: s.i, goc: chunk[k].text, viet: s.text })),
+        slice.map((s, k) => ({ i: s.i, goc: chunk[k].text, viet: s.text, max: charBudget(chunk[k]) })),
       );
       try {
         const textByIndex = await structuredCall(

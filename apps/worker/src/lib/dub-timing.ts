@@ -13,13 +13,22 @@ export function slotMs(
 }
 
 /**
+ * Trần tốc độ ép giọng lồng tiếng. Trên ~1.5× là nghe gấp gáp, mất tự nhiên —
+ * gốc rễ (câu dịch quá dài) đã xử ở khâu dịch bằng ngân sách ký tự (translate.ts
+ * `charBudget`). Ở đây chỉ chặn trần cho phần dư hiếm hoi; câu vẫn vượt sau khi
+ * ép 1.5× sẽ bị `-t slot` trong dub.ts cắt đuôi (rất hiếm khi bản dịch đã gọn).
+ * Trước đây trần 4× cho ra giọng đọc nhanh 2-4× nghe như tua băng.
+ */
+const MAX_TEMPO = 1.5;
+
+/**
  * Chuỗi filter atempo để tăng tốc audio theo hệ số factor (>1 = nhanh hơn).
  * atempo chỉ nhận 0.5..100 mỗi tầng — hệ số lớn được xâu chuỗi.
  * Trả về null khi không cần chỉnh (lệch dưới 3%).
  */
 export function atempoChain(factor: number): string | null {
   if (factor <= 1.03) return null;
-  const capped = Math.min(factor, 4); // quá 4x thì đằng nào cũng phải cắt
+  const capped = Math.min(factor, MAX_TEMPO);
   const stages: number[] = [];
   let remaining = capped;
   while (remaining > 2) {
