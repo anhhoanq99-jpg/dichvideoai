@@ -24,7 +24,7 @@ import {
 } from "@dichvideo/shared";
 import { useEditorState } from "@/hooks/use-editor-state";
 import type { Lang } from "@/lib/i18n";
-import { Modal } from "@/components/ui/modal";
+import { Modal, ModalAnchorContext } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toaster";
 import { inputClass } from "@/components/ui/form-styles";
 import { cn } from "@/lib/utils";
@@ -217,6 +217,12 @@ export function StudioShell({
   const DEFAULT_LINE_BOX = { x: 0.06, y: 0.72, w: 0.88, h: 0.14 };
 
   const [modal, setModal] = useState<StudioModal>(null);
+  // vị trí nút vừa bấm để bảng công cụ neo ngay dưới nút đó (xem ModalAnchorContext)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const openModal = (m: StudioModal, e?: React.MouseEvent<HTMLElement>) => {
+    if (e) setAnchorRect(e.currentTarget.getBoundingClientRect());
+    setModal(m);
+  };
   const [settings, setSettings] = useState<RenderSettings>({
     ...DEFAULT_RENDER_SETTINGS,
     coverMode: defaultCoverMode,
@@ -397,23 +403,23 @@ export function StudioShell({
 
         <button
           type="button"
-          onClick={() => setModal("retranslate")}
+          onClick={(e) => openModal("retranslate", e)}
           className="flex items-center gap-1.5 rounded-md bg-accent-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-accent-700"
         >
           <Sparkles className="h-3.5 w-3.5" /> {t.aiTranslate}
         </button>
-        <button type="button" onClick={() => setModal("cover")} className={toolbarButton}>
+        <button type="button" onClick={(e) => openModal("cover", e)} className={toolbarButton}>
           <Droplets className="h-3.5 w-3.5" /> {t.blurBtn}
         </button>
-        <button type="button" onClick={() => setModal("style")} className={toolbarButton}>
+        <button type="button" onClick={(e) => openModal("style", e)} className={toolbarButton}>
           <Type className="h-3.5 w-3.5" /> {t.subtitleBtn}
         </button>
-        <button type="button" onClick={() => setModal("logo")} className={toolbarButton}>
+        <button type="button" onClick={(e) => openModal("logo", e)} className={toolbarButton}>
           <Stamp className="h-3.5 w-3.5" /> {t.logoBtn}
         </button>
         <button
           type="button"
-          onClick={() => setModal("dub")}
+          onClick={(e) => openModal("dub", e)}
           className={cn(
             toolbarButton,
             dub.enabled &&
@@ -422,12 +428,12 @@ export function StudioShell({
         >
           <Mic className="h-3.5 w-3.5" /> {t.dubBtn}{dub.enabled ? t.dubBtnOn : ""}
         </button>
-        <button type="button" onClick={() => setModal("presets")} className={toolbarButton}>
+        <button type="button" onClick={(e) => openModal("presets", e)} className={toolbarButton}>
           <Save className="h-3.5 w-3.5" /> {t.presetsBtn}
         </button>
         <button
           type="button"
-          onClick={() => setModal("export")}
+          onClick={(e) => openModal("export", e)}
           className="flex items-center gap-1.5 rounded-md bg-success-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-success-800"
         >
           <Upload className="h-3.5 w-3.5" /> {t.exportBtn}
@@ -603,6 +609,7 @@ export function StudioShell({
       </div>
 
       {/* ---- Modals ---- */}
+      <ModalAnchorContext.Provider value={anchorRect}>
       {modal === "addSegment" && (
         <AddSegmentModal
           currentMs={addSegmentAtMs}
@@ -700,6 +707,7 @@ export function StudioShell({
           lang={lang}
         />
       )}
+      </ModalAnchorContext.Provider>
     </div>
   );
 }
