@@ -14,9 +14,13 @@ module.exports = {
     {
       name: "dichvideo-worker",
       cwd: __dirname, // apps/worker
-      script: "pnpm",
-      args: "start",
-      interpreter: "none", // exec pnpm trực tiếp, không bọc qua node
+      // Chạy .ts trực tiếp qua tsx dưới dạng loader của node — KHÔNG bọc qua pnpm
+      // (pnpm/.cmd không đáng tin khi pm2 spawn trên Windows). Đây đúng là cách
+      // worker pm2 trên máy dev đang chạy: `node --import tsx src/index.ts`.
+      script: "src/index.ts",
+      interpreter: "node",
+      interpreter_args: "--import tsx",
+      exec_mode: "fork",
       autorestart: true,
       // render ffmpeg + tải video 2GB có thể ăn RAM; quá ngưỡng thì pm2 restart
       max_memory_restart: "1500M",
