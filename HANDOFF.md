@@ -7,16 +7,19 @@
 
 Code đã push + deploy, nhưng đang chờ **user** làm mấy cấu hình hạ tầng:
 
-1. 🔴 **Upload "Load failed" — CORS R2 chưa thêm domain mới.** Upload đẩy file thẳng lên R2
-   (`use-multipart-upload.ts` `fetch PUT`) = cross-origin. R2 CORS cũ chỉ cho `vercel.app`,
-   domain mới `subvideoai.com` bị chặn. **Sửa ở dashboard Cloudflare** (token `.env` object-scoped,
-   không sửa CORS được — đã thử, AccessDenied). R2 → bucket `dichvideo-prod` → Settings → CORS Policy,
-   thêm `https://subvideoai.com`, `https://www.subvideoai.com` vào AllowedOrigins (methods GET/PUT/HEAD,
-   ExposeHeaders `ETag`). **Đây là ưu tiên số 1 — không có nó khách không upload được.**
-2. 🟠 **Google OAuth callback chưa thêm domain mới** — nút "Đăng nhập với Google" sẽ lỗi
-   `redirect_uri_mismatch`. Vào Google Cloud Console (project `508013265653`) → OAuth client →
-   thêm origin `https://subvideoai.com` + redirect URI `https://subvideoai.com/api/auth/callback/google`.
-   (Email/mật khẩu vẫn chạy bình thường.)
+1. ✅ **XONG 29/07 — CORS R2 cho subvideoai.com.** Đã kiểm chứng thật (không phải suy đoán):
+   presign PUT rồi gửi kèm `Origin: https://subvideoai.com` → 200, có `ETag`, có
+   `Access-Control-Expose-Headers: ETag`. 4 origin được phép: apex, `www`, `dichvideoai-web.vercel.app`,
+   `http://localhost:3000`; domain lạ vẫn 403. ⚠️ `ExposeHeaders: ["ETag"]` là BẮT BUỘC —
+   `use-multipart-upload.ts` đọc ETag mỗi part; thiếu nó thì preflight vẫn 204 nhưng upload chết với
+   "Thiếu ETag trong phản hồi R2" (trông y hệt lỗi CORS, rất dễ chẩn nhầm).
+2. ✅ **XONG 29/07 — Google OAuth callback.** Đã thêm origin `https://subvideoai.com` +
+   `https://www.subvideoai.com` và redirect URI `https://subvideoai.com/api/auth/callback/google`.
+   Chỉ cần 1 redirect URI cho apex: `www` bị `proxy.ts` 308 về apex TRƯỚC khi chạm route auth, và
+   `BETTER_AUTH_URL=https://subvideoai.com` nên better-auth luôn gửi redirect_uri của apex.
+   Dòng `vercel.app` cũ giữ lại làm bảo hiểm cutover (đã là code chết, không phải rủi ro bảo mật).
+   ⚠️ Google Console đang có **2 client secret** (`****IMTJ` 9/7, `****GUas` 14/7) — nên dọn còn 1,
+   nhưng phải đối chiếu với env Vercel trước, xoá nhầm là chết đăng nhập Google.
 3. 🔴 **Worker VPS chưa cập nhật code mới** — watermark render + Groq-primary + giá mới nằm ở worker.
    **Nâng lên ĐỎ**: bản vá lỗ hổng freemium (mục 3, commit mới nhất) nằm PHẦN LỚN ở worker —
    không `git pull` thì tài khoản dùng thử vẫn xuất được video SẠCH, không watermark, không giới hạn 5 phút.
@@ -125,12 +128,22 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
 - 🟡 File R2 `outputs/` "xoá sau 7 ngày" nhưng lifecycle rule CHƯA bật (token object-scoped, làm ở dashboard).
 - 🟡 Nhân bản giọng riêng không chạy — key ElevenLabs free thiếu quyền `create_instant_voice_clone`.
 - 🟡 Chưa có thông tin pháp lý/công ty (NĐ 52/2013) — user chủ động bỏ qua.
+- 🟠 **Vercel Attack Challenge bật lên khi bị gọi dồn** — poll `/robots.txt` 20s/lần đã đủ khiến
+  Vercel trả 403 kèm `X-Vercel-Mitigated: challenge` cho MỌI user-agent từ IP đó (kể cả giả Googlebot).
+  Trình duyệt thật vượt qua tự động bằng JS. **Chưa xác minh được** đây là chặn tạm theo IP (tự hết)
+  hay Attack Challenge Mode bật sẵn cho cả project — kiểm ở Vercel → project `dichvideoai` → Firewall.
+  Nếu bật thường trực thì crawler lấy `robots.txt`/`sitemap.xml` sẽ ăn 403 → hỏng SEO.
+  ⚠️ Đừng dùng vòng lặp curl để chờ deploy; dùng `vercel ls` / `vercel inspect` ở `apps/web`.
+- ⚪ Tên project Vercel thật là **`dichvideoai`** (scope `wc-s-projects5`), không phải `dichvideoai-web`
+  như ghi ở mục 2 — `vercel ls dichvideoai-web` sẽ báo project_not_found. Alias production gồm
+  `subvideoai.com`, `www`, `dichvideoai-web.vercel.app`.
 - ⚪ Lint 1 warning cố hữu (TanStack Virtual ở `segment-table.tsx`) — vô hại.
 
 ## 6. VIỆC TIẾP THEO (ưu tiên cao → thấp)
 
-1. **USER: thêm CORS R2 cho subvideoai.com** (mục 0.1) — chặn upload, gấp nhất.
-2. **USER: Google OAuth callback** (mục 0.2) + **cập nhật worker VPS** (mục 0.3) + **xác nhận email quên MK** (mục 0.4).
+1. ✅ CORS R2 (mục 0.1) — xong + đã kiểm chứng. ✅ Google OAuth (mục 0.2) — xong.
+2. 🔴 **USER: cập nhật worker VPS** (mục 0.3) — GẤP NHẤT hiện tại, bản vá freemium nằm ở đó.
+   + **xác nhận email quên MK** (mục 0.4).
 3. **USER: bật auto-reload Gemini.**
 4. ✅ Rà soát freemium ở tầng code XONG (tìm ra + vá lỗ hổng luồng một chạm, xem mục 3).
    ⏳ **Còn lại phần phải nhìn bằng mắt, làm SAU khi cập nhật worker VPS**: tạo tài khoản mới →
