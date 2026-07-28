@@ -87,7 +87,11 @@ function recordGeminiUsage(
   res: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } },
 ) {
   const inputTokens = res.usageMetadata?.promptTokenCount ?? 0;
-  const outputTokens = res.usageMetadata?.candidatesTokenCount ?? 0;
+  // Token "suy nghĩ" (thinking) của model suy luận BỊ TÍNH TIỀN như output nhưng
+  // trước đây không đếm → ước tính chi phí thấp hơn thực tế nhiều lần. Cộng vào.
+  const thoughtTokens =
+    (res.usageMetadata as { thoughtsTokenCount?: number } | undefined)?.thoughtsTokenCount ?? 0;
+  const outputTokens = (res.usageMetadata?.candidatesTokenCount ?? 0) + thoughtTokens;
   ctx.usage.push(
     {
       provider: "gemini",
@@ -136,6 +140,10 @@ async function generateGemini(ctx: TranslateContext, opts: GenerateOptions) {
           ? { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA }
           : {}),
         temperature: opts.temperature,
+        // TẮT token "thinking" — dịch phụ đề không cần chuỗi suy luận, mà token
+        // thinking của model suy luận đốt tiền gấp nhiều lần. Đây là nguồn chi phí
+        // Gemini cao bất thường. (Gemini giờ chỉ là dự phòng của Groq.)
+        thinkingConfig: { thinkingBudget: 0 },
       },
     }),
   );
@@ -192,11 +200,26 @@ function isGeminiUnavailable(err: unknown) {
 }
 
 /**
- * Gọi model đang chọn. Gemini lỗi (hết hạn mức ngày, hết tiền trả trước,
- * hay lỗi dai dẳng sau khi đã retry) mà có key Groq → tự chuyển sang Groq
- * (Llama, miễn phí) cho phần còn lại của job thay vì fail.
+ * Gọi model đang chọn.
+ * - Mặc định Groq (miễn phí). Groq hết hạn mức NGÀY mà có key Gemini → rơi xuống
+ *   Gemini dự phòng (chất lượng cao hơn) cho phần còn lại của job.
+ * - Nếu vì lý do nào đó đang ở Gemini và Gemini lỗi (hết hạn/hết tiền) → quay về
+ *   Groq. Hai chiều này để job không chết chỉ vì một nguồn tạm hết.
  */
-async function generate(ctx: TranslateContext, opts: GenerateOptions) {
+async function generate(ctx: TranslateContext, opts: GenerateOptions): Promise<string> {
+  if (ctx.provider === "groq") {
+    try {
+      return await generateGroq(ctx, opts);
+    } catch (err) {
+      // Groq hết hạn ngày mà có Gemini → dùng Gemini cho phần còn lại.
+      if (!ctx.gemini || !(err instanceof Error && err.name === "UnrecoverableError")) throw err;
+      ctx.provider = "gemini";
+      logger.warn(
+        { err: String(err).slice(0, 200) },
+        "Groq hết hạn ngày — chuyển sang Gemini dự phòng cho job này",
+      );
+    }
+  }
   while (ctx.provider === "gemini") {
     try {
       return await generateGemini(ctx, opts);
@@ -332,8 +355,11 @@ export async function translateSegments(
     groq: groqKey ? new Groq({ apiKey: groqKey }) : null,
     keys,
     keyIdx: 0,
-    // ưu tiên Gemini (chất lượng dịch tốt hơn); không có key → chạy thẳng Groq
-    provider: keys.length > 0 ? "gemini" : "groq",
+    // MẶC ĐỊNH Groq (miễn phí) cho rẻ. Trước đây ưu tiên Gemini vì chất lượng,
+    // nhưng token "thinking" của model suy luận đốt tiền quá mức — chuyển Groq làm
+    // chính, Gemini thành DỰ PHÒNG (dùng khi Groq hết hạn ngày). Không có key Groq
+    // thì chạy thẳng Gemini.
+    provider: groqKey ? "groq" : "gemini",
     geminiModel:
       // gemini-3-flash-preview: ĐÃ ĐO bằng key thật — 3/3 lượt thành công.
       // KHÔNG dùng gemini-3.5-flash (luôn 503 "high demand" ở bậc miễn phí) và

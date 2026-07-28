@@ -92,6 +92,8 @@ export class GeminiVideoOcrExtractor implements SubtitleExtractor {
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,
           mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
+          // tắt token "thinking" tốn tiền — OCR là trích xuất, không cần suy luận
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     );
