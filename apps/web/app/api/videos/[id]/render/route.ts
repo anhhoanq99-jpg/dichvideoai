@@ -18,6 +18,7 @@ import {
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { hasPaidTopup, trialVideoLimitMessage, trialVideoTooLong } from "@/lib/trial";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -111,6 +112,12 @@ export async function POST(
   const track = await findVideoTrack(body.data.trackId, video.id);
   if (!track) return jsonError("Track phụ đề không hợp lệ", 400);
 
+  // Tài khoản dùng thử (chưa nạp): chặn video quá dài + gắn watermark lên bản xuất.
+  const paid = await hasPaidTopup(session.user.id);
+  if (!paid && trialVideoTooLong(video.durationSec)) {
+    return jsonError(trialVideoLimitMessage(video.durationSec), 403);
+  }
+
   // báo thiếu xu NGAY, đừng để khách chờ job rồi mới biết hỏng
   const credits = await requireCredits(
     session.user.id,
@@ -118,6 +125,9 @@ export async function POST(
   );
   if (credits.response) return credits.response;
 
-  const job = await createPipelineJob("render", video.id, session.user.id, body.data);
+  const job = await createPipelineJob("render", video.id, session.user.id, {
+    ...body.data,
+    watermark: !paid,
+  });
   return NextResponse.json({ ok: true, jobId: job.id });
 }

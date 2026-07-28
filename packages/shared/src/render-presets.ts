@@ -290,4 +290,6 @@ export interface RenderParams extends StyleOverrides {
   logo?: LogoParams;
   /** watermark hình ảnh (thay cho logo chữ) */
   logoImage?: LogoImageParams;
+  /** true = tài khoản dùng thử → burn watermark "SubVideo AI" lên bản xuất */
+  watermark?: boolean;
 }

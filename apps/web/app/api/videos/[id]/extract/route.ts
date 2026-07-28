@@ -8,6 +8,7 @@ import {
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { hasPaidTopup, trialVideoLimitMessage, trialVideoTooLong } from "@/lib/trial";
 
 const schema = z.object({
   method: z.enum(EXTRACT_METHODS),
@@ -27,6 +28,12 @@ export async function POST(
   const { session, video } = auth;
   if (video.status !== "uploaded" && video.status !== "ready") {
     return jsonError("Video chưa sẵn sàng để trích xuất (đang tải lên hoặc đang xử lý)", 409);
+  }
+
+  // Tài khoản dùng thử (chưa nạp) không xử lý được video quá dài — chặn NGAY từ
+  // bước trích xuất để khách biết sớm, không phí công chỉnh rồi mới bị chặn ở xuất.
+  if (!(await hasPaidTopup(session.user.id)) && trialVideoTooLong(video.durationSec)) {
+    return jsonError(trialVideoLimitMessage(video.durationSec ?? 0), 403);
   }
 
   const body = await parseJsonBody(req, schema);

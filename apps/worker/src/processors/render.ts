@@ -165,6 +165,10 @@ export async function renderProcessor(job: Job<JobPayload>) {
       fontsDir: FONTS_DIR,
       logo: logoImagePath ? undefined : logo,
       logoImage: logoImagePath ? params.logoImage : undefined,
+      // tài khoản dùng thử (chưa nạp) → burn watermark "SubVideo AI" giữa khung
+      trialWatermarkFontFile: params.watermark
+        ? path.join(FONTS_DIR, "BeVietnamPro-Bold.ttf")
+        : undefined,
     });
 
     const outPath = path.join(dir, "out.mp4");

@@ -39,6 +39,8 @@ export interface FiltergraphInput {
   logo?: LogoParams & { fontFile: string };
   /** watermark hình ảnh — file đã tải về local, đưa vào ffmpeg là input thứ 2 ([1:v]) */
   logoImage?: Pick<LogoImageParams, "position" | "scalePct" | "opacity" | "fx" | "fy">;
+  /** tài khoản dùng thử → burn watermark "SubVideo AI" giữa khung (đường dẫn font) */
+  trialWatermarkFontFile?: string;
 }
 
 /** Escape a path for use inside an ffmpeg filter argument (Windows colons/backslashes). */
@@ -278,7 +280,10 @@ export function buildFiltergraph(input: FiltergraphInput): string {
 
   // 3. burn Vietnamese subs
   const hasWatermark = Boolean(input.logo || input.logoImage);
-  const subOut = hasWatermark ? "[sub]" : "[v]";
+  // nhãn output cuối cùng của graph "thường". Nếu có watermark DÙNG THỬ thì graph
+  // thường kết ở [base], rồi bước 5 vẽ "SubVideo AI" lên trên mới ra [v].
+  const finalLabel = input.trialWatermarkFontFile ? "[base]" : "[v]";
+  const subOut = hasWatermark ? "[sub]" : finalLabel;
   steps.push(
     `${current}ass=filename='${escapeFilterPath(input.assPath)}':fontsdir='${escapeFilterPath(input.fontsDir)}'${subOut}`,
   );
@@ -309,7 +314,7 @@ export function buildFiltergraph(input: FiltergraphInput): string {
         : OVERLAY_XY[img.position];
     steps.push(
       `[1:v]scale=${logoWidth}:-1,format=rgba,colorchannelmixer=aa=${alpha}[lg]`,
-      `[sub][lg]overlay=${overlayXY}[v]`,
+      `[sub][lg]overlay=${overlayXY}${finalLabel}`,
     );
   } else if (input.logo) {
     const text = sanitizeDrawText(input.logo.text);
@@ -320,7 +325,21 @@ export function buildFiltergraph(input: FiltergraphInput): string {
         ? `x=(w-tw)*${input.logo.fx.toFixed(4)}:y=(h-th)*${input.logo.fy.toFixed(4)}`
         : LOGO_XY[input.logo.position];
     steps.push(
-      `[sub]drawtext=fontfile='${escapeFilterPath(input.logo.fontFile)}':text='${text}':fontsize=${input.logo.fontSize}:fontcolor=${color}:borderw=2:bordercolor=0x000000@${Math.min(alpha, 0.5)}:${drawXY}[v]`,
+      `[sub]drawtext=fontfile='${escapeFilterPath(input.logo.fontFile)}':text='${text}':fontsize=${input.logo.fontSize}:fontcolor=${color}:borderw=2:bordercolor=0x000000@${Math.min(alpha, 0.5)}:${drawXY}${finalLabel}`,
+    );
+  }
+
+  // 5. watermark DÙNG THỬ "SubVideo AI" — mờ, giữa khung, cỡ theo chiều cao video.
+  // Vẽ SAU cùng (trên mọi thứ) để tài khoản chưa trả phí không xoá được dễ dàng.
+  if (input.trialWatermarkFontFile) {
+    const out = outputResolution({
+      srcWidth: input.srcWidth,
+      srcHeight: input.srcHeight,
+      aspect: input.aspect,
+    });
+    const fs = Math.max(20, Math.round(out.h / 16));
+    steps.push(
+      `[base]drawtext=fontfile='${escapeFilterPath(input.trialWatermarkFontFile)}':text='SubVideo AI':fontsize=${fs}:fontcolor=white@0.4:borderw=2:bordercolor=0x000000@0.35:x=(w-tw)/2:y=(h-th)/2[v]`,
     );
   }
 
