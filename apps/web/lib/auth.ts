@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { applyCreditDelta, schema } from "@dichvideo/db";
 import { SIGNUP_TRIAL_CREDITS } from "@dichvideo/shared";
 import { db } from "./db";
+import { sendResetPasswordEmail } from "./email";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -36,6 +37,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 6,
+    // quên mật khẩu: better-auth sinh link đặt lại, ta gửi qua email (Gmail SMTP)
+    sendResetPassword: async ({ user, url }) => {
+      await sendResetPasswordEmail(user.email, url);
+    },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 giờ
   },
   user: {
     additionalFields: {

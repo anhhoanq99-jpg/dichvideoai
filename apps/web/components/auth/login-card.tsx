@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, Mail, User } from "lucide-react";
 import { SIGNUP_TRIAL_CREDITS } from "@dichvideo/shared";
@@ -20,6 +21,7 @@ const T = {
     emailPh: "Nhập email của bạn",
     password: "Mật khẩu",
     passwordPh: "Nhập mật khẩu",
+    forgot: "Quên mật khẩu?",
     name: "Tên hiển thị",
     namePh: "Tên của bạn",
     signIn: "Đăng nhập →",
@@ -43,6 +45,7 @@ const T = {
     emailPh: "Enter your email",
     password: "Password",
     passwordPh: "Enter your password",
+    forgot: "Forgot password?",
     name: "Display name",
     namePh: "Your name",
     signIn: "Sign In →",
@@ -210,6 +213,17 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
                 />
               </span>
             </label>
+
+            {mode === "login" && (
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                >
+                  {t.forgot}
+                </Link>
+              </div>
+            )}
 
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
