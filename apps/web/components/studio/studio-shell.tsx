@@ -51,17 +51,35 @@ import type { DubConfig } from "./export-modal";
  * tích ngay lúc vào studio (~1.400 dòng JS). Tải động để route nặng nhất của
  * app tương tác được sớm hơn, nhất là trên 4G.
  */
-const RetranslateModal = dynamic(() =>
-  import("@/components/editor/retranslate-modal").then((m) => m.RetranslateModal),
-);
-const ExportModal = dynamic(() => import("./export-modal").then((m) => m.ExportModal));
-const CoverModal = dynamic(() => import("./cover-modal").then((m) => m.CoverModal));
-const StyleModal = dynamic(() => import("./style-modal").then((m) => m.StyleModal));
-const DubModal = dynamic(() => import("./dub-modal").then((m) => m.DubModal));
-const PresetsModal = dynamic(() => import("./presets-modal").then((m) => m.PresetsModal));
-const AddSegmentModal = dynamic(() =>
-  import("./add-segment-modal").then((m) => m.AddSegmentModal),
-);
+// Tách hàm import ra riêng để vừa truyền cho dynamic(), vừa gọi NẠP TRƯỚC lúc
+// vào studio — tránh khựng một nhá khi bấm mở công cụ lần đầu (phải tải chunk).
+const loadRetranslate = () =>
+  import("@/components/editor/retranslate-modal").then((m) => m.RetranslateModal);
+const loadExport = () => import("./export-modal").then((m) => m.ExportModal);
+const loadCover = () => import("./cover-modal").then((m) => m.CoverModal);
+const loadStyle = () => import("./style-modal").then((m) => m.StyleModal);
+const loadDub = () => import("./dub-modal").then((m) => m.DubModal);
+const loadPresets = () => import("./presets-modal").then((m) => m.PresetsModal);
+const loadAddSegment = () => import("./add-segment-modal").then((m) => m.AddSegmentModal);
+
+const RetranslateModal = dynamic(loadRetranslate);
+const ExportModal = dynamic(loadExport);
+const CoverModal = dynamic(loadCover);
+const StyleModal = dynamic(loadStyle);
+const DubModal = dynamic(loadDub);
+const PresetsModal = dynamic(loadPresets);
+const AddSegmentModal = dynamic(loadAddSegment);
+
+/** Nạp sẵn mọi bảng công cụ để lần bấm đầu tiên mở tức thì (không tải chunk lúc bấm). */
+function preloadStudioModals() {
+  void loadRetranslate();
+  void loadExport();
+  void loadCover();
+  void loadStyle();
+  void loadDub();
+  void loadPresets();
+  void loadAddSegment();
+}
 
 const SAVE_ICONS = {
   saved: Check,
@@ -223,6 +241,12 @@ export function StudioShell({
     if (e) setAnchorRect(e.currentTarget.getBoundingClientRect());
     setModal(m);
   };
+  // nạp trước chunk các bảng công cụ ngay sau khi studio hiện, để lần bấm đầu
+  // tiên không phải chờ tải → hết "giật load"
+  useEffect(() => {
+    const timer = setTimeout(preloadStudioModals, 300);
+    return () => clearTimeout(timer);
+  }, []);
   const [settings, setSettings] = useState<RenderSettings>({
     ...DEFAULT_RENDER_SETTINGS,
     coverMode: defaultCoverMode,
