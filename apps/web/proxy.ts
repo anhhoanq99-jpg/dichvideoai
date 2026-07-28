@@ -5,9 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * Cookie đăng nhập gắn theo từng host — user vào bằng alias khác sẽ tưởng bị
  * đăng xuất. Ép mọi alias về MỘT địa chỉ chính để phiên đăng nhập luôn dính.
  */
-const CANONICAL_HOST = "dichvideoai-web.vercel.app";
+const CANONICAL_HOST = "subvideoai.com";
 
 const ALIAS_HOSTS = new Set([
+  "www.subvideoai.com",
+  "dichvideoai-web.vercel.app",
   "dichvideoai-web-wc-s-projects5.vercel.app",
   "dichvideoai-web-git-main-wc-s-projects5.vercel.app",
 ]);
