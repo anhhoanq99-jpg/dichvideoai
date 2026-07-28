@@ -1,152 +1,137 @@
-# HANDOFF — Dịch Video AI
+# HANDOFF — SubVideo AI (Việt hóa & lồng tiếng video AI)
 
-> Cập nhật: **2026-07-27**. Đọc file này + `CLAUDE.md` + `PROGRESS.md` trước khi làm.
-> Bàn giao cho AI/dev tiếp theo — đủ để tiếp tục ngay.
+> Cập nhật: **2026-07-29**. Đọc file này + `CLAUDE.md` + `apps/web/AGENTS.md` trước khi làm.
+> Đủ để AI/dev mới tiếp tục ngay.
 
-## 0. ĐỌC TRƯỚC TIÊN — 3 nút thắt hạ tầng ĐÃ GỠ (27/07/2026)
+## 0. ĐỌC TRƯỚC TIÊN — việc CỦA USER đang dở (chặn tính năng)
 
-Phiên 27/07 đã xử xong cả 3 chặn cứng của phiên trước:
-- ✅ **Upstash Redis** đã nâng **pay-as-you-go** (trước cạn hạn free 500k → web chết). Đã test lại OK.
-- ✅ **Gemini** đã bật **billing pay-as-you-go** (credit đ300.000, auto-reload user chưa bật — nhắc).
-  Trần 20 lượt/ngày/key không còn.
-- ✅ **Worker đã chuyển sang VPS** `103.249.201.118` (Windows Server 2022, 3 nhân/6GB, hãng trumvps).
-  Chạy pm2 `dichvideo-worker` (`node --import tsx src/index.ts`), tự sống lại sau reboot bằng
-  Scheduled Task `pm2-resurrect`. Worker máy cá nhân đã `pm2 stop` (giữ làm đường lùi, chưa xoá).
-  Chi tiết dựng: `apps/worker/DEPLOY-VPS-WINDOWS.md`.
+Code đã push + deploy, nhưng đang chờ **user** làm mấy cấu hình hạ tầng:
 
-Kiểm tra queue bất cứ lúc nào: `cd apps/worker && npx tsx --env-file=../../.env scripts/check-queue-health.ts`
-
-**⚠️ Nếu ĐỔI mật khẩu Administrator VPS** (mật khẩu `Q8SSi7wt` đã lộ qua ảnh chat) → phải chạy lại
-Scheduled Task với mật khẩu mới, nếu không reboot worker sẽ không tự lên:
-`schtasks /Create /TN "pm2-resurrect" /TR "C:\tools\pm2-resurrect.cmd" /SC ONSTART /RU Administrator /RP * /RL HIGHEST /F`
+1. 🔴 **Upload "Load failed" — CORS R2 chưa thêm domain mới.** Upload đẩy file thẳng lên R2
+   (`use-multipart-upload.ts` `fetch PUT`) = cross-origin. R2 CORS cũ chỉ cho `vercel.app`,
+   domain mới `subvideoai.com` bị chặn. **Sửa ở dashboard Cloudflare** (token `.env` object-scoped,
+   không sửa CORS được — đã thử, AccessDenied). R2 → bucket `dichvideo-prod` → Settings → CORS Policy,
+   thêm `https://subvideoai.com`, `https://www.subvideoai.com` vào AllowedOrigins (methods GET/PUT/HEAD,
+   ExposeHeaders `ETag`). **Đây là ưu tiên số 1 — không có nó khách không upload được.**
+2. 🟠 **Google OAuth callback chưa thêm domain mới** — nút "Đăng nhập với Google" sẽ lỗi
+   `redirect_uri_mismatch`. Vào Google Cloud Console (project `508013265653`) → OAuth client →
+   thêm origin `https://subvideoai.com` + redirect URI `https://subvideoai.com/api/auth/callback/google`.
+   (Email/mật khẩu vẫn chạy bình thường.)
+3. 🟠 **Worker VPS chưa cập nhật code mới** — watermark render + Groq-primary + giá mới nằm ở worker.
+   Trên VPS chạy: `cd $env:USERPROFILE\dichvideoai; git pull; pm2 restart dichvideo-worker`.
+4. 🟡 **Quên mật khẩu — chờ xác nhận email tới.** Đã thêm env `GMAIL_USER` + `GMAIL_APP_PASSWORD`
+   (Gmail SMTP, App Password) trên Vercel + redeploy. Endpoint test trả 200. User cần kiểm hộp thư
+   `anhhoanq.99@gmail.com` (cả Spam) xem mail "Đặt lại mật khẩu" tới chưa. Không tới → đổi sang **Resend**.
 
 ## 1. Mục tiêu tổng thể
 
-SaaS **Việt hóa & lồng tiếng video bằng AI** (cạnh tranh gensubai.com). Luồng:
-upload/dán link → trích phụ đề (OCR/STT) → dịch văn nói → studio chỉnh sửa → xuất MP4.
-Kèm: nhân bản giọng, cộng đồng, nạp xu. **ĐÃ LÊN PRODUCTION và thu tiền thật.**
-
-Giai đoạn hiện tại: **chuẩn bị thương mại hóa** — vá lỗ hổng tiền bạc, gỡ trần hạn mức,
-làm giao diện đủ chuyên nghiệp để quảng cáo rộng.
+SaaS **Việt hóa & lồng tiếng video bằng AI** (đối thủ gensubai.com). Luồng: upload/dán link →
+trích phụ đề (OCR/STT) → dịch văn nói → studio chỉnh sửa → xuất MP4 (kèm lồng tiếng). **ĐÃ LÊN
+PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa dựng xong hệ thống freemium
+(tài khoản dùng thử bị giới hạn, nạp tiền mở khoá) + đổi brand + domain riêng để quảng cáo rộng.
 
 ## 2. Hạ tầng (ĐANG CHẠY THẬT)
 
-- **Web**: https://subvideoai.com — Vercel `dichvideoai-web`, root `apps/web`.
-- **Repo**: GitHub `anhhoanq99-jpg/dichvideoai`, push `main` → Vercel tự deploy (~2.5 phút).
-- **Worker**: pm2 `dichvideo-worker` trên máy Windows của user. Dev local dùng `pnpm dev:web`
-  (KHÔNG `pnpm dev`). Sửa code worker xong: `pm2 restart dichvideo-worker`.
-- **DB** Neon · **Redis** Upstash · **R2** Cloudflare (`dichvideo-prod`).
-- Env prod = `.env` gốc repo. Đổi env Vercel phải redeploy mới có tác dụng.
+- **Web**: https://subvideoai.com (Cloudflare Registrar, DNS Cloudflare CNAME → Vercel, DNS-only).
+  Vercel project `dichvideoai-web`, root `apps/web`. `vercel.app` + `www` → 308 redirect về apex
+  (`apps/web/proxy.ts` `CANONICAL_HOST`). Env `BETTER_AUTH_URL` + `NEXT_PUBLIC_SITE_URL` = domain mới.
+- **Repo**: GitHub `anhhoanq99-jpg/dichvideoai`, push `main` → Vercel auto-deploy (~2.5 phút).
+- **Worker**: pm2 `dichvideo-worker` trên **VPS Windows Server 2022** `103.249.201.118` (trumvps,
+  3 nhân/6GB). Chạy `node --import tsx src/index.ts`, `concurrency: 2`. Tự sống lại sau reboot bằng
+  Scheduled Task `pm2-resurrect` (chạy `C:\tools\pm2-resurrect.cmd` lúc startup). ffmpeg+yt-dlp ở
+  `C:\tools\bin` (`FFMPEG_DIR`/`YTDLP_PATH` trong `.env` VPS). Dựng lại: `apps/worker/DEPLOY-VPS-WINDOWS.md`.
+  ⚠️ Đổi mật khẩu VPS (`Q8SSi7wt` đã lộ) thì phải tạo lại Scheduled Task với mật khẩu mới.
+- **DB** Neon Postgres 18 · **Redis** Upstash (pay-as-you-go) · **R2** Cloudflare (`dichvideo-prod`).
+- **Gemini** đã bật billing pay-as-you-go (auto-reload user chưa bật). Groq (free) là provider dịch CHÍNH.
+- Env prod trên Vercel (đổi bằng `vercel env add/rm ... production` rồi redeploy). `.env` gốc repo = dev.
 
-Quy mô thật (đo 2026-07-23): **7 user · 103 video · 4,4 video/ngày · 2 lượt nạp (320.000 xu)**.
-Mỗi video ≈ 125 giây CPU worker → máy rảnh 99,4% thời gian. **Tốc độ xử lý KHÔNG phải nút thắt** —
-nút thắt là hạn mức API và việc worker nằm trên máy cá nhân.
+## 3. ĐÃ HOÀN THÀNH session này (mới → cũ, commit hash)
 
-## 3. ĐÃ HOÀN THÀNH session này (mới → cũ)
+| Commit | Nội dung |
+|---|---|
+| `20c97cc` | **Quên mật khẩu**: `lib/email.ts` (Gmail SMTP nodemailer) + better-auth `sendResetPassword` + trang `/forgot-password` `/reset-password` + link ở login-card. Client dùng `requestPasswordReset`/`resetPassword` (better-auth 1.6) |
+| `87fd07b` | **Cutover domain subvideoai.com**: `proxy.ts` CANONICAL_HOST + env BETTER_AUTH_URL/NEXT_PUBLIC_SITE_URL |
+| `46b0713` | **Trial: credit tặng hết hạn 7 ngày** — migration `0004` (enum `trial_expired`), `lib/trial.ts` `resolveSpendableBalance` (kết toán idempotent, không sống lại khi nạp), `requireCredits`, balance API, trang credits |
+| `48e9032` | **Trial: watermark preview + banner** — editor page tính `isTrial`, StudioShell overlay + banner, upload page banner |
+| `de32dcb` | **Trial: chặn video >5 phút + watermark render** — `lib/trial.ts` `hasPaidTopup`, route extract/render 403, `filtergraph.ts` `trialWatermarkFontFile` burn "SubVideo AI" |
+| `c3aa3a9` | **Đổi brand "SubVideo AI" + tagline "Dịch & lồng tiếng video AI"** — `lib/site.ts` SITE_NAME, `brand-logo.tsx` (prop `tagline`, `BRAND_TAGLINE{vi,en}`), header/footer/sidebar bật tagline, đổi 14 chỗ "Dịch Video AI" |
+| `deccc3e` | **Admin khoá/mở tài khoản** — migration `0003` (`user.banned_at`), route `/api/admin/users/:id/ban` (xoá phiên khi khoá), layout `(app)` chặn banned, login page nhận diện banned tránh loop, nút Khoá/Mở ở Users tab |
+| `30df756` | **Admin cộng/trừ xu thủ công** — route `/api/admin/users/:id/credits` (applyCreditDelta reason=admin_adjust), `admin-users-client.tsx` (modal Sửa xu) |
+| `6742a92` | **Promo nạp thử 50k tặng 20k lần đầu** — `shared/credits.ts` `FIRST_TOPUP_PROMO`/`topupCredits`/`firstTopupPack`, webhook sepay cộng bonus lần đầu, banner ở topup-panel |
+| `8fe8f7a` | **Nâng giá lồng tiếng ElevenLabs 700→8.000 xu/phút** (`dubGeminiPerMin`, giá thật ~6.500đ) |
+| `e353e11` | **Chi phí Gemini: Groq làm chính (miễn phí) + tắt token thinking** — `translate.ts` (provider mặc định groq, `thinkingConfig:{thinkingBudget:0}`, đếm `thoughtsTokenCount`), OCR extractor tắt thinking |
+| `9e59fc8` | **Admin tab "Người dùng"** (danh sách + thống kê, chỉ xem ban đầu) |
+| `5424407`/`1b14541`/`11d82f4` | **Studio: bảng công cụ neo dưới nút + hết "giật load"** — `ui/modal.tsx` (ModalAnchorContext, position fixed dưới nút, bỏ animation), nạp trước chunk modal |
+| `2e102a0` | Thêm email liên hệ `subdubaiglobal@gmail.com` vào `/lien-he` (`shared/support.ts`) |
+| `519cc6f` | **Fix giọng lồng tiếng đọc quá nhanh** — `translate.ts` `charBudget` (ngân sách ký tự theo thời lượng, TARGET_CPS=15), `dub-timing.ts` hạ trần atempo 4×→1.5× |
+| `dd13326` | Bảng Quản trị tiêu thụ API phản ánh Gemini/Redis đã trả phí |
+| (đầu session) | `da2c514` dựng lại migration baseline `0002` · `7c79539` trang `/lien-he` |
 
-| Commit | Nội dung | File chính |
-|---|---|---|
-| `7c79539` | **Trang liên hệ `/lien-he`** — Zalo + form nhắn thẳng admin | `app/(marketing)/lien-he/page.tsx` (mới), `marketing/support-message-form.tsx` (mới), `site-footer.tsx`, `app/sitemap.ts` |
-| `da2c514` | **Dựng lại lịch sử migration khớp DB thật** — hết món nợ `drizzle-kit push` | `db/migrations/0002_drift_baseline.sql` (mới), `db/scripts/` (4 script mới), `db/package.json`, `db/tsconfig.json` |
-| `b971bf8` | **Gỡ bỏ VieNeu, Kokoro, Viettel AI, FPT.AI** (chất lượng kém, không có key) | `shared/dub-presets.ts`, `worker/lib/tts.ts`, `worker/lib/usage.ts`, `worker/processors/dub.ts`, `web/lib/tts-web.ts`, `api/tts-preview`, `voice-picker.tsx`, xoá `services/tts-local/`, `.venv-tts` |
-| `04f2d4f` | Trang Quản trị chia **4 tab** | `admin/admin-tabs.tsx` (mới), `admin/page.tsx` |
-| `628d2f3` | **Bảng theo dõi tiêu thụ API** + cảnh báo sắp chạm trần | `admin/admin-usage-panel.tsx` (mới) |
-| `32b1491` | **Tìm ra gốc rễ lỗi upload** = Redis cạn; giảm ~12× lệnh Redis worker đốt lúc rảnh | `worker/src/index.ts` (`drainDelay` 5s→60s), `web/lib/queue.ts` (timeout 8s), `api/videos/[id]/complete` |
-| `0160178` | Không nuốt lỗi thật sau "Unexpected end of JSON input" | `web/lib/http-json.ts` + `.test.ts` (mới, 7 test), `hooks/use-multipart-upload.ts`, `api/videos/route.ts`, `link-import-card.tsx` |
-| `25c4099` | Báo thiếu xu TRƯỚC khi xuất; sửa giá giọng trả phí; chặn farm tài khoản; onboarding | `lib/api-helpers.ts` (`requireCredits`), `export-modal.tsx`, `shared/dub-presets.ts` (`isPremiumVoice`), `api/auth/[...all]/route.ts`, `videos/upload/page.tsx`, `upload-page-client.tsx` |
-| `c261840` | Video kẹt "processing"; studio trên điện thoại; tương phản nút tiền đạt WCAG AA | `worker/src/index.ts`, `studio-shell.tsx`, `segment-table.tsx`, `ui/button.tsx`, `login-card.tsx`, `web/scripts/check-contrast.ts` |
-| `9f3e7bb` | Bảng công cụ studio **neo cạnh** (không che video); thêm Zalo hỗ trợ | `ui/modal.tsx` (`dock`), `shared/src/support.ts` (mới), `site-footer.tsx`, `topup-panel.tsx` |
-| `b119a9f` | **Vá 2 lỗ hổng tiền bạc** + job báo thất bại sai | `packages/db/src/credits.ts`, `db/schema/app.ts` (unique index), `api/webhooks/sepay`, `api/voice-clone/speak`, `worker/src/index.ts`, `app/error.tsx` + `not-found.tsx` (mới) |
+**Migration hiện tại**: `0000`→`0004`. Chuỗi đã verify dựng lại đúng prod (113 cột · 5 enum ·
+26 index · 28 ràng buộc). Script: `pnpm --filter @dichvideo/db db:verify-migrations` / `db:drift`.
 
-**Script chẩn đoán mới** (`apps/worker/scripts/`, chạy bằng `npx tsx --env-file=../../.env`):
-`check-queue-health.ts` · `check-capacity.ts` · `check-cost-projection.ts` · `check-money-fixes.ts` ·
-`check-ledger-dups.ts` · `add-ledger-unique-index.ts` · `check-usage-query.ts` · `check-removed-voices.ts` ·
-`check-edge-fallback.ts`. Bên web: `check-pricing.ts`, `check-contrast.ts`, `check-default-voice.ts`.
+## 4. QUYẾT ĐỊNH quan trọng (BẤT BIẾN — đừng phá)
 
-**Script DB/migration** (`packages/db/scripts/`, chạy qua pnpm script — có sẵn `tsx` + `pg`):
-```bash
-pnpm --filter @dichvideo/db db:drift              # bảng/cột/enum/index thật + lịch sử migration đã ghi nhận
-pnpm --filter @dichvideo/db db:constraints        # tên khoá ngoại thật
-pnpm --filter @dichvideo/db db:dryrun             # chạy thử 0002 trên prod rồi ROLLBACK (chứng minh idempotent)
-pnpm --filter @dichvideo/db db:verify-migrations  # dựng DB tạm từ 0 rồi so với prod, xong tự xoá
-```
-
-## 4. QUYẾT ĐỊNH quan trọng session này
-
-- **Chống cộng xu trùng bằng RÀNG BUỘC DB**, không bằng SELECT trước giao dịch.
-  Index `credit_ledger_ref_uidx UNIQUE (ref_type, ref_id, reason)` + `onConflictDoNothing`.
-  `reason` PHẢI nằm trong khoá — một job ghi cả `job_charge` lẫn `job_refund` dưới cùng
-  `(ref_type='job', ref_id=jobId)`; thiếu nó là **chặn mất hoàn xu**.
-  Trong `applyCreditDelta`: ghi ledger TRƯỚC, đổi số dư SAU; trùng thì trả `null`.
-- **Một nguồn sự thật cho phân loại giọng** (`shared/dub-presets.ts`):
-  `isPremiumVoice()` (gemini + eleven → giá cao cấp) và `hasWideTtsQuota()` (edge + gcloud →
-  được đọc văn bản tuỳ ý miễn phí). Trước đây định nghĩa bị chép ở 4 nơi và lệch nhau.
-- **Job chưa hết lượt retry thì KHÔNG ghi `status='failed'`** — web coi `failed` là kết thúc,
-  SSE đóng, studio dừng theo dõi. Ghi sớm = khách thấy "thất bại" trong khi job sắp xong.
-- **Giọng mặc định = `gcloud`** (SubdubAI/Chirp3-HD). Hết hạn mức Google → **cả job** hạ xuống
-  Edge (`edgeFallbackVoice`), quyết định MỘT LẦN trước khi sinh câu nào để video không lẫn 2 giọng.
-- **Nhãn nguồn giọng theo thương hiệu mình**, không lộ nhà cung cấp: Google → "SubdubAI",
-  Gemini → "Cao cấp", Edge → "Cơ bản", ElevenLabs → "Eleven".
-- **Modal studio có chế độ `dock`**: từ `lg` neo mép phải, bỏ nền mờ, click xuyên qua để vẫn
-  xem/tua video. Dùng `hidden` (không bỏ khỏi cây React) để giữ trạng thái khi đổi tab.
-- **Tương phản**: chữ nhỏ trên nền thương hiệu dùng `primary-700`/`success-700` (≥4.5:1).
-  KHÔNG đổi bảng màu — `primary-600` đo được 4,41:1, vẫn trượt chuẩn.
-- **Trang Quản trị**: nội dung do server render, truyền vào `AdminTabs` (client) làm children —
-  giữ mọi truy vấn DB phía máy chủ.
-- **Migration baseline `0002` phải IDEMPOTENT** (`IF NOT EXISTS` + `DO $$ … EXCEPTION WHEN
-  duplicate_object $$`). Nó mô tả những thứ ĐÃ CÓ SẴN trên prod (do `drizzle-kit push` đưa lên),
-  nên vừa phải chạy được như no-op trên prod, vừa phải dựng đúng trên DB trống. Đừng sửa nó về
-  dạng thường. **Từ 0003 trở đi viết bình thường** — lịch sử đã sạch.
-- **Trang liên hệ KHÔNG dựng bảng `contact_submissions` riêng** — form POST thẳng vào
-  `/api/chat` `room="support"`, tức cùng hộp thư với trang Chat. Hai chỗ nhận tin nhắn mà
-  admin chỉ nhớ một chỗ là kiểu bỏ sót khách đã trả tiền.
-- **Kiểm chứng bằng DB thật, không bằng mắt**: `db:dryrun` (chạy thật rồi ROLLBACK) chứng minh
-  không nổ trên prod; `db:verify-migrations` dựng DB tạm từ con số 0 rồi so từng cột/enum/index/
-  ràng buộc với prod. Đã chạy: **112 cột · 5 enum · 26 index · 28 ràng buộc — khớp tuyệt đối.**
+- **Tài khoản DÙNG THỬ = chưa từng nạp tiền** (`lib/trial.ts` `hasPaidTopup` = có dòng ledger
+  reason `topup` chưa). Khi dùng thử: watermark "SubVideo AI" (render + preview), chặn video >5 phút
+  (`TRIAL_MAX_VIDEO_SEC=300`), credit tặng hết hạn 7 ngày. **Đã nạp → mở hết.**
+- **Credit ĐÃ NẠP không bao giờ hết hạn** (lợi thế cạnh tranh). CHỈ credit tặng (signup) hết hạn 7
+  ngày với tài khoản chưa nạp. `resolveSpendableBalance` kết toán idempotent qua unique
+  `(ref_type='trial', ref_id=userId, reason='trial_expired')` → credit đã trừ KHÔNG sống lại khi nạp sau.
+- **Dịch: Groq (Llama, MIỄN PHÍ) là CHÍNH, Gemini chỉ dự phòng khi Groq hết hạn ngày.** Gốc rễ chi
+  phí Gemini cao = token "thinking" của model suy luận không được đếm. Đã tắt `thinkingBudget:0`.
+  Muốn Gemini cao cấp trả phí thì làm tuỳ chọn riêng sau (user muốn hướng này nhưng CHƯA làm UI chọn).
+- **Chống cộng xu trùng bằng RÀNG BUỘC DB** (`credit_ledger_ref_uidx UNIQUE (ref_type, ref_id, reason)`).
+  `reason` PHẢI trong khoá (một job ghi cả `job_charge` lẫn `job_refund`). `applyCreditDelta`: ghi
+  ledger TRƯỚC, đổi số dư SAU; trùng → trả `null`. **Đây là cách DUY NHẤT đổi số dư.**
+- **Đổi schema DB bằng MIGRATION, KHÔNG `drizzle-kit push`** (`generate` → xem SQL → `migrate`).
+  Từ `0003` viết bình thường (lịch sử đã sạch). `0002` baseline phải giữ IDEMPOTENT.
+- **Brand = "SubVideo AI"** (viết hoa giữa, có khoảng trắng). Tagline `BRAND_TAGLINE` (i18n) luôn đi
+  kèm logo ở landing/footer/sidebar. Màu thương hiệu cam san hô `#ee5631` (KHÔNG đổi).
+- **Đơn vị hiển thị = "xu"** (bản en giữ "credits"). 1 credit = 1 VND. Code identifier vẫn `credit*`.
+- **Nhãn nguồn giọng theo thương hiệu mình**: Google → "SubdubAI" (⚠️ lệch brand mới, user CHƯA quyết
+  đổi thành "SubVideo AI" — hỏi trước khi đổi), Gemini → "Cao cấp", Edge → "Cơ bản", ElevenLabs → "Eleven".
+- **Giọng mặc định = `gcloud`** (Chirp3-HD). Hết hạn Google → cả job hạ Edge (`edgeFallbackVoice`), 1 lần.
+- **Ngân sách ký tự khi dịch** (`translate.ts` `charBudget`, TARGET_CPS=15): dịch cô đọng để lồng
+  tiếng không bị ép đọc nhanh + phụ đề không đỏ. Trần atempo lồng tiếng = 1.5× (`dub-timing.ts`).
+- **Modal studio neo dưới nút vừa bấm** (`ui/modal.tsx` ModalAnchorContext, `dock`), hiện tức thì
+  không animation (tránh "giật"), nạp trước chunk. Vẫn click xuyên qua để xem/tua video.
+- **Khoá tài khoản**: layout `(app)` truy vấn `banned_at` TƯƠI mỗi lần tải trang (better-auth cache
+  phiên 5 phút). Login page nhận diện banned để KHÔNG đẩy vào app (tránh loop redirect với layout).
+- **Quên mật khẩu qua Gmail SMTP** (`lib/email.ts`, env `GMAIL_USER`/`GMAIL_APP_PASSWORD`). better-auth
+  1.6 client method là `requestPasswordReset` (KHÔNG phải `forgetPassword`).
+- **Trang liên hệ KHÔNG dựng bảng riêng** — form POST vào `/api/chat` room="support" (cùng hộp Chat).
 
 ## 5. LỖI/VẤN ĐỀ đã biết, CHƯA xử lý
 
-- ✅ ~~Upstash Redis cạn~~ · ~~Gemini gói free~~ · ~~Worker trên máy cá nhân~~ — **ĐÃ XỬ (mục 0)**.
-- 🟠 **Auto-reload Gemini chưa bật** — credit đ300.000 dùng lâu nhưng hết là Gemini chết âm thầm.
-  User cần bấm `Set up auto reload` ở AI Studio → Billing.
-- 🟠 **VPS 3 nhân, ffmpeg render đa luồng** — giữ `concurrency: 2` (đừng tăng ở 3 nhân). Đông
-  khách thì nâng VPS nhiều nhân rồi mới tăng concurrency, hoặc thêm worker thứ 2 (cùng code).
-- ✅ ~~Giá lồng tiếng ElevenLabs lỗ~~ — **ĐÃ nâng 700 → 8.000 xu/phút** (28/07, giá thật ~6.500đ/phút).
-- ✅ ~~Chi phí Gemini cao~~ — **ĐÃ chuyển Groq làm chính (miễn phí) + tắt token thinking** (28/07).
-  Gốc rễ: token "thinking" của `gemini-3-flash-preview` không được đếm. Gemini giờ chỉ dự phòng.
-- 🟠 **đ18.771 credit Gemini bị trừ 27/07 CHƯA rõ nguồn** — user nói không test AI Studio; key worker
-  lại ở gói FREE (hit 20/day). Cần user xem lịch sử giao dịch ở console Google để truy nguồn.
-- 🟠 **Khoá tài khoản có cửa sổ ~5 phút** — better-auth cache phiên 5 phút; layout `(app)` truy vấn
-  `banned_at` tươi mỗi lần tải trang nên chặn ngay ở full-load, nhưng điều hướng client-side trong
-  app có thể trễ tới 5 phút. Chấp nhận được; muốn tức thì tuyệt đối thì thêm hook better-auth chặn tạo phiên.
-- 🟡 **Chưa có thông tin pháp lý/công ty** (NĐ 52/2013, 85/2021) — user chủ động bỏ qua.
-- 🟡 Chưa có bằng chứng xã hội thật (đánh giá, video khách). Con số "1.500+" ở
-  `hero-section.tsx` là tự đặt (số thật: 7 user · 103 video) — **user đã quyết GIỮ NGUYÊN
-  (23/07/2026), đừng tự sửa**. Rủi ro đã báo: Luật Quảng cáo + mất niềm tin nếu khách phát hiện.
+- 🟠 **Auto-reload Gemini chưa bật** — hết credit là Gemini (dự phòng) chết ngầm. User bấm ở AI Studio → Billing.
+- 🟠 **đ18.771 credit Gemini bị trừ 27/07 chưa rõ nguồn** — key worker ở gói free (hit 20/day), user nói
+  không test AI Studio. Cần user xem lịch sử giao dịch console Google.
+- 🟡 **Gemini cao cấp trả phí (tuỳ chọn khách chọn) CHƯA làm** — user muốn có, cần UI chọn model +
+  giá premium ở khâu dịch/retranslate.
+- 🟡 Nhãn giọng "SubdubAI" lệch brand "SubVideo AI" — chờ user quyết có đổi không.
+- 🟡 Con số "1.500+" ở `hero-section.tsx` là tự đặt (thật: 7 user) — **user quyết GIỮ NGUYÊN, đừng sửa.**
+- 🟡 File R2 `outputs/` "xoá sau 7 ngày" nhưng lifecycle rule CHƯA bật (token object-scoped, làm ở dashboard).
 - 🟡 Nhân bản giọng riêng không chạy — key ElevenLabs free thiếu quyền `create_instant_voice_clone`.
-- 🟡 File R2 `outputs/` nói "xoá sau 7 ngày" nhưng **lifecycle rule chưa bật** (token object-scoped).
-- ⚪ Lint còn 1 warning cố hữu (TanStack Virtual ở `segment-table.tsx`) — vô hại.
+- 🟡 Chưa có thông tin pháp lý/công ty (NĐ 52/2013) — user chủ động bỏ qua.
+- ⚪ Lint 1 warning cố hữu (TanStack Virtual ở `segment-table.tsx`) — vô hại.
 
 ## 6. VIỆC TIẾP THEO (ưu tiên cao → thấp)
 
-0. ⚠️ **CHƯA PUSH** — có ~9 commit local (migration, /lien-he, docs VPS, ecosystem, bảng tiêu thụ
-   API cập nhật). Push `main` → Vercel deploy web (trang liên hệ + bảng Quản trị mới chỉ hiện SAU
-   khi deploy). An toàn: không đụng luồng xử lý video.
-1. ~~USER: nâng Upstash Redis~~ · ~~bật billing Gemini~~ · ~~chuyển worker sang VPS~~ — **XONG (27/07)**.
-2. **USER: bật auto-reload Gemini** (AI Studio → Billing → Set up auto reload) — kẻo hết credit chết ngầm.
-3. Chạy 1 tuần, xem **Quản trị → Mức tiêu thụ API** để biết số thật.
-4. ~~Dựng lại lịch sử migration~~ — **XONG** (`0002_drift_baseline.sql`).
-5. ~~Trang liên hệ riêng~~ — **XONG** (`/lien-he`). Còn lại: bằng chứng xã hội thật
-   (đánh giá, video kết quả khách) — cần user thu thập, tôi không bịa được.
-6. Bật lifecycle rule R2 cho `outputs/` (dashboard Cloudflare, prefix `outputs/`, 7 ngày).
-7. Đối chiếu hoá đơn ElevenLabs thật → chỉnh lại `dubGeminiPerMin` nếu đang lỗ.
+1. **USER: thêm CORS R2 cho subvideoai.com** (mục 0.1) — chặn upload, gấp nhất.
+2. **USER: Google OAuth callback** (mục 0.2) + **cập nhật worker VPS** (mục 0.3) + **xác nhận email quên MK** (mục 0.4).
+3. **USER: bật auto-reload Gemini.**
+4. Test freemium end-to-end: tạo tài khoản mới → upload <5ph → thấy watermark+banner → xuất có watermark;
+   upload >5ph → bị chặn. (Test hết hạn 7 ngày: chỉnh tạm `TRIAL_CREDITS_EXPIRE_DAYS` nếu cần.)
+5. (Nếu email Gmail không tới) đổi `lib/email.ts` sang **Resend** (API key, xác minh domain Cloudflare).
+6. Làm **Gemini cao cấp trả phí** tuỳ chọn (UI chọn model + giá premium) — user muốn.
+7. Bật lifecycle R2 `outputs/` 7 ngày; đối chiếu hoá đơn ElevenLabs thật.
+8. Bằng chứng xã hội thật (đánh giá, video khách) — cần user thu thập.
 
-## 7. Việc user cần tự kiểm tra bằng mắt (tôi không kiểm được)
+## 7. Việc user tự kiểm bằng mắt (tôi không kiểm được)
 
-- Bảng công cụ studio **neo cạnh** — mở "Làm mờ"/"Lồng tiếng", xem video còn thấy không.
-- **Studio trên điện thoại thật** — nút thao tác đã nâng 18px → 44px.
-- **Khối chào người dùng mới** — tạo tài khoản mới để xem.
-- Chất lượng 4 nguồn giọng còn lại sau khi gỡ bớt.
-- **Trang `/lien-he` khi ĐÃ đăng nhập**: gõ tin rồi bấm "Gửi cho admin" → phải hiện xác nhận
-  xanh và tin nhắn xuất hiện trong `/chat` tab Hỗ trợ. *(Tôi đã kiểm được nhánh chưa đăng nhập,
-  render VI/EN, link footer, sitemap; nhánh gửi thật cần một phiên đăng nhập.)*
+- Upload thật trên subvideoai.com SAU khi thêm CORS.
+- Nút "Đăng nhập với Google" SAU khi thêm OAuth URI.
+- Email "Đặt lại mật khẩu" có tới hộp thư không (cả Spam).
+- Watermark trên video XUẤT RA (sau khi cập nhật VPS) — tài khoản chưa nạp.
+- Tagline + tên "SubVideo AI" hiển thị ở landing/header/footer đã ưng chưa.
