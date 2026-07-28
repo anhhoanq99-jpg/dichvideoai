@@ -111,8 +111,14 @@ pnpm --filter @dichvideo/db db:verify-migrations  # dựng DB tạm từ 0 rồi
   User cần bấm `Set up auto reload` ở AI Studio → Billing.
 - 🟠 **VPS 3 nhân, ffmpeg render đa luồng** — giữ `concurrency: 2` (đừng tăng ở 3 nhân). Đông
   khách thì nâng VPS nhiều nhân rồi mới tăng concurrency, hoặc thêm worker thứ 2 (cùng code).
-- 🟡 Giá lồng tiếng ElevenLabs đã nâng lên bậc cao cấp (700 xu/phút) nhưng **có thể vẫn lỗ** —
-  giá ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại. Cần đối chiếu hoá đơn thật.
+- ✅ ~~Giá lồng tiếng ElevenLabs lỗ~~ — **ĐÃ nâng 700 → 8.000 xu/phút** (28/07, giá thật ~6.500đ/phút).
+- ✅ ~~Chi phí Gemini cao~~ — **ĐÃ chuyển Groq làm chính (miễn phí) + tắt token thinking** (28/07).
+  Gốc rễ: token "thinking" của `gemini-3-flash-preview` không được đếm. Gemini giờ chỉ dự phòng.
+- 🟠 **đ18.771 credit Gemini bị trừ 27/07 CHƯA rõ nguồn** — user nói không test AI Studio; key worker
+  lại ở gói FREE (hit 20/day). Cần user xem lịch sử giao dịch ở console Google để truy nguồn.
+- 🟠 **Khoá tài khoản có cửa sổ ~5 phút** — better-auth cache phiên 5 phút; layout `(app)` truy vấn
+  `banned_at` tươi mỗi lần tải trang nên chặn ngay ở full-load, nhưng điều hướng client-side trong
+  app có thể trễ tới 5 phút. Chấp nhận được; muốn tức thì tuyệt đối thì thêm hook better-auth chặn tạo phiên.
 - 🟡 **Chưa có thông tin pháp lý/công ty** (NĐ 52/2013, 85/2021) — user chủ động bỏ qua.
 - 🟡 Chưa có bằng chứng xã hội thật (đánh giá, video khách). Con số "1.500+" ở
   `hero-section.tsx` là tự đặt (số thật: 7 user · 103 video) — **user đã quyết GIỮ NGUYÊN
