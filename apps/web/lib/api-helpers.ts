@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import type { z } from "zod";
-import { jobs, schema, subtitleTracks } from "@dichvideo/db";
+import { jobs, subtitleTracks } from "@dichvideo/db";
 import type { JobType } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { enqueuePipelineJob } from "@/lib/queue";
 import { getSession } from "@/lib/session";
 import { isAdminEmail } from "@/lib/admin";
 import { getOwnVideo } from "@/lib/video-access";
+import { resolveSpendableBalance } from "@/lib/trial";
 
 export function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -80,19 +81,19 @@ export async function requireCredits(
   userId: string,
   needed: number,
 ): Promise<{ response?: NextResponse; balance: number }> {
-  const [row] = await db
-    .select({ balance: schema.user.creditBalance })
-    .from(schema.user)
-    .where(eq(schema.user.id, userId));
-  const balance = row?.balance ?? 0;
+  // kết toán credit dùng thử hết hạn TRƯỚC khi kiểm — hết hạn thì spendable = 0
+  const { balance, trialExpired } = await resolveSpendableBalance(userId);
   if (balance >= needed) return { balance };
 
+  const error = trialExpired
+    ? "Credit dùng thử đã hết hạn (7 ngày). Vui lòng nạp tiền để tiếp tục — xu đã nạp KHÔNG bao giờ hết hạn."
+    : `Không đủ xu: cần ${needed.toLocaleString("vi-VN")}, bạn đang có ${balance.toLocaleString("vi-VN")}`;
   return {
     balance,
     response: NextResponse.json(
       {
-        error: `Không đủ xu: cần ${needed.toLocaleString("vi-VN")}, bạn đang có ${balance.toLocaleString("vi-VN")}`,
-        code: "INSUFFICIENT_CREDITS",
+        error,
+        code: trialExpired ? "TRIAL_EXPIRED" : "INSUFFICIENT_CREDITS",
         needed,
         balance,
         shortfall: needed - balance,

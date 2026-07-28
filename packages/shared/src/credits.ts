@@ -133,6 +133,7 @@ export const CREDIT_REASONS = [
   "job_charge",
   "job_refund",
   "admin_adjust",
+  "trial_expired",
 ] as const;
 
 export type CreditReason = (typeof CREDIT_REASONS)[number];

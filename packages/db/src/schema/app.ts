@@ -47,6 +47,8 @@ export const creditReason = pgEnum("credit_reason", [
   "job_charge",
   "job_refund",
   "admin_adjust",
+  // credit tặng (signup_trial) hết hạn sau 7 ngày với tài khoản chưa nạp
+  "trial_expired",
 ]);
 
 export const videos = pgTable(

@@ -7,6 +7,7 @@ import { CREDIT_PRICING } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
+import { resolveSpendableBalance, trialDaysLeft } from "@/lib/trial";
 import { TopupPanel } from "@/components/credits/topup-panel";
 
 export const dynamic = "force-dynamic";
@@ -96,9 +97,9 @@ export default async function CreditsPage() {
   const lang = await getLang();
   const t = T[lang];
 
-  const [[userRow], [priorTopup]] = await Promise.all([
+  const [[userRow], [priorTopup], spendable] = await Promise.all([
     db
-      .select({ balance: schema.user.creditBalance })
+      .select({ createdAt: schema.user.createdAt })
       .from(schema.user)
       .where(eq(schema.user.id, session.user.id)),
     db
@@ -106,11 +107,18 @@ export default async function CreditsPage() {
       .from(creditLedger)
       .where(and(eq(creditLedger.userId, session.user.id), eq(creditLedger.reason, "topup")))
       .limit(1),
+    // kết toán credit dùng thử hết hạn → số dư thực tiêu được
+    resolveSpendableBalance(session.user.id),
   ]);
 
   const code = `DV${session.user.id.slice(0, 8)}`.toUpperCase();
-  const balance = userRow?.balance ?? 0;
+  const balance = spendable.balance;
   const isFirstTopup = !priorTopup;
+  // tài khoản dùng thử (chưa nạp): còn mấy ngày / đã hết hạn credit tặng
+  const trialInfo =
+    isFirstTopup && userRow
+      ? { daysLeft: trialDaysLeft(userRow.createdAt), expired: spendable.trialExpired }
+      : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -120,6 +128,25 @@ export default async function CreditsPage() {
           <Coins className="h-4 w-4" /> {t.balance(balance.toLocaleString("vi-VN"))}
         </p>
       </div>
+
+      {/* Tài khoản dùng thử: nhắc hạn credit tặng — mồi nạp để giữ xu vĩnh viễn */}
+      {trialInfo && (
+        <p
+          className={
+            trialInfo.expired
+              ? "rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+              : "rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+          }
+        >
+          {trialInfo.expired
+            ? lang === "vi"
+              ? "⚠️ Credit dùng thử đã hết hạn. Nạp tiền để tiếp tục — xu đã nạp KHÔNG bao giờ hết hạn."
+              : "⚠️ Your trial credits have expired. Top up to continue — purchased credits never expire."
+            : lang === "vi"
+              ? `⏳ Credit tặng dùng thử còn ${trialInfo.daysLeft} ngày. Nạp tiền bất kỳ để giữ xu VĨNH VIỄN (xu đã nạp không hết hạn).`
+              : `⏳ Your trial credits expire in ${trialInfo.daysLeft} day(s). Top up once to keep your credits FOREVER (purchased credits never expire).`}
+        </p>
+      )}
 
       <TopupPanel
         code={code}
