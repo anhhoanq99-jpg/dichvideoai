@@ -15,6 +15,7 @@ import { getLang } from "@/lib/i18n";
 import { isAdminEmail } from "@/lib/admin";
 import { AdminDemoClient } from "./admin-demo-client";
 import { AdminUsagePanel } from "./admin-usage-panel";
+import { AdminUsersClient } from "./admin-users-client";
 import { AdminTabs } from "./admin-tabs";
 import {
   AdminModerationClient,
@@ -349,65 +350,7 @@ export default async function AdminPage() {
           {
             id: "users",
             label: t.usersTitle,
-            content:
-              usersView.length === 0 ? (
-                <p className="text-sm text-neutral-400">{t.noUsers}</p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <StatCard
-                      icon={<Users className="h-4 w-4" />}
-                      label={t.totalUsers}
-                      value={num(usersView.length)}
-                    />
-                  </div>
-                  <div className="mt-5 overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800">
-                    <table className="w-full min-w-[560px] text-sm">
-                      <thead className="border-b border-neutral-200 text-left text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-                        <tr>
-                          <th className="px-3 py-2.5 font-medium">{t.colUser}</th>
-                          <th className="px-3 py-2.5 text-right font-medium">{t.colBalance}</th>
-                          <th className="px-3 py-2.5 text-right font-medium">{t.colVideos}</th>
-                          <th className="px-3 py-2.5 text-right font-medium">{t.colTopup}</th>
-                          <th className="px-3 py-2.5 text-right font-medium">{t.colJoined}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {usersView.map((u) => (
-                          <tr
-                            key={u.id}
-                            className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60"
-                          >
-                            <td className="px-3 py-2">
-                              <p className="flex items-center gap-1.5 font-medium">
-                                {u.name}
-                                {u.isAdmin && (
-                                  <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
-                                    {t.adminTag}
-                                  </span>
-                                )}
-                              </p>
-                              <p className="truncate text-xs text-neutral-400">{u.email}</p>
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">
-                              {num(u.balance)} {t.xu}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums text-neutral-500 dark:text-neutral-400">
-                              {num(u.videos)}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-neutral-500 dark:text-neutral-400">
-                              {u.topups > 0 ? `${num(u.topups)} ${t.xu}` : "—"}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-400">
-                              {u.joined}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              ),
+            content: <AdminUsersClient users={usersView} lang={lang} />,
           },
           {
             id: "moderation",
