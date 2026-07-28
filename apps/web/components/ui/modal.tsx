@@ -134,7 +134,10 @@ export function Modal({
         aria-modal={dock ? undefined : true}
         tabIndex={-1}
         className={cn(
-          "animate-fade-up max-h-[90dvh] w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl outline-none dark:border-neutral-800 dark:bg-neutral-900",
+          "max-h-[90dvh] w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl outline-none dark:border-neutral-800 dark:bg-neutral-900",
+          // hộp giữa: trượt lên nhẹ; bảng neo dưới nút: hiện tại chỗ, KHÔNG trượt
+          // (tránh "giật load" mỗi lần mở)
+          dock ? "animate-pop-in" : "animate-fade-up",
           wide ? "max-w-2xl" : "max-w-lg",
           dock &&
             "lg:pointer-events-auto lg:max-h-[calc(100dvh-5rem)] lg:shadow-2xl lg:ring-1 lg:ring-black/5",

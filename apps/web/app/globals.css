@@ -164,6 +164,19 @@ body {
   }
 }
 
+/* Popover neo dưới nút (bảng công cụ studio): hiện TẠI CHỖ, KHÔNG trượt dọc 24px
+   như fade-up — cú trượt đó gây cảm giác "giật load" mỗi lần mở. Chỉ mờ nhẹ + phóng
+   rất nhỏ cho êm. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.animate-pop-in {
+  animation: pop-in 0.12s ease-out;
+}
+
 /* chạy ngay khi tải trang (hero) — delay đặt qua --reveal-delay */
 .animate-fade-up {
   animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -247,6 +260,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
+  .animate-pop-in,
   .reveal.is-visible,
   .stagger-group.is-visible > *,
   .animate-glow-pulse {
