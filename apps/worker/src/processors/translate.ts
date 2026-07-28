@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { createDb, jobs, subtitleTracks, videos } from "@dichvideo/db";
 import { DUB_VOICES, type JobPayload, type SubtitleSegment } from "@dichvideo/shared";
 import { chainJob } from "../lib/chain";
+import { hasPaidTopup } from "../lib/trial";
 import { translateSegments, type TranslationStyle } from "../lib/translate";
 import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
@@ -85,6 +86,12 @@ export async function translateProcessor(job: Job<JobPayload>) {
   const finish = job.data.params.finish as
     | { render?: boolean; dub?: boolean; voice?: string }
     | undefined;
+  // Tài khoản DÙNG THỬ → bản xuất phải có watermark. Job nối ở đây KHÔNG đi qua
+  // route web (nơi tính cờ này), nên phải tự tra lại — thiếu dòng này thì luồng
+  // một chạm (luồng chính của khách) ra video sạch, freemium coi như vô hiệu.
+  const watermark = finish?.render || finish?.dub
+    ? !(await hasPaidTopup(db, job.data.userId))
+    : false;
   if (finish?.render) {
     // dải đáy video — vị trí phụ đề gốc thường gặp; phụ đề dịch đè đúng chỗ đó
     const band = { x: 0.02, y: 0.78, w: 0.96, h: 0.16 };
@@ -100,6 +107,7 @@ export async function translateProcessor(job: Job<JobPayload>) {
         regions: [band],
         subBox: { x: 0.05, y: band.y, w: 0.9, h: band.h },
         finish,
+        watermark,
       },
     });
     logger.info({ videoId: video.id, nextId }, "chained render (auto-finish)");
@@ -114,6 +122,8 @@ export async function translateProcessor(job: Job<JobPayload>) {
         speed: 1,
         aiVolume: 100,
         bgVolume: 20,
+        // lồng tiếng THẲNG trên video gốc (không qua render) → tự burn watermark
+        watermark,
       },
     });
     logger.info({ videoId: video.id, nextId }, "chained dub (auto-finish)");

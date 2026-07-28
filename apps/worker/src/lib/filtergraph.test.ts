@@ -7,6 +7,7 @@ import {
   regionToPixels,
   safeBoxblur,
   sanitizeDrawText,
+  trialWatermarkDrawText,
 } from "./filtergraph";
 
 const BASE = {
@@ -32,6 +33,53 @@ test("regionToPixels denormalizes, evens, clamps — x=0 stays 0", () => {
 test("no cover, keep aspect → single ass step", () => {
   const g = buildFiltergraph({ ...BASE, coverMode: "none", aspect: "keep" });
   assert.match(g, /^\[0:v\]ass=filename='C\\:\/tmp\/subs\.ass':fontsdir='C\\:\/repo\/fonts'\[v\]$/);
+});
+
+// ---- Watermark tài khoản DÙNG THỬ ----
+
+const WM_FONT = "C:\\repo\\fonts\\BeVietnamPro-Bold.ttf";
+
+test("watermark dùng thử: vẽ SAU CÙNG, ra nhãn [v], cỡ chữ theo chiều cao", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "none",
+    aspect: "keep",
+    trialWatermarkFontFile: WM_FONT,
+  });
+  // graph thường kết ở [base], watermark mới ra [v]
+  assert.match(g, /ass=.*\[base\]/);
+  assert.match(g, /\[base\]drawtext=.*text='SubVideo AI'.*\[v\]$/);
+  // 1080 / 16 = 67.5 → làm tròn 68
+  assert.match(g, /fontsize=68/);
+});
+
+test("watermark dùng thử vẫn nằm TRÊN logo riêng của khách", () => {
+  const g = buildFiltergraph({
+    ...BASE,
+    coverMode: "none",
+    aspect: "keep",
+    logo: {
+      text: "Kênh ABC",
+      position: "tr",
+      fontSize: 40,
+      color: "#ffffff",
+      opacity: 80,
+      fontFile: WM_FONT,
+    },
+    trialWatermarkFontFile: WM_FONT,
+  });
+  assert.ok(g.indexOf("Kênh ABC") < g.indexOf("SubVideo AI"));
+  assert.match(g, /text='SubVideo AI'.*\[v\]$/);
+});
+
+test("không có cờ dùng thử → KHÔNG có watermark", () => {
+  const g = buildFiltergraph({ ...BASE, coverMode: "none", aspect: "keep" });
+  assert.ok(!g.includes("SubVideo AI"));
+});
+
+test("trialWatermarkDrawText: cỡ chữ có sàn 20px cho video nhỏ", () => {
+  assert.match(trialWatermarkDrawText(WM_FONT, 120), /fontsize=20/);
+  assert.match(trialWatermarkDrawText(WM_FONT, 1920), /fontsize=120/);
 });
 
 // ---- Vùng che gắn theo từng dòng phụ đề (che chữ nước ngoài xuất hiện rải rác) ----

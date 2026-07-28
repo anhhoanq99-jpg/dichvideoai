@@ -17,7 +17,9 @@ Code đã push + deploy, nhưng đang chờ **user** làm mấy cấu hình hạ
    `redirect_uri_mismatch`. Vào Google Cloud Console (project `508013265653`) → OAuth client →
    thêm origin `https://subvideoai.com` + redirect URI `https://subvideoai.com/api/auth/callback/google`.
    (Email/mật khẩu vẫn chạy bình thường.)
-3. 🟠 **Worker VPS chưa cập nhật code mới** — watermark render + Groq-primary + giá mới nằm ở worker.
+3. 🔴 **Worker VPS chưa cập nhật code mới** — watermark render + Groq-primary + giá mới nằm ở worker.
+   **Nâng lên ĐỎ**: bản vá lỗ hổng freemium (mục 3, commit mới nhất) nằm PHẦN LỚN ở worker —
+   không `git pull` thì tài khoản dùng thử vẫn xuất được video SẠCH, không watermark, không giới hạn 5 phút.
    Trên VPS chạy: `cd $env:USERPROFILE\dichvideoai; git pull; pm2 restart dichvideo-worker`.
 4. 🟡 **Quên mật khẩu — chờ xác nhận email tới.** Đã thêm env `GMAIL_USER` + `GMAIL_APP_PASSWORD`
    (Gmail SMTP, App Password) trên Vercel + redeploy. Endpoint test trả 200. User cần kiểm hộp thư
@@ -49,6 +51,7 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
 
 | Commit | Nội dung |
 |---|---|
+| (mới) | **VÁ LỖ HỔNG FREEMIUM — luồng một chạm thoát rào hoàn toàn.** Rà soát end-to-end phát hiện: web chỉ chặn ở route `/extract` + `/render`, nhưng luồng CHÍNH (upload & nhập link → probe → trích xuất → dịch → render) do **worker tự nối job** nên KHÔNG đi qua hai route đó → khách chưa nạp xuất video sạch, dài bao nhiêu cũng được. Sửa: hằng số trial dời sang `packages/shared/src/trial.ts` (web + worker dùng chung), `worker/lib/trial.ts` `hasPaidTopup`, `probe.ts` chặn >5 phút ngay khi biết thời lượng, `translate.ts` truyền `watermark` vào job render/dub nối tiếp, `dub.ts` burn watermark khi lồng tiếng thẳng trên video gốc, route `/api/videos/[id]/dub` thêm rào trial. +4 test filtergraph |
 | `20c97cc` | **Quên mật khẩu**: `lib/email.ts` (Gmail SMTP nodemailer) + better-auth `sendResetPassword` + trang `/forgot-password` `/reset-password` + link ở login-card. Client dùng `requestPasswordReset`/`resetPassword` (better-auth 1.6) |
 | `87fd07b` | **Cutover domain subvideoai.com**: `proxy.ts` CANONICAL_HOST + env BETTER_AUTH_URL/NEXT_PUBLIC_SITE_URL |
 | `46b0713` | **Trial: credit tặng hết hạn 7 ngày** — migration `0004` (enum `trial_expired`), `lib/trial.ts` `resolveSpendableBalance` (kết toán idempotent, không sống lại khi nạp), `requireCredits`, balance API, trang credits |
@@ -75,6 +78,14 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
 - **Tài khoản DÙNG THỬ = chưa từng nạp tiền** (`lib/trial.ts` `hasPaidTopup` = có dòng ledger
   reason `topup` chưa). Khi dùng thử: watermark "SubVideo AI" (render + preview), chặn video >5 phút
   (`TRIAL_MAX_VIDEO_SEC=300`), credit tặng hết hạn 7 ngày. **Đã nạp → mở hết.**
+- **Rào dùng thử phải đặt ở CẢ HAI TẦNG — web VÀ worker.** Route web (`/extract`, `/render`, `/dub`)
+  chỉ gác cửa khi user bấm từng bước; luồng một chạm thì **worker tự nối job** (`lib/chain.ts`) nên
+  không đi qua route nào. Chốt chặn thật: `probe.ts` (chặn >5 phút, chỗ đầu tiên biết thời lượng) +
+  `translate.ts` (gắn cờ `watermark` vào job render/dub nối tiếp). Thêm bước mới vào pipeline thì
+  PHẢI hỏi lại `hasPaidTopup` ở worker, đừng tin cờ do web gửi.
+- **Mọi bản xuất của tài khoản dùng thử đều phải có watermark**, kể cả lồng tiếng không qua render —
+  `dub.ts` khi đó mất `-c:v copy`, phải mã hoá lại (chậm hơn, chỉ khách chưa nạp chịu). Lồng tiếng
+  nối SAU render thì nguồn đã có watermark sẵn (`sourceR2Key`) → không vẽ chồng.
 - **Credit ĐÃ NẠP không bao giờ hết hạn** (lợi thế cạnh tranh). CHỈ credit tặng (signup) hết hạn 7
   ngày với tài khoản chưa nạp. `resolveSpendableBalance` kết toán idempotent qua unique
   `(ref_type='trial', ref_id=userId, reason='trial_expired')` → credit đã trừ KHÔNG sống lại khi nạp sau.
@@ -121,8 +132,10 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
 1. **USER: thêm CORS R2 cho subvideoai.com** (mục 0.1) — chặn upload, gấp nhất.
 2. **USER: Google OAuth callback** (mục 0.2) + **cập nhật worker VPS** (mục 0.3) + **xác nhận email quên MK** (mục 0.4).
 3. **USER: bật auto-reload Gemini.**
-4. Test freemium end-to-end: tạo tài khoản mới → upload <5ph → thấy watermark+banner → xuất có watermark;
-   upload >5ph → bị chặn. (Test hết hạn 7 ngày: chỉnh tạm `TRIAL_CREDITS_EXPIRE_DAYS` nếu cần.)
+4. ✅ Rà soát freemium ở tầng code XONG (tìm ra + vá lỗ hổng luồng một chạm, xem mục 3).
+   ⏳ **Còn lại phần phải nhìn bằng mắt, làm SAU khi cập nhật worker VPS**: tạo tài khoản mới →
+   upload <5ph → thấy watermark+banner → xuất ra MP4 có watermark giữa khung; upload >5ph → job probe
+   fail với thông báo "vượt giới hạn 5 phút". (Test hết hạn 7 ngày: chỉnh tạm `TRIAL_CREDITS_EXPIRE_DAYS`.)
 5. (Nếu email Gmail không tới) đổi `lib/email.ts` sang **Resend** (API key, xác minh domain Cloudflare).
 6. Làm **Gemini cao cấp trả phí** tuỳ chọn (UI chọn model + giá premium) — user muốn.
 7. Bật lifecycle R2 `outputs/` 7 ngày; đối chiếu hoá đơn ElevenLabs thật.

@@ -14,6 +14,7 @@ import {
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { hasPaidTopup, trialVideoLimitMessage, trialVideoTooLong } from "@/lib/trial";
 
 const schema = z.object({
   trackId: z.string().uuid(),
@@ -47,6 +48,14 @@ export async function POST(
   const track = await findVideoTrack(body.data.trackId, video.id);
   if (!track) return jsonError("Track phụ đề không hợp lệ", 400);
 
+  // Tài khoản dùng thử (chưa nạp): chặn video quá dài + gắn watermark lên bản
+  // lồng tiếng — cùng luật với route /render, đừng để đây thành cửa sau ra
+  // video sạch (lồng tiếng cũng cho ra file MP4 tải về được).
+  const paid = await hasPaidTopup(session.user.id);
+  if (!paid && trialVideoTooLong(video.durationSec)) {
+    return jsonError(trialVideoLimitMessage(video.durationSec), 403);
+  }
+
   // bao thieu xu NGAY, dung de khach cho job roi moi biet hong.
   // Gia theo giong: nguon tinh tien theo ky tu (Gemini/ElevenLabs) dat hon.
   const voice = String(body.data.voice ?? "");
@@ -59,6 +68,9 @@ export async function POST(
   );
   if (credits.response) return credits.response;
 
-  const job = await createPipelineJob("dub", video.id, session.user.id, body.data);
+  const job = await createPipelineJob("dub", video.id, session.user.id, {
+    ...body.data,
+    watermark: !paid,
+  });
   return NextResponse.json({ ok: true, jobId: job.id });
 }

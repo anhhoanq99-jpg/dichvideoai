@@ -1,16 +1,19 @@
 import path from "node:path";
-import type { Job } from "bullmq";
+import { UnrecoverableError, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import { createDb, videos } from "@dichvideo/db";
 import {
   EXTRACT_METHODS,
   UPLOAD_MAX_DURATION_SEC,
+  trialVideoLimitMessage,
+  trialVideoTooLong,
   type ExtractMethod,
   type JobPayload,
 } from "@dichvideo/shared";
 import { chainJob } from "../lib/chain";
 import { ffprobe } from "../lib/ffmpeg";
 import { cleanupJobDir, downloadFromR2, jobTempDir } from "../lib/r2";
+import { hasPaidTopup } from "../lib/trial";
 import { logger } from "../logger";
 
 export async function probeProcessor(job: Job<JobPayload>) {
@@ -58,6 +61,21 @@ export async function probeProcessor(job: Job<JobPayload>) {
     const chain = job.data.params.chain as
       | { method?: string; translate?: boolean; finish?: Record<string, unknown> }
       | undefined;
+
+    /**
+     * Chặn video quá dài cho tài khoản DÙNG THỬ ngay tại đây.
+     *
+     * Route web `/extract` và `/render` đã chặn, nhưng luồng một chạm (upload &
+     * nhập link) KHÔNG đi qua hai route đó — worker tự nối job — nên trước đây
+     * khách chưa nạp vẫn xử lý được video dài bao nhiêu cũng được. Đây là lần
+     * đầu tiên biết thời lượng thật, nên chặn ở đúng chỗ này.
+     */
+    if (chain?.method && trialVideoTooLong(meta.durationSec)) {
+      if (!(await hasPaidTopup(db, job.data.userId))) {
+        throw new UnrecoverableError(trialVideoLimitMessage(meta.durationSec));
+      }
+    }
+
     if (chain?.method && EXTRACT_METHODS.includes(chain.method as ExtractMethod)) {
       const nextId = await chainJob({
         videoId: video.id,

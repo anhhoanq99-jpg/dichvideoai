@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
@@ -17,12 +18,18 @@ import {
 import { slotMs, atempoChain } from "../lib/dub-timing";
 import { audioDurationMs, ffBin, ffprobe, makeSilence } from "../lib/ffmpeg";
 import { runFfmpeg } from "../lib/ffmpeg-run";
+import { trialWatermarkDrawText } from "../lib/filtergraph";
 import { cleanupJobDir, downloadFromR2, jobTempDir, uploadToR2 } from "../lib/r2";
 import { isGCloudQuotaError, synthesizeClipWithRetry } from "../lib/tts";
 import { recordUsage } from "../lib/usage";
 import { logger } from "../logger";
 
 const execFileAsync = promisify(execFile);
+
+const FONTS_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../fonts",
+);
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
@@ -308,25 +315,39 @@ export async function dubProcessor(job: Job<JobPayload>) {
     // tiếng gốc: GIỮA các câu = bgVol (nhạc nền), TRONG câu = origVoiceVol
     // (hạ giọng nói gốc đúng lúc AI đọc — mô phỏng tách giọng/nhạc)
     const originalAudioFilter = buildOriginalVolumeFilter(segments, bgVol, origVoiceVol);
-    const audioArgs = mixWithOriginal
-      ? [
-          "-filter_complex",
-          `[0:a]${originalAudioFilter}[a0];[1:a]volume=${aiVol}[a1];[a0][a1]amix=inputs=2:duration=first:normalize=0[aout]`,
-          "-map", "0:v",
-          "-map", "[aout]",
-        ]
-      : [
-          "-filter_complex", `[1:a]volume=${aiVol}[aout]`,
-          "-map", "0:v",
-          "-map", "[aout]",
-        ];
+    const audioFilter = mixWithOriginal
+      ? `[0:a]${originalAudioFilter}[a0];[1:a]volume=${aiVol}[a1];[a0][a1]amix=inputs=2:duration=first:normalize=0[aout]`
+      : `[1:a]volume=${aiVol}[aout]`;
+
+    /**
+     * Tài khoản dùng thử lồng tiếng THẲNG trên video gốc (không qua render) thì
+     * phải tự burn watermark ở đây — nếu không bản xuất ra sạch trơn và freemium
+     * vô hiệu. Có `sourceR2Key` nghĩa là nguồn là bản ĐÃ render (watermark nằm
+     * sẵn trong ảnh) → không vẽ lại.
+     *
+     * Đánh đổi: mất `-c:v copy`, phải mã hoá lại video nên chậm hơn — chỉ tài
+     * khoản chưa nạp mới chịu.
+     */
+    const burnWatermark = Boolean(params.watermark) && !params.sourceR2Key;
+    const videoArgs = burnWatermark
+      ? ["-map", "[vout]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+         "-pix_fmt", "yuv420p"]
+      : ["-map", "0:v", "-c:v", "copy"];
+    const filterComplex = burnWatermark
+      ? `${audioFilter};[0:v]${trialWatermarkDrawText(
+          path.join(FONTS_DIR, "BeVietnamPro-Bold.ttf"),
+          meta.height || video.height || 720,
+        )}[vout]`
+      : audioFilter;
+
     await runFfmpeg({
       args: [
         "-y",
         "-i", srcPath,
         "-i", dubTrack,
-        ...audioArgs,
-        "-c:v", "copy",
+        "-filter_complex", filterComplex,
+        ...videoArgs,
+        "-map", "[aout]",
         "-c:a", "aac",
         "-b:a", "192k",
         "-movflags", "+faststart",

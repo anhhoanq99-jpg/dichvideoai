@@ -43,6 +43,16 @@ export interface FiltergraphInput {
   trialWatermarkFontFile?: string;
 }
 
+/**
+ * Filter `drawtext` gắn watermark DÙNG THỬ "SubVideo AI" — mờ, chính giữa khung,
+ * cỡ chữ theo chiều cao khung hình. Dùng chung cho render (trong filtergraph) và
+ * lồng tiếng-không-qua-render (dub.ts), để hai đường xuất file ra CÙNG một dấu.
+ */
+export function trialWatermarkDrawText(fontFile: string, outHeight: number): string {
+  const fs = Math.max(20, Math.round(outHeight / 16));
+  return `drawtext=fontfile='${escapeFilterPath(fontFile)}':text='SubVideo AI':fontsize=${fs}:fontcolor=white@0.4:borderw=2:bordercolor=0x000000@0.35:x=(w-tw)/2:y=(h-th)/2`;
+}
+
 /** Escape a path for use inside an ffmpeg filter argument (Windows colons/backslashes). */
 export function escapeFilterPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:");
@@ -337,9 +347,8 @@ export function buildFiltergraph(input: FiltergraphInput): string {
       srcHeight: input.srcHeight,
       aspect: input.aspect,
     });
-    const fs = Math.max(20, Math.round(out.h / 16));
     steps.push(
-      `[base]drawtext=fontfile='${escapeFilterPath(input.trialWatermarkFontFile)}':text='SubVideo AI':fontsize=${fs}:fontcolor=white@0.4:borderw=2:bordercolor=0x000000@0.35:x=(w-tw)/2:y=(h-th)/2[v]`,
+      `[base]${trialWatermarkDrawText(input.trialWatermarkFontFile, out.h)}[v]`,
     );
   }
 

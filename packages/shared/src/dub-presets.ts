@@ -212,6 +212,12 @@ export interface DubParams {
   voices?: string[];
   /** lồng tiếng lên file khác video gốc (vd: bản đã render phụ đề) */
   sourceR2Key?: string;
+  /**
+   * true = tài khoản dùng thử → burn watermark "SubVideo AI" lên bản xuất.
+   * CHỈ đặt khi lồng tiếng THẲNG trên video gốc; nếu `sourceR2Key` trỏ vào bản
+   * đã render thì watermark đã nằm sẵn trong ảnh, đặt thêm sẽ vẽ chồng hai lần.
+   */
+  watermark?: boolean;
   /** 0.8 .. 1.3 — tốc độ đọc cơ bản (trước khi ép khớp thời lượng) */
   speed: number;
   /**
