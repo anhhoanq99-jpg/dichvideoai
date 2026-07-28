@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Coins } from "lucide-react";
-import { schema } from "@dichvideo/db";
+import { creditLedger, schema } from "@dichvideo/db";
 import { CREDIT_PRICING } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
@@ -62,10 +62,10 @@ const T = {
       { label: "Dịch AI (mọi ngôn ngữ, mọi model)", unit: "xu / dòng" },
       { label: "Render video (phụ đề + che chữ + logo)", unit: "xu / phút" },
       {
-        label: "Lồng tiếng AI — giọng thường / Google / ElevenLabs",
+        label: "Lồng tiếng AI — giọng thường (Edge / Google)",
         unit: "xu / phút",
       },
-      { label: "Lồng tiếng AI — giọng cao cấp Gemini", unit: "xu / phút" },
+      { label: "Lồng tiếng AI — giọng cao cấp (ElevenLabs)", unit: "xu / phút" },
     ],
     footnote1: "Xu không hết hạn · job lỗi hoàn 100% tự động · xem chi tiết trừ/hoàn trong",
     footnoteLink: "Lịch sử giao dịch",
@@ -80,10 +80,10 @@ const T = {
       { label: "AI translation (any language, any model)", unit: "credits / line" },
       { label: "Video render (subtitles + masking + logo)", unit: "credits / minute" },
       {
-        label: "AI dubbing — standard / Google / ElevenLabs voices",
+        label: "AI dubbing — standard voices (Edge / Google)",
         unit: "credits / minute",
       },
-      { label: "AI dubbing — premium Gemini voices", unit: "credits / minute" },
+      { label: "AI dubbing — premium voices (ElevenLabs)", unit: "credits / minute" },
     ],
     footnote1: "Credits never expire · failed jobs are auto-refunded 100% · see every charge/refund in",
     footnoteLink: "Transaction history",
@@ -96,13 +96,21 @@ export default async function CreditsPage() {
   const lang = await getLang();
   const t = T[lang];
 
-  const [userRow] = await db
-    .select({ balance: schema.user.creditBalance })
-    .from(schema.user)
-    .where(eq(schema.user.id, session.user.id));
+  const [[userRow], [priorTopup]] = await Promise.all([
+    db
+      .select({ balance: schema.user.creditBalance })
+      .from(schema.user)
+      .where(eq(schema.user.id, session.user.id)),
+    db
+      .select({ id: creditLedger.id })
+      .from(creditLedger)
+      .where(and(eq(creditLedger.userId, session.user.id), eq(creditLedger.reason, "topup")))
+      .limit(1),
+  ]);
 
   const code = `DV${session.user.id.slice(0, 8)}`.toUpperCase();
   const balance = userRow?.balance ?? 0;
+  const isFirstTopup = !priorTopup;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -119,6 +127,7 @@ export default async function CreditsPage() {
         account={process.env.SEPAY_ACCOUNT ?? null}
         accountName={process.env.SEPAY_ACCOUNT_NAME ?? null}
         initialBalance={balance}
+        isFirstTopup={isFirstTopup}
         lang={lang}
       />
 

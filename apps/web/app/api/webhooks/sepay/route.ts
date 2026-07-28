@@ -1,9 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { applyCreditDelta, schema } from "@dichvideo/db";
-import { VND_PER_CREDIT, topupBonusPercent } from "@dichvideo/shared";
+import { applyCreditDelta, creditLedger, schema } from "@dichvideo/db";
+import { topupCredits } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 
 /**
@@ -62,9 +62,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, skipped: "user not found" });
   }
 
-  // nạp nhiều tặng thêm: +10% từ 200k … +80% từ 5 triệu
-  const base = Math.floor(tx.transferAmount / VND_PER_CREDIT);
-  const credits = Math.floor(base * (1 + topupBonusPercent(tx.transferAmount) / 100));
+  // Lần nạp ĐẦU (chưa có lượt topup nào) đủ điều kiện → cộng thêm bonus mồi.
+  // Trên webhook retry, lượt topup lần 1 đã ghi vào ledger nên lần 2 thấy "đã có"
+  // → không tính bonus lại; mà applyCreditDelta cũng chặn trùng ở tầng DB.
+  const [priorTopup] = await db
+    .select({ id: creditLedger.id })
+    .from(creditLedger)
+    .where(and(eq(creditLedger.userId, userRow.id), eq(creditLedger.reason, "topup")))
+    .limit(1);
+  const isFirstTopup = !priorTopup;
+
+  // nạp nhiều tặng thêm (+10% từ 200k … +80% từ 5 triệu) + bonus lần đầu (50k → +20k)
+  const credits = topupCredits(tx.transferAmount, isFirstTopup);
   if (credits <= 0) return NextResponse.json({ success: true, skipped: "amount too small" });
 
   /**

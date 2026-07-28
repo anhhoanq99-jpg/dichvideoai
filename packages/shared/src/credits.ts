@@ -33,6 +33,21 @@ export const CREDIT_PRICING = {
   dubMin: 100,
 } as const;
 
+/**
+ * Khuyến mãi LẦN NẠP ĐẦU — mồi khách dùng thử: nạp từ 50k trở lên, lần đầu tiên
+ * được tặng thêm 20.000 xu (cộng DỒN với % nạp nhiều bên dưới). Áp đúng một lần
+ * cho mỗi tài khoản (webhook kiểm tra chưa có lượt nạp nào trước đó).
+ */
+export const FIRST_TOPUP_PROMO = { minVnd: 50_000, bonusCredits: 20_000 } as const;
+
+/** Số xu nhận được khi nạp `vnd`, đã gồm % nạp-nhiều và (nếu đủ điều kiện) bonus lần đầu. */
+export function topupCredits(vnd: number, isFirstTopup: boolean): number {
+  const base = Math.floor(vnd * (1 + topupBonusPercent(vnd) / 100));
+  const firstBonus =
+    isFirstTopup && vnd >= FIRST_TOPUP_PROMO.minVnd ? FIRST_TOPUP_PROMO.bonusCredits : 0;
+  return base + firstBonus;
+}
+
 /** Nạp nhiều tặng thêm — % bonus theo mức nạp (VND). */
 export function topupBonusPercent(amountVnd: number): number {
   if (amountVnd >= 5_000_000) return 80;
@@ -52,6 +67,19 @@ export interface TopupPack {
   credits: number;
   /** gói được làm nổi bật trên UI */
   popular: boolean;
+  /** gói khuyến mãi lần nạp đầu (mồi dùng thử) — chỉ hiện cho khách chưa nạp lần nào */
+  firstTopup?: boolean;
+}
+
+/** Gói mồi LẦN NẠP ĐẦU (50k → +20k) — chỉ hiển thị cho khách chưa từng nạp. */
+export function firstTopupPack(): TopupPack {
+  return {
+    vnd: FIRST_TOPUP_PROMO.minVnd,
+    bonus: 0,
+    credits: topupCredits(FIRST_TOPUP_PROMO.minVnd, true),
+    popular: false,
+    firstTopup: true,
+  };
 }
 
 /** Các mức nạp chuẩn — nguồn duy nhất cho landing page và trang Nạp credits. */

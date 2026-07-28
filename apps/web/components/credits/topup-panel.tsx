@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   CREDIT_PRICING,
+  firstTopupPack,
   SUPPORT_ZALO,
   SUPPORT_ZALO_URL,
   topupPacks,
@@ -66,6 +67,12 @@ const T = {
     popular: "Phổ biến",
     bonusExtra: (pct: number) => `+${pct}% Tặng thêm`,
     selected: "✓ Đang chọn — quét QR phía trên để nạp",
+    trialTitle: "🎁 Ưu đãi lần đầu",
+    trialDesc: (n: string) =>
+      `Nạp 50.000đ nhận ${n} xu — tặng thêm 20.000 xu cho lần nạp đầu tiên!`,
+    trialCta: "Chọn gói dùng thử",
+    trialBadge: "Tặng 20.000 lần đầu",
+    trialName: "DÙNG THỬ",
   },
   en: {
     packNames: ["STARTER", "BASIC", "STANDARD", "PRO", "STUDIO", "ENTERPRISE"],
@@ -104,6 +111,12 @@ const T = {
     popular: "Popular",
     bonusExtra: (pct: number) => `+${pct}% bonus`,
     selected: "✓ Selected — scan the QR above to top up",
+    trialTitle: "🎁 First top-up offer",
+    trialDesc: (n: string) =>
+      `Top up 50,000₫, get ${n} credits — an extra 20,000 credits on your first top-up!`,
+    trialCta: "Pick the trial pack",
+    trialBadge: "+20,000 first top-up",
+    trialName: "TRIAL",
   },
 } as const;
 
@@ -135,6 +148,8 @@ interface TopupPanelProps {
   account: string | null;
   accountName: string | null;
   initialBalance: number;
+  /** khách chưa từng nạp → hiện gói mồi 50k tặng 20k */
+  isFirstTopup: boolean;
   lang?: Lang;
 }
 
@@ -148,11 +163,16 @@ export function TopupPanel({
   account,
   accountName,
   initialBalance,
+  isFirstTopup,
   lang = "vi",
 }: TopupPanelProps) {
   const t = T[lang];
+  // gói mồi lần đầu đứng đầu danh sách (nếu khách chưa từng nạp)
+  const promoPack = isFirstTopup ? firstTopupPack() : null;
+  const allPacks = promoPack ? [promoPack, ...PACKS] : PACKS;
   const [method, setMethod] = useState<"vietqr" | "paypal">("vietqr");
-  const [selected, setSelected] = useState(PACKS[0].vnd);
+  // khách mới → chọn sẵn gói dùng thử để mời gọi
+  const [selected, setSelected] = useState(allPacks[0].vnd);
   const [copied, setCopied] = useState<string | null>(null);
   // số xu vừa nhận (khác null → hiện màn cảm ơn thay cho khung QR chờ)
   const [paid, setPaid] = useState<number | null>(null);
@@ -160,7 +180,7 @@ export function TopupPanel({
   const router = useRouter();
   const balanceRef = useRef(initialBalance);
   const qrSectionRef = useRef<HTMLDivElement>(null);
-  const pack = PACKS.find((p) => p.vnd === selected)!;
+  const pack = allPacks.find((p) => p.vnd === selected) ?? allPacks[0];
 
   const qrUrl =
     bank && account
@@ -349,6 +369,37 @@ export function TopupPanel({
             {t.neverExpire}
           </span>
         </div>
+
+        {/* Gói mồi LẦN NẠP ĐẦU — nổi bật để chuyển đổi khách mới */}
+        {promoPack && (
+          <button
+            type="button"
+            onClick={() => pickPack(promoPack.vnd)}
+            className={cn(
+              "mt-4 flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left transition-colors",
+              selected === promoPack.vnd
+                ? "border-primary-500 bg-primary-50 dark:bg-primary-950/40"
+                : "border-primary-300 bg-primary-50/40 hover:border-primary-400 dark:border-primary-800 dark:bg-primary-950/20",
+            )}
+          >
+            <Gift className="h-8 w-8 shrink-0 text-primary-500" />
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-primary-700 dark:text-primary-300">
+                {t.trialTitle}
+                <span className="rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                  {t.trialBadge}
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-300">
+                {t.trialDesc(fmt(promoPack.credits))}
+              </p>
+            </div>
+            <span className="ml-auto hidden shrink-0 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white sm:block">
+              {t.trialCta}
+            </span>
+          </button>
+        )}
+
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PACKS.map((p, i) => (
             <button
