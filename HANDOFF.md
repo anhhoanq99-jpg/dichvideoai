@@ -31,7 +31,7 @@ làm giao diện đủ chuyên nghiệp để quảng cáo rộng.
 
 ## 2. Hạ tầng (ĐANG CHẠY THẬT)
 
-- **Web**: https://dichvideoai-web.vercel.app — Vercel `dichvideoai-web`, root `apps/web`.
+- **Web**: https://subvideoai.com — Vercel `dichvideoai-web`, root `apps/web`.
 - **Repo**: GitHub `anhhoanq99-jpg/dichvideoai`, push `main` → Vercel tự deploy (~2.5 phút).
 - **Worker**: pm2 `dichvideo-worker` trên máy Windows của user. Dev local dùng `pnpm dev:web`
   (KHÔNG `pnpm dev`). Sửa code worker xong: `pm2 restart dichvideo-worker`.
