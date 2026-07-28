@@ -41,13 +41,23 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
+/** Tagline dưới logo — luôn nhắc tool làm CẢ dịch lẫn lồng tiếng (tên "SubVideo AI"
+ *  không tự nói ra điều đó). Khai báo một chỗ để mọi nơi dùng lại nhất quán. */
+export const BRAND_TAGLINE = {
+  vi: "Dịch & lồng tiếng video AI",
+  en: "AI video translation & dubbing",
+} as const;
+
 /** Logo + tên thương hiệu, bấm vào về trang chủ. */
 export function BrandLogo({
   className,
   textClassName,
+  tagline,
 }: {
   className?: string;
   textClassName?: string;
+  /** chuỗi tagline hiện ngay dưới tên (vd BRAND_TAGLINE[lang]); bỏ trống = không hiện */
+  tagline?: string;
 }) {
   return (
     <Link
@@ -57,9 +67,18 @@ export function BrandLogo({
         className,
       )}
     >
-      <BrandMark className="h-8 w-8" />
-      <span className={textClassName}>
-        Dịch Video <span className="text-primary-500">AI</span>
+      <BrandMark className="h-8 w-8 shrink-0" />
+      <span className={cn("flex flex-col leading-tight", textClassName)}>
+        <span>
+          SubVideo <span className="text-primary-500">AI</span>
+        </span>
+        {tagline && (
+          // kế thừa màu chữ của tên (trắng ở landing, mặc định ở app) rồi làm mờ
+          // → đọc được trên cả nền tối lẫn sáng mà không cần điều kiện màu
+          <span className="text-[11px] font-normal tracking-normal opacity-70">
+            {tagline}
+          </span>
+        )}
       </span>
     </Link>
   );

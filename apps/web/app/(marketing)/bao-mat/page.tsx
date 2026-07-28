@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
-  title: "Chính sách bảo mật — Dịch Video AI",
+  title: "Chính sách bảo mật — SubVideo AI",
   description:
-    "Chính sách bảo mật của Dịch Video AI: dữ liệu thu thập, cách lưu trữ video và quyền xóa dữ liệu của bạn.",
+    "Chính sách bảo mật của SubVideo AI: dữ liệu thu thập, cách lưu trữ video và quyền xóa dữ liệu của bạn.",
   alternates: { canonical: "/bao-mat" },
 };
 

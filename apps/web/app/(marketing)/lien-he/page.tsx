@@ -13,7 +13,7 @@ import { getLang } from "@/lib/i18n";
 import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "Liên hệ hỗ trợ — Dịch Video AI",
+  title: "Liên hệ hỗ trợ — SubVideo AI",
   description:
     "Cần hỗ trợ về dịch video, lồng tiếng hoặc nạp xu? Nhắn Zalo 0365797631, email subdubaiglobal@gmail.com, hoặc gửi tin trực tiếp cho admin trong ứng dụng.",
   alternates: { canonical: "/lien-he" },

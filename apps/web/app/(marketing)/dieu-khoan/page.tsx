@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
-  title: "Điều khoản sử dụng — Dịch Video AI",
+  title: "Điều khoản sử dụng — SubVideo AI",
   description:
-    "Điều khoản sử dụng dịch vụ Dịch Video AI: quyền và trách nhiệm khi dùng công cụ dịch thuật, lồng tiếng video bằng AI.",
+    "Điều khoản sử dụng dịch vụ SubVideo AI: quyền và trách nhiệm khi dùng công cụ dịch thuật, lồng tiếng video bằng AI.",
   alternates: { canonical: "/dieu-khoan" },
 };
 
@@ -12,7 +12,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: "1. Dịch vụ",
     body: [
-      "Dịch Video AI là công cụ hỗ trợ dịch thuật và lồng tiếng video bằng trí tuệ nhân tạo: tách phụ đề, dịch sang tiếng Việt, che chữ trên hình, gắn phụ đề và tạo giọng đọc.",
+      "SubVideo AI là công cụ hỗ trợ dịch thuật và lồng tiếng video bằng trí tuệ nhân tạo: tách phụ đề, dịch sang tiếng Việt, che chữ trên hình, gắn phụ đề và tạo giọng đọc.",
       "Kết quả do AI tạo ra có thể chưa hoàn hảo; bạn có công cụ chỉnh sửa trước khi xuất và tự chịu trách nhiệm về nội dung cuối cùng mình phát hành.",
     ],
   },

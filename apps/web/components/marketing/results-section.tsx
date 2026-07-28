@@ -81,8 +81,8 @@ export function ResultsSection({ lang = "vi" }: { lang?: Lang }) {
         <Reveal>
           <p className="mt-6 text-center text-xs text-neutral-500">
             {lang === "vi"
-              ? "Video demo xử lý 100% tự động bằng Dịch Video AI — không chỉnh tay."
-              : "Demo processed 100% automatically by Dịch Video AI — no manual edits."}
+              ? "Video demo xử lý 100% tự động bằng SubVideo AI — không chỉnh tay."
+              : "Demo processed 100% automatically by SubVideo AI — no manual edits."}
           </p>
         </Reveal>
       </div>

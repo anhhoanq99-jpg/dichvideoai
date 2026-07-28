@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Clapperboard, MessageCircle } from "lucide-react";
 import { SUPPORT_ZALO, SUPPORT_ZALO_URL } from "@dichvideo/shared";
+import { BRAND_TAGLINE } from "@/components/brand-logo";
 import type { Lang } from "@/lib/i18n";
 import { Reveal } from "./reveal";
 
@@ -9,7 +10,7 @@ const T = {
     ctaH2: "Sẵn sàng Việt hóa video đầu tiên?",
     ctaP: "Đăng nhập bằng Google, nhận 10.000 xu dùng thử — không cần thẻ.",
     ctaBtn: "Bắt đầu ngay",
-    brand: "Dịch Video AI",
+    brand: "SubVideo AI",
     navFeatures: "Tính năng",
     navPricing: "Bảng giá",
     navFaq: "Hỏi đáp",
@@ -25,7 +26,7 @@ const T = {
     ctaH2: "Ready to localize your first video?",
     ctaP: "Sign in with Google and get 10,000 free trial credits — no card required.",
     ctaBtn: "Get started",
-    brand: "Dịch Video AI",
+    brand: "SubVideo AI",
     navFeatures: "Features",
     navPricing: "Pricing",
     navFaq: "FAQ",
@@ -65,12 +66,15 @@ export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
       </div>
 
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 border-t border-white/5 px-4 py-8 sm:flex-row sm:justify-between">
-        <p className="flex items-center gap-2 text-sm font-semibold text-white">
+        <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-accent-600">
             <Clapperboard className="h-3.5 w-3.5 text-white" />
           </span>
-          {t.brand}
-        </p>
+          <span className="flex flex-col leading-tight">
+            <span className="text-sm font-semibold text-white">{t.brand}</span>
+            <span className="text-[11px] text-neutral-400">{BRAND_TAGLINE[lang]}</span>
+          </span>
+        </div>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-neutral-400">
           <Link href={`${home}#tinh-nang`} className="hover:text-white">{t.navFeatures}</Link>
           <Link href={`${home}#bang-gia`} className="hover:text-white">{t.navPricing}</Link>

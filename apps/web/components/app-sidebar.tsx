@@ -16,7 +16,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogo, BRAND_TAGLINE } from "@/components/brand-logo";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -133,7 +133,7 @@ export function AppSidebar({ lang = "vi", isAdmin }: { lang?: Lang; isAdmin?: bo
   return (
     <aside className="hidden h-full w-60 flex-col border-r border-neutral-200 bg-white lg:flex dark:border-neutral-800 dark:bg-neutral-950">
       <div className="flex h-14 items-center px-4">
-        <BrandLogo />
+        <BrandLogo tagline={BRAND_TAGLINE[lang]} />
       </div>
       <NavLinks lang={lang} isAdmin={isAdmin} />
     </aside>
@@ -165,7 +165,7 @@ export function MobileNav({ lang = "vi", isAdmin }: { lang?: Lang; isAdmin?: boo
         >
           <aside className="flex h-full w-72 max-w-[85vw] flex-col rounded-r-2xl bg-white shadow-xl dark:bg-neutral-950">
             <div className="flex h-14 items-center justify-between px-4">
-              <BrandLogo />
+              <BrandLogo tagline={BRAND_TAGLINE[lang]} />
               <button
                 type="button"
                 onClick={() => setOpen(false)}

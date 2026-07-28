@@ -7,7 +7,7 @@ export const SITE_URL =
   process.env.BETTER_AUTH_URL ??
   "http://localhost:3000";
 
-export const SITE_NAME = "Dịch Video AI";
+export const SITE_NAME = "SubVideo AI";
 
 export const SITE_DESCRIPTION = {
   vi: "Trích xuất phụ đề, dịch sang tiếng Việt và lồng tiếng AI cho video của bạn. Nhanh, chính xác, tự nhiên.",

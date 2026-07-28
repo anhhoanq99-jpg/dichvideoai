@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogo, BRAND_TAGLINE } from "@/components/brand-logo";
 import { LangSwitcher } from "@/components/lang-switcher";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ export function SiteHeader({ lang = "vi" }: { lang?: Lang }) {
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-cinema/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <BrandLogo textClassName="text-white" />
+        <BrandLogo textClassName="text-white" tagline={BRAND_TAGLINE[lang]} />
 
         <nav className="hidden items-center gap-6 md:flex">
           {NAV.map((n) => (

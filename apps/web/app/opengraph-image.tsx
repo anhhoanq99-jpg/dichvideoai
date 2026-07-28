@@ -6,7 +6,7 @@ import { SITE_NAME } from "@/lib/site";
  * Font Be Vietnam Pro tải từ Google Fonts (subset đúng ký tự dùng) để dấu
  * tiếng Việt hiển thị chuẩn; nếu tải lỗi thì rơi về font mặc định thay vì fail build.
  */
-export const alt = "Dịch Video AI — Việt hóa & lồng tiếng video bằng AI";
+export const alt = "SubVideo AI — Việt hóa & lồng tiếng video bằng AI";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
