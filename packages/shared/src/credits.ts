@@ -21,10 +21,15 @@ export const CREDIT_PRICING = {
   /** render phụ đề + che chữ — theo phút video */
   renderPerMin: 50,
   renderMin: 20,
-  /** lồng tiếng giọng thường (Edge) — theo phút video */
+  /** lồng tiếng giọng thường (Edge/Google) — theo phút video. Chi phí thật ≈ 0 → lãi. */
   dubEdgePerMin: 500,
-  /** lồng tiếng giọng cao cấp (Gemini) — theo phút video */
-  dubGeminiPerMin: 700,
+  /**
+   * Lồng tiếng giọng CAO CẤP (ElevenLabs) — theo phút video.
+   * Giá thật ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại; đặt 8.000 để bù
+   * chi phí + lãi nhẹ. Trước đây 700 → LỖ ~9× mỗi phút. (Tên biến giữ nguyên để
+   * không phải sửa nơi tham chiếu; áp cho mọi giọng premium — xem isPremiumVoice.)
+   */
+  dubGeminiPerMin: 8_000,
   dubMin: 100,
 } as const;
 
