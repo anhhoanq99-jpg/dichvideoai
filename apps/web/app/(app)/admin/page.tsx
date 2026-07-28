@@ -236,6 +236,7 @@ export default async function AdminPage() {
         email: schema.user.email,
         creditBalance: schema.user.creditBalance,
         createdAt: schema.user.createdAt,
+        bannedAt: schema.user.bannedAt,
       })
       .from(schema.user)
       .orderBy(desc(schema.user.createdAt))
@@ -264,6 +265,7 @@ export default async function AdminPage() {
     videos: videoByUser.get(u.id) ?? 0,
     topups: topupByUser.get(u.id) ?? 0,
     isAdmin: isAdminEmail(u.email),
+    banned: Boolean(u.bannedAt),
     joined: fmtDate(u.createdAt),
   }));
 

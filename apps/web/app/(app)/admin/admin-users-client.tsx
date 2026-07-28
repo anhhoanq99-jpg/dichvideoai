@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coins, Pencil, Users } from "lucide-react";
+import { Coins, Lock, LockOpen, Pencil, Users } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/form-styles";
@@ -18,6 +18,7 @@ export interface AdminUserRow {
   videos: number;
   topups: number;
   isAdmin: boolean;
+  banned: boolean;
   joined: string;
 }
 
@@ -43,6 +44,13 @@ const T = {
     invalid: "Nhập số xu lớn hơn 0",
     done: (n: number) => `Đã ${n > 0 ? "cộng" : "trừ"} ${Math.abs(n).toLocaleString("vi-VN")} xu`,
     failed: "Không điều chỉnh được — thử lại",
+    lockedTag: "Đã khoá",
+    lock: "Khoá",
+    unlock: "Mở khoá",
+    lockConfirm: (name: string) => `Khoá tài khoản "${name}"? Họ sẽ bị đăng xuất và không vào được app.`,
+    lockDone: "Đã khoá tài khoản",
+    unlockDone: "Đã mở khoá tài khoản",
+    lockFailed: "Không đổi được trạng thái — thử lại",
   },
   en: {
     totalUsers: "Total users",
@@ -65,6 +73,13 @@ const T = {
     invalid: "Enter an amount greater than 0",
     done: (n: number) => `${n > 0 ? "Added" : "Subtracted"} ${Math.abs(n).toLocaleString("en-US")} credits`,
     failed: "Could not adjust — try again",
+    lockedTag: "Locked",
+    lock: "Lock",
+    unlock: "Unlock",
+    lockConfirm: (name: string) => `Lock "${name}"? They will be signed out and blocked from the app.`,
+    lockDone: "Account locked",
+    unlockDone: "Account unlocked",
+    lockFailed: "Could not update — try again",
   },
 } as const;
 
@@ -83,6 +98,31 @@ export function AdminUsersClient({
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lockingId, setLockingId] = useState<string | null>(null);
+
+  async function toggleLock(u: AdminUserRow) {
+    const next = !u.banned;
+    if (next && !window.confirm(t.lockConfirm(u.name))) return;
+    setLockingId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/ban`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned: next }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast(data?.error ?? t.lockFailed, "error");
+        return;
+      }
+      toast(next ? t.lockDone : t.unlockDone);
+      router.refresh();
+    } catch {
+      toast(t.lockFailed, "error");
+    } finally {
+      setLockingId(null);
+    }
+  }
 
   async function adjust(sign: 1 | -1) {
     if (!editing) return;
@@ -153,6 +193,11 @@ export function AdminUsersClient({
                         {t.adminTag}
                       </span>
                     )}
+                    {u.banned && (
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                        {t.lockedTag}
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-xs text-neutral-400">{u.email}</p>
                 </td>
@@ -168,18 +213,37 @@ export function AdminUsersClient({
                 <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-400">
                   {u.joined}
                 </td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(u);
-                      setAmount("");
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    {t.edit}
-                  </button>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(u);
+                        setAmount("");
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {t.edit}
+                    </button>
+                    {/* admin không khoá được (kể cả chính mình) → tránh tự đá ra */}
+                    {!u.isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => toggleLock(u)}
+                        disabled={lockingId === u.id}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-50",
+                          u.banned
+                            ? "border-success-300 text-success-700 hover:bg-success-50 dark:border-success-800 dark:text-success-300 dark:hover:bg-success-950/40"
+                            : "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40",
+                        )}
+                      >
+                        {u.banned ? <LockOpen className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                        {u.banned ? t.unlock : t.lock}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -32,6 +32,7 @@ const T = {
     bonus: `*Đăng ký lần đầu tặng ${SIGNUP_TRIAL_CREDITS.toLocaleString("vi-VN")} xu!`,
     errLogin: "Email hoặc mật khẩu không đúng",
     errSignup: "Không tạo được tài khoản — email có thể đã dùng",
+    banned: "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ hỗ trợ nếu cần trợ giúp.",
   },
   en: {
     title: "Welcome Back",
@@ -54,10 +55,11 @@ const T = {
     bonus: `*New accounts get ${SIGNUP_TRIAL_CREDITS.toLocaleString("en-US")} free credits!`,
     errLogin: "Wrong email or password",
     errSignup: "Could not create account — email may be taken",
+    banned: "Your account has been locked. Please contact support if you need help.",
   },
 } as const;
 
-export function LoginCard({ lang }: { lang: Lang }) {
+export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boolean }) {
   const t = T[lang];
   const router = useRouter();
   const [tab, setTab] = useState<"google" | "email">("google");
@@ -106,6 +108,12 @@ export function LoginCard({ lang }: { lang: Lang }) {
         <h1 className="mt-4 text-center text-2xl font-bold tracking-tight">
           {t.title}
         </h1>
+
+        {banned && (
+          <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+            {t.banned}
+          </p>
+        )}
 
         {/* tab Google | Email */}
         <div className="mt-5 grid grid-cols-2 border-b border-neutral-200 text-center text-sm font-semibold dark:border-neutral-800">

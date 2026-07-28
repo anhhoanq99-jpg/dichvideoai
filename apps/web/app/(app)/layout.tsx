@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { schema } from "@dichvideo/db";
+import { db } from "@/lib/db";
 import { AppHeaderShell } from "@/components/app-header-shell";
 import { AppSidebar, MobileNav } from "@/components/app-sidebar";
 import { BackButton } from "@/components/back-button";
@@ -16,6 +19,13 @@ export default async function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const session = await getSession();
   if (!session) redirect("/login");
+  // Tài khoản bị admin khoá → chặn mọi trang app. Truy vấn tươi (không qua cache
+  // phiên 5 phút của better-auth) để khoá có hiệu lực ngay ở lần tải trang tiếp.
+  const [account] = await db
+    .select({ bannedAt: schema.user.bannedAt })
+    .from(schema.user)
+    .where(eq(schema.user.id, session.user.id));
+  if (account?.bannedAt) redirect("/login?banned=1");
   const lang = await getLang();
   const isAdmin = isAdminEmail(session.user.email);
 

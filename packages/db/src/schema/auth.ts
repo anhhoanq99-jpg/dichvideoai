@@ -18,6 +18,8 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   creditBalance: integer("credit_balance").notNull().default(0),
+  /** khác null = tài khoản bị admin khoá (chặn truy cập app) */
+  bannedAt: timestamp("banned_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
