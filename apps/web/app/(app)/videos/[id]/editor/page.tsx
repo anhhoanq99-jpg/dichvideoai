@@ -11,6 +11,7 @@ import { getLang } from "@/lib/i18n";
 import { getR2, r2Bucket } from "@/lib/r2";
 import { getSession } from "@/lib/session";
 import { getOwnVideo } from "@/lib/video-access";
+import { hasPaidTopup } from "@/lib/trial";
 import { ProcessingView } from "@/components/studio/processing-view";
 import { StudioShell } from "@/components/studio/studio-shell";
 
@@ -58,6 +59,9 @@ export default async function EditorPage({
     (s) => s.box,
   );
 
+  // tài khoản dùng thử (chưa nạp) → watermark preview + nhắc nạp
+  const isTrial = !(await hasPaidTopup(session.user.id));
+
   return (
     <div className="space-y-2">
       {/* chỉ nút quay lại gọn — tên video dài (nhất là tên Trung) chiếm 2 dòng
@@ -79,6 +83,7 @@ export default async function EditorPage({
         durationSec={video.durationSec}
         original={(original?.segments ?? []) as SubtitleSegment[]}
         translated={translated.segments as SubtitleSegment[]}
+        isTrial={isTrial}
         lang={lang}
       />
     </div>

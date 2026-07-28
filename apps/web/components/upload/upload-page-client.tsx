@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloudUpload, Gift, GraduationCap, Loader2, Play, X } from "lucide-react";
+import {
+  CloudUpload,
+  Gift,
+  GraduationCap,
+  Loader2,
+  Play,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import Link from "next/link";
 import { BrandMark } from "@/components/brand-logo";
 import {
   CREDIT_PRICING,
@@ -138,12 +147,15 @@ export function UploadPageClient({
   initialUrl = "",
   firstTime = false,
   balance = 0,
+  isTrial = false,
 }: {
   lang?: Lang;
   initialUrl?: string;
   /** chưa có video nào → hiện lời chào + số xu đang có */
   firstTime?: boolean;
   balance?: number;
+  /** tài khoản dùng thử (chưa nạp) → banner báo watermark + giới hạn */
+  isTrial?: boolean;
 }) {
   const t = T[lang];
   const { state, upload, cancel } = useMultipartUpload();
@@ -229,6 +241,31 @@ export function UploadPageClient({
           {t.title}
         </h1>
       </div>
+
+      {/* Tài khoản dùng thử (chưa nạp): báo trước watermark + giới hạn để mời nạp */}
+      {isTrial && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <TriangleAlert className="h-6 w-6 shrink-0 text-amber-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {lang === "vi"
+                ? "Tài khoản dùng thử: video xuất ra sẽ gắn watermark"
+                : "Trial account: exported videos get a watermark"}
+            </p>
+            <p className="mt-0.5 text-xs text-amber-700/90 dark:text-amber-200/80">
+              {lang === "vi"
+                ? "Nạp tiền để gỡ watermark “SubVideo AI”, mở giới hạn 5 phút và dùng đầy đủ tính năng."
+                : "Top up to remove the “SubVideo AI” watermark, unlock the 5-minute limit, and use every feature."}
+            </p>
+          </div>
+          <Link
+            href="/credits"
+            className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
+          >
+            {lang === "vi" ? "Xem Bảng Giá" : "See pricing"}
+          </Link>
+        </div>
+      )}
 
       {/* Lần đầu vào: nói rõ đang có bao nhiêu xu và làm được gì với số đó.
           Con số quy đổi tính từ ĐƠN GIÁ THẬT nên không bao giờ lệch bảng giá. */}

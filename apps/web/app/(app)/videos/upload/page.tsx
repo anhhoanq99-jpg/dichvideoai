@@ -3,6 +3,7 @@ import { videos } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
+import { hasPaidTopup } from "@/lib/trial";
 import { UploadPageClient } from "@/components/upload/upload-page-client";
 
 export default async function UploadPage({
@@ -24,6 +25,7 @@ export default async function UploadPage({
    */
   let firstTime = false;
   let balance = 0;
+  let isTrial = false;
   if (session) {
     const [row] = await db
       .select({ n: count() })
@@ -31,6 +33,7 @@ export default async function UploadPage({
       .where(eq(videos.userId, session.user.id));
     firstTime = (row?.n ?? 0) === 0;
     balance = session.user.creditBalance ?? 0;
+    isTrial = !(await hasPaidTopup(session.user.id));
   }
 
   return (
@@ -39,6 +42,7 @@ export default async function UploadPage({
       initialUrl={params.url ?? ""}
       firstTime={firstTime}
       balance={balance}
+      isTrial={isTrial}
     />
   );
 }

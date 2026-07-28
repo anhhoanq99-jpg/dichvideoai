@@ -195,6 +195,8 @@ interface StudioShellProps {
   durationSec: number | null;
   original: SubtitleSegment[];
   translated: SubtitleSegment[];
+  /** tài khoản dùng thử (chưa nạp) → watermark preview + nhắc nạp */
+  isTrial?: boolean;
   lang?: Lang;
 }
 
@@ -214,6 +216,7 @@ export function StudioShell({
   durationSec,
   original,
   translated,
+  isTrial = false,
   lang = "vi",
 }: StudioShellProps) {
   const t = T[lang];
@@ -409,6 +412,19 @@ export function StudioShell({
      * hai bên cuộn độc lập.
      */
     <div className="flex flex-col gap-3 lg:h-[calc(100dvh-7.5rem)]">
+      {isTrial && (
+        <a
+          href="/credits"
+          className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50"
+        >
+          <TriangleAlert className="h-4 w-4 shrink-0" />
+          <span>
+            {lang === "vi"
+              ? "Tài khoản dùng thử — video xuất ra sẽ gắn watermark “SubVideo AI”. Nạp tiền để gỡ watermark & mở giới hạn 5 phút."
+              : "Trial account — exported videos get a “SubVideo AI” watermark. Top up to remove it and unlock the 5-minute limit."}
+          </span>
+        </a>
+      )}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -488,6 +504,7 @@ export function StudioShell({
           </div>
 
           {previewUrl ? (
+            <div className="relative">
             <RenderPreview
               previewUrl={previewUrl}
               segments={subtitleView === "original" ? original : segments}
@@ -514,6 +531,15 @@ export function StudioShell({
               onActiveLineLayoutChange={setSegmentLayout}
               lang={lang}
             />
+            {/* tài khoản dùng thử: nhắc trước rằng bản xuất sẽ có watermark */}
+            {isTrial && (
+              <span className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-[18%]">
+                <span className="select-none text-2xl font-bold text-white/40 [text-shadow:0_1px_4px_rgba(0,0,0,0.5)] sm:text-3xl">
+                  SubVideo AI
+                </span>
+              </span>
+            )}
+            </div>
           ) : (
             <div className="flex aspect-video items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-400 dark:bg-neutral-900">
               {t.loadingVideo}
