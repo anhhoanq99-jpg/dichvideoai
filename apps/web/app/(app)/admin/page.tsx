@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { Coins, Shield, TrendingUp, Users, Wallet } from "lucide-react";
 import {
   communityComments,
@@ -7,6 +7,7 @@ import {
   creditLedger,
   schema,
   usageEvents,
+  videos,
 } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
@@ -38,6 +39,15 @@ const T = {
     demoTitle: "Video demo trang chủ",
     usageTitle: "Mức tiêu thụ API & hạn mức",
     modTitle: "Kiểm duyệt cộng đồng",
+    usersTitle: "Người dùng",
+    totalUsers: "Tổng người dùng",
+    colUser: "Người dùng",
+    colBalance: "Số dư xu",
+    colVideos: "Video",
+    colTopup: "Tổng nạp",
+    colJoined: "Tham gia",
+    adminTag: "Admin",
+    noUsers: "Chưa có người dùng.",
     xu: "xu",
   },
   en: {
@@ -54,6 +64,15 @@ const T = {
     demoTitle: "Homepage demo videos",
     usageTitle: "API usage & quotas",
     modTitle: "Community moderation",
+    usersTitle: "Users",
+    totalUsers: "Total users",
+    colUser: "User",
+    colBalance: "Credit balance",
+    colVideos: "Videos",
+    colTopup: "Total top-ups",
+    colJoined: "Joined",
+    adminTag: "Admin",
+    noUsers: "No users yet.",
     xu: "credits",
   },
 } as const;
@@ -65,6 +84,12 @@ const fmtWhen = (d: Date) =>
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+  }).format(d);
+const fmtDate = (d: Date) =>
+  new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(d);
 
 function StatCard({
@@ -199,6 +224,48 @@ export default async function AdminPage() {
     when: fmtWhen(c.createdAt),
   }));
 
+  // ---- Tab Người dùng: danh sách + thống kê (chỉ xem) ----
+  // Đếm video và tổng nạp theo user ở 2 truy vấn RIÊNG rồi ghép bằng Map — join
+  // cả hai vào bảng user cùng lúc sẽ nhân bản dòng (fan-out) làm sai số liệu.
+  const [allUsers, videoCounts, userTopups] = await Promise.all([
+    db
+      .select({
+        id: schema.user.id,
+        name: schema.user.name,
+        email: schema.user.email,
+        creditBalance: schema.user.creditBalance,
+        createdAt: schema.user.createdAt,
+      })
+      .from(schema.user)
+      .orderBy(desc(schema.user.createdAt))
+      .limit(500),
+    db
+      .select({ userId: videos.userId, cnt: count() })
+      .from(videos)
+      .where(isNull(videos.deletedAt))
+      .groupBy(videos.userId),
+    db
+      .select({
+        userId: creditLedger.userId,
+        sum: sql<string>`coalesce(sum(${creditLedger.delta}), 0)`,
+      })
+      .from(creditLedger)
+      .where(isTopup)
+      .groupBy(creditLedger.userId),
+  ]);
+  const videoByUser = new Map(videoCounts.map((v) => [v.userId, Number(v.cnt)]));
+  const topupByUser = new Map(userTopups.map((u) => [u.userId, Number(u.sum)]));
+  const usersView = allUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    balance: u.creditBalance,
+    videos: videoByUser.get(u.id) ?? 0,
+    topups: topupByUser.get(u.id) ?? 0,
+    isAdmin: isAdminEmail(u.email),
+    joined: fmtDate(u.createdAt),
+  }));
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight">
@@ -278,6 +345,69 @@ export default async function AdminPage() {
             id: "usage",
             label: t.usageTitle,
             content: <AdminUsagePanel lang={lang} />,
+          },
+          {
+            id: "users",
+            label: t.usersTitle,
+            content:
+              usersView.length === 0 ? (
+                <p className="text-sm text-neutral-400">{t.noUsers}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <StatCard
+                      icon={<Users className="h-4 w-4" />}
+                      label={t.totalUsers}
+                      value={num(usersView.length)}
+                    />
+                  </div>
+                  <div className="mt-5 overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                    <table className="w-full min-w-[560px] text-sm">
+                      <thead className="border-b border-neutral-200 text-left text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                        <tr>
+                          <th className="px-3 py-2.5 font-medium">{t.colUser}</th>
+                          <th className="px-3 py-2.5 text-right font-medium">{t.colBalance}</th>
+                          <th className="px-3 py-2.5 text-right font-medium">{t.colVideos}</th>
+                          <th className="px-3 py-2.5 text-right font-medium">{t.colTopup}</th>
+                          <th className="px-3 py-2.5 text-right font-medium">{t.colJoined}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usersView.map((u) => (
+                          <tr
+                            key={u.id}
+                            className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60"
+                          >
+                            <td className="px-3 py-2">
+                              <p className="flex items-center gap-1.5 font-medium">
+                                {u.name}
+                                {u.isAdmin && (
+                                  <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+                                    {t.adminTag}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="truncate text-xs text-neutral-400">{u.email}</p>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">
+                              {num(u.balance)} {t.xu}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-neutral-500 dark:text-neutral-400">
+                              {num(u.videos)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-neutral-500 dark:text-neutral-400">
+                              {u.topups > 0 ? `${num(u.topups)} ${t.xu}` : "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-400">
+                              {u.joined}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ),
           },
           {
             id: "moderation",
