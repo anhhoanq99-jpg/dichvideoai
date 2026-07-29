@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clapperboard, Download, FileText, Wallet } from "lucide-react";
+import { Clapperboard, Download, FileText, Sparkles, Wallet } from "lucide-react";
 import {
+  FIRST_TOPUP_PROMO,
   estimateJobCredits,
   isPremiumVoice,
+  topupCredits,
   type CoverRegion,
   type JobStatus,
 } from "@dichvideo/shared";
@@ -45,6 +47,11 @@ const T = {
     translatedVtt: "Bản dịch .VTT",
     translatedTxt: "Bản dịch .TXT",
     originalSrt: "Bản gốc .SRT",
+    trialTitle: "Video sẽ có watermark “SubVideo AI” giữa khung hình",
+    trialBody: (vnd: string, bonus: string, total: string) =>
+      `Tài khoản dùng thử nên bản xuất bị đóng dấu. Nạp lần đầu ${vnd}đ được tặng thêm ${bonus} xu — nhận ${total} xu, gỡ watermark vĩnh viễn và mở giới hạn 5 phút.`,
+    trialCta: (vnd: string, total: string) => `Nạp ${vnd}đ → nhận ${total} xu`,
+    trialNoExpire: "Xu đã nạp không bao giờ hết hạn.",
   },
   en: {
     startFail: "Could not start the export",
@@ -74,7 +81,22 @@ const T = {
     translatedVtt: "Translation .VTT",
     translatedTxt: "Translation .TXT",
     originalSrt: "Original .SRT",
+    trialTitle: "Your video will carry a “SubVideo AI” watermark in the centre",
+    trialBody: (vnd: string, bonus: string, total: string) =>
+      `Trial accounts get a watermarked export. Your first top-up of ${vnd}₫ comes with ${bonus} bonus credits — ${total} credits in total, removing the watermark for good and unlocking the 5-minute limit.`,
+    trialCta: (vnd: string, total: string) => `Top up ${vnd}₫ → get ${total} credits`,
+    trialNoExpire: "Purchased credits never expire.",
   },
+} as const;
+
+/**
+ * Gói mồi lần nạp đầu, tính từ HẰNG SỐ THẬT trong `shared/credits.ts` thay vì gõ
+ * "50k tặng 20k" vào chuỗi — đổi khuyến mãi một chỗ là mọi lời mời đổi theo.
+ */
+const PROMO = {
+  vnd: FIRST_TOPUP_PROMO.minVnd.toLocaleString("vi-VN"),
+  bonus: FIRST_TOPUP_PROMO.bonusCredits.toLocaleString("vi-VN"),
+  total: topupCredits(FIRST_TOPUP_PROMO.minVnd, true).toLocaleString("vi-VN"),
 } as const;
 
 export interface DubConfig {
@@ -105,6 +127,8 @@ interface ExportModalProps {
   regions: CoverRegion[];
   subBox: CoverRegion | null;
   dub: DubConfig;
+  /** tài khoản dùng thử (chưa nạp) → nhắc watermark + mời gói nạp lần đầu */
+  isTrial?: boolean;
   onClose: () => void;
   lang?: Lang;
 }
@@ -129,6 +153,7 @@ export function ExportModal({
   regions,
   subBox,
   dub,
+  isTrial = false,
   onClose,
   lang = "vi",
 }: ExportModalProps) {
@@ -336,6 +361,33 @@ export function ExportModal({
           <p className="text-xs text-neutral-400">
             {t.wysiwyg}
           </p>
+
+          {/*
+            Tài khoản dùng thử: nói thẳng bản xuất sẽ bị đóng dấu, NGAY TRƯỚC nút
+            xuất — đây là khoảnh khắc khách sẵn sàng trả tiền nhất, và cũng là lúc
+            duy nhất họ còn kịp đổi ý trước khi tiêu xu vào một bản có watermark.
+          */}
+          {isTrial && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                {t.trialTitle}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-700/90 dark:text-amber-200/80">
+                {t.trialBody(PROMO.vnd, PROMO.bonus, PROMO.total)}
+              </p>
+              <a
+                href="/credits"
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t.trialCta(PROMO.vnd, PROMO.total)}
+              </a>
+              <p className="mt-1.5 text-center text-[11px] text-amber-700/70 dark:text-amber-200/60">
+                {t.trialNoExpire}
+              </p>
+            </div>
+          )}
+
           {shortfall > 0 ? (
             // thiếu xu → mời nạp thay vì để bấm rồi nhận lỗi
             <a

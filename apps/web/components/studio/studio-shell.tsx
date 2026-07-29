@@ -531,10 +531,16 @@ export function StudioShell({
               onActiveLineLayoutChange={setSegmentLayout}
               lang={lang}
             />
-            {/* tài khoản dùng thử: nhắc trước rằng bản xuất sẽ có watermark */}
+            {/*
+              Tài khoản dùng thử: nhắc trước rằng bản xuất sẽ có watermark.
+              Đặt CHÍNH GIỮA và cỡ lớn cho khớp bản render thật — worker burn ở
+              `x=(w-tw)/2:y=(h-th)/2` với cỡ chữ = chiều cao khung / 16
+              (`trialWatermarkDrawText`). Lệch lên 18% như trước khiến khách
+              tưởng watermark nằm chỗ khác và nhỏ hơn thực tế.
+            */}
             {isTrial && (
-              <span className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-[18%]">
-                <span className="select-none text-2xl font-bold text-white/40 [text-shadow:0_1px_4px_rgba(0,0,0,0.5)] sm:text-3xl">
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span className="select-none text-4xl font-bold text-white/45 [text-shadow:0_2px_6px_rgba(0,0,0,0.55)] sm:text-5xl lg:text-6xl">
                   SubVideo AI
                 </span>
               </span>
@@ -753,6 +759,7 @@ export function StudioShell({
           regions={regions}
           subBox={effectiveSubBox}
           dub={dub}
+          isTrial={isTrial}
           onClose={() => setModal(null)}
           lang={lang}
         />

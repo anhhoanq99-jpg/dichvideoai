@@ -262,7 +262,7 @@ export function UploadPageClient({
             href="/credits"
             className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
           >
-            {lang === "vi" ? "Xem Bảng Giá" : "See pricing"}
+            {lang === "vi" ? "Nạp xu" : "Top up"}
           </Link>
         </div>
       )}
