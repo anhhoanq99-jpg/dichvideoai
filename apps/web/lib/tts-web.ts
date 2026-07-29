@@ -49,8 +49,8 @@ export async function synthGemini(voiceName: string, text: string): Promise<Buff
   return pcmToWav(Buffer.from(data, "base64"));
 }
 
-/** ElevenLabs TTS — dùng cho cả giọng có sẵn (Adam…) lẫn giọng nhân bản (voice_id). */
-export async function synthEleven(voiceId: string, text: string): Promise<Buffer> {
+/** ElevenLabs TTS cho giọng có sẵn trong catalog (Adam…). */
+async function synthEleven(voiceId: string, text: string): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     throw new Error("Chưa cấu hình ELEVENLABS_API_KEY (đăng ký free tại elevenlabs.io)");
@@ -104,11 +104,7 @@ export async function synthGCloud(voiceName: string, text: string): Promise<Buff
   return Buffer.from(data.audioContent, "base64");
 }
 
-/**
- * Đọc `text` bằng bất kỳ id giọng nào trong catalog
- * (edge/gemini/eleven/gcloud).
- * KHÔNG xử lý giọng nhân bản "mine:" — nơi gọi tự resolve rồi dùng synthEleven.
- */
+/** Đọc `text` bằng bất kỳ id giọng nào trong catalog (edge/gemini/eleven/gcloud). */
 export async function synthesizeVoice(voice: string, text: string): Promise<Synthesized> {
   const gemini = geminiVoiceName(voice);
   const eleven = elevenVoiceId(voice);

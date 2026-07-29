@@ -1,18 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { hasWideTtsQuota, isValidVoiceId } from "@dichvideo/shared";
-import { clonedVoices } from "@dichvideo/db";
-import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { synthEleven, synthesizeVoice } from "@/lib/tts-web";
+import { synthesizeVoice } from "@/lib/tts-web";
 import { jsonError } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
 const Body = z.object({
-  /** "mine:<uuid>" (giọng nhân bản) hoặc id catalog bất kỳ (edge/gcloud/eleven/gemini) */
+  /** id giọng trong catalog (edge/gcloud/eleven/gemini) */
   voiceId: z.string().min(1),
   text: z.string().trim().min(1, "Chưa nhập văn bản").max(2000, "Tối đa 2.000 ký tự"),
 });
@@ -32,23 +29,6 @@ export async function POST(req: NextRequest) {
   const { voiceId, text } = parsed.data;
 
   try {
-    // giọng nhân bản của user → tra voice_id thật rồi đọc qua ElevenLabs
-    if (voiceId.startsWith("mine:")) {
-      const [voice] = await db
-        .select({ providerVoiceId: clonedVoices.providerVoiceId })
-        .from(clonedVoices)
-        .where(
-          and(
-            eq(clonedVoices.id, voiceId.slice("mine:".length)),
-            eq(clonedVoices.userId, session.user.id),
-          ),
-        );
-      if (!voice) return jsonError("Không tìm thấy giọng nhân bản", 404);
-      const body = await synthEleven(voice.providerVoiceId, text);
-      return audio(body, "audio/mpeg");
-    }
-
-    // giọng có sẵn trong catalog
     if (!isValidVoiceId(voiceId)) return jsonError("Giọng không hợp lệ", 400);
     /**
      * Chặn ElevenLabs/Gemini ở công cụ đọc thử: hai nguồn này tính tiền theo ký

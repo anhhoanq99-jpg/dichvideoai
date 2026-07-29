@@ -1,41 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioLines, Download, Loader2, Mic2, Play, Trash2, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AudioLines, Download, Loader2, Play } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
-import { VOICE_CLONE_ENABLED } from "@/lib/features";
-import { fieldLabelClass, inputClass, selectClass } from "@/components/ui/form-styles";
+import { inputClass } from "@/components/ui/form-styles";
 import {
   DEFAULT_VOICE_SELECTION,
   VoicePicker,
   resolveVoice,
   type VoiceSelection,
 } from "@/components/dub/voice-picker";
-import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const T = {
   vi: {
-    hint: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được. Nhân bản giọng riêng cần gói ElevenLabs trả phí.",
-    // dùng khi VOICE_CLONE_ENABLED = false: không nhắc tới nhân bản nữa
-    hintNoClone: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được.",
-    myVoices: "Giọng của tôi",
-    cloneTitle: "Nhân bản giọng mới",
-    clonePaidNote:
-      "⚠️ Nhân bản giọng riêng từ file mẫu CẦN gói ElevenLabs trả phí (Starter ~5$/tháng tại elevenlabs.io) — gói miễn phí không mở tính năng này. Nếu chỉ cần đọc văn bản, hàng trăm giọng bên dưới đều miễn phí.",
-    cloneNamePh: "Đặt tên giọng (vd: Giọng của tôi)…",
-    clonePick: "Chọn file mẫu (MP3/WAV, 30–120 giây, tối đa 10MB)",
-    cloneHint: "Mẫu càng rõ, ít tạp âm thì giọng nhân bản càng giống. Đọc tự nhiên ~1 phút là đẹp.",
-    consent: "Tôi xác nhận đây là giọng của tôi hoặc tôi đã được người sở hữu giọng cho phép sử dụng.",
-    cloneBtn: "Nhân bản giọng",
-    cloning: "Đang nhân bản…",
-    cloneDone: (name: string) => `Đã nhân bản giọng "${name}" — chọn ở danh sách để dùng`,
-    deleteVoice: "Xóa giọng này",
-    deleted: "Đã xóa giọng",
+    hint: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được.",
     speakTitle: "Đọc văn bản",
-    groupMine: "Giọng nhân bản của tôi",
-    useCatalog: "— Dùng giọng có sẵn bên dưới —",
     textPh: "Nhập văn bản cần đọc (tiếng Việt hoặc ngôn ngữ bất kỳ)…",
     generate: "Tạo giọng nói",
     generating: "Đang tạo…",
@@ -43,24 +24,8 @@ const T = {
     fail: "Không tạo được — thử lại",
   },
   en: {
-    hint: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file. Cloning your own voice needs a paid ElevenLabs plan.",
-    hintNoClone: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file.",
-    myVoices: "My voices",
-    cloneTitle: "Clone a new voice",
-    clonePaidNote:
-      "⚠️ Cloning your own voice from a sample REQUIRES a paid ElevenLabs plan (Starter ~$5/mo at elevenlabs.io) — the free plan doesn't unlock it. If you just need text-to-speech, the hundreds of voices below are all free.",
-    cloneNamePh: "Voice name (e.g. My voice)…",
-    clonePick: "Choose a sample file (MP3/WAV, 30–120s, max 10MB)",
-    cloneHint: "Clear, noise-free samples clone best. ~1 minute of natural speech is ideal.",
-    consent: "I confirm this is my own voice or I have the owner's permission to use it.",
-    cloneBtn: "Clone voice",
-    cloning: "Cloning…",
-    cloneDone: (name: string) => `Voice "${name}" cloned — pick it from the list`,
-    deleteVoice: "Delete this voice",
-    deleted: "Voice deleted",
+    hint: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file.",
     speakTitle: "Read text aloud",
-    groupMine: "My cloned voices",
-    useCatalog: "— Use a catalog voice below —",
     textPh: "Enter the text to read…",
     generate: "Generate speech",
     generating: "Generating…",
@@ -69,54 +34,24 @@ const T = {
   },
 } as const;
 
-interface ClonedVoice {
-  id: string;
-  name: string;
-  createdAt: string;
-}
-
 const MAX_TEXT = 2000;
 
-/** Công cụ nhân bản giọng nói: clone giọng từ mẫu + đọc văn bản bằng giọng đã chọn. */
+/**
+ * Công cụ đọc văn bản thành giọng nói bằng giọng trong catalog.
+ *
+ * Phần NHÂN BẢN GIỌNG đã gỡ bỏ (30/07/2026): nhân bản là thao tác tạo giọng mới
+ * từ file mẫu, không nguồn miễn phí nào làm được (Edge/Gemini chỉ đọc theo danh
+ * sách cố định, Google Cloud tính là sản phẩm doanh nghiệp trả phí riêng), còn
+ * gói ElevenLabs miễn phí thì thiếu quyền `create_instant_voice_clone`.
+ */
 export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
   const t = T[lang];
-  const { toast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const [myVoices, setMyVoices] = useState<ClonedVoice[]>([]);
-  const [maxClones, setMaxClones] = useState(3);
-  const [cloneName, setCloneName] = useState("");
-  const [cloneFile, setCloneFile] = useState<File | null>(null);
-  const [consent, setConsent] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloneError, setCloneError] = useState<string | null>(null);
-
-  // giọng đọc: chọn từ catalog đầy đủ (VoicePicker) HOẶC 1 giọng nhân bản của mình
   const [selection, setSelection] = useState<VoiceSelection>(DEFAULT_VOICE_SELECTION);
-  const [clonedVoiceId, setClonedVoiceId] = useState<string | null>(null);
-  const effectiveVoice = clonedVoiceId ?? resolveVoice(selection);
   const [text, setText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [speakError, setSpeakError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-
-  const loadVoices = useCallback(async () => {
-    try {
-      const res = await fetch("/api/voice-clone/voices");
-      if (!res.ok) return;
-      const data = await res.json();
-      setMyVoices(data.voices);
-      setMaxClones(data.max);
-    } catch {
-      /* thử lại ở thao tác sau */
-    }
-  }, []);
-
-  // trì hoãn lần tải đầu qua setTimeout(0) — rule set-state-in-effect
-  useEffect(() => {
-    const t = setTimeout(loadVoices, 0);
-    return () => clearTimeout(t);
-  }, [loadVoices]);
 
   // dọn URL audio cũ khi tạo bản mới / rời trang
   useEffect(() => {
@@ -124,44 +59,6 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
-
-  async function clone() {
-    if (!cloneName.trim() || !cloneFile || !consent || cloning) return;
-    setCloning(true);
-    setCloneError(null);
-    try {
-      const form = new FormData();
-      form.append("name", cloneName.trim());
-      form.append("consent", "true");
-      form.append("file", cloneFile);
-      const res = await fetch("/api/voice-clone/voices", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) {
-        setCloneError(data.error ?? t.fail);
-        return;
-      }
-      toast(t.cloneDone(data.voice.name));
-      setCloneName("");
-      setCloneFile(null);
-      setConsent(false);
-      if (fileRef.current) fileRef.current.value = "";
-      await loadVoices();
-      setClonedVoiceId(`mine:${data.voice.id}`);
-    } catch {
-      setCloneError(t.fail);
-    } finally {
-      setCloning(false);
-    }
-  }
-
-  async function removeVoice(id: string) {
-    const res = await fetch(`/api/voice-clone/voices/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast(t.deleted, "info");
-      if (clonedVoiceId === `mine:${id}`) setClonedVoiceId(null);
-      await loadVoices();
-    }
-  }
 
   async function generate() {
     if (!text.trim() || generating) return;
@@ -171,7 +68,7 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
       const res = await fetch("/api/voice-clone/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ voiceId: effectiveVoice, text: text.trim() }),
+        body: JSON.stringify({ voiceId: resolveVoice(selection), text: text.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -190,131 +87,15 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
 
   return (
     <div className="space-y-4 pb-8">
-      <p className="text-xs text-neutral-400">
-        {VOICE_CLONE_ENABLED ? t.hint : t.hintNoClone}
-      </p>
+      <p className="text-xs text-neutral-400">{t.hint}</p>
 
-      {/* Nhân bản giọng mới + giọng của tôi — ẩn hẳn khi tính năng tạm dừng.
-          Giữ nguyên code thay vì xoá: bật lại chỉ cần đổi một cờ. */}
-      {VOICE_CLONE_ENABLED && (
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-        <p className="flex items-center gap-2 text-sm font-semibold">
-          <Mic2 className="h-4 w-4 text-primary-500" /> {t.cloneTitle}
-          <span className="ml-auto text-xs font-normal text-neutral-400">
-            {myVoices.length}/{maxClones}
-          </span>
-        </p>
-
-        {/* báo trước: nhân bản cần gói trả phí — tránh user thử rồi mới thấy lỗi */}
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-          {t.clonePaidNote}
-        </p>
-
-        {myVoices.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
-            {myVoices.map((v) => (
-              <li
-                key={v.id}
-                className="flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2 text-sm dark:bg-neutral-800/60"
-              >
-                <span className="flex items-center gap-2 font-medium">
-                  <AudioLines className="h-4 w-4 text-primary-500" /> {v.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void removeVoice(v.id)}
-                  title={t.deleteVoice}
-                  className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <input
-            value={cloneName}
-            onChange={(e) => setCloneName(e.target.value)}
-            placeholder={t.cloneNamePh}
-            maxLength={60}
-            className={cn(inputClass, "w-full")}
-          />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className={cn(
-              inputClass,
-              "flex w-full items-center gap-2 text-left",
-              cloneFile ? "" : "text-neutral-400",
-            )}
-          >
-            <Upload className="h-4 w-4 shrink-0" />
-            <span className="truncate">{cloneFile ? cloneFile.name : t.clonePick}</span>
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,audio/*"
-            className="hidden"
-            onChange={(e) => setCloneFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <p className="mt-2 text-xs text-neutral-400">{t.cloneHint}</p>
-        <label className="mt-2 flex items-start gap-2 text-xs text-neutral-600 dark:text-neutral-300">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            className="mt-0.5"
-          />
-          {t.consent}
-        </label>
-        {cloneError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{cloneError}</p>}
-        <button
-          type="button"
-          disabled={cloning || !cloneName.trim() || !cloneFile || !consent}
-          onClick={() => void clone()}
-          className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-50"
-        >
-          {cloning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />}
-          {cloning ? t.cloning : t.cloneBtn}
-        </button>
-      </div>
-      )}
-
-      {/* đọc văn bản */}
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
         <p className="flex items-center gap-2 text-sm font-semibold">
           <Play className="h-4 w-4 text-primary-500" /> {t.speakTitle}
         </p>
 
-        {/* giọng nhân bản của mình (nếu có) — chọn để ưu tiên dùng, bỏ chọn để dùng catalog */}
-        {myVoices.length > 0 && (
-          <label className="mt-3 block text-sm">
-            <span className={fieldLabelClass}>{t.groupMine}</span>
-            <select
-              value={clonedVoiceId ?? ""}
-              onChange={(e) => setClonedVoiceId(e.target.value || null)}
-              className={cn(selectClass, "mt-1 w-full sm:w-80")}
-            >
-              <option value="">{t.useCatalog}</option>
-              {myVoices.map((v) => (
-                <option key={v.id} value={`mine:${v.id}`}>
-                  🎙 {v.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
         {/* catalog đầy đủ: 322 giọng thường + 40 giọng Google + Adam… + cao cấp */}
-        <div
-          className={cn("mt-3", clonedVoiceId && "pointer-events-none opacity-50")}
-          onFocusCapture={() => clonedVoiceId && setClonedVoiceId(null)}
-          onClickCapture={() => clonedVoiceId && setClonedVoiceId(null)}
-        >
+        <div className="mt-3">
           <VoicePicker
             value={selection}
             onChange={(patch) => setSelection((s) => ({ ...s, ...patch }))}

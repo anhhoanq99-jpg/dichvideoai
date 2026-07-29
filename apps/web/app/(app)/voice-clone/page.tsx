@@ -2,18 +2,13 @@ import { redirect } from "next/navigation";
 import { AudioLines } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
-import { VOICE_CLONE_ENABLED } from "@/lib/features";
 import { VoiceCloneClient } from "./voice-clone-client";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Tên trang đổi theo cờ tính năng: tắt nhân bản mà vẫn treo biển "Nhân bản giọng
- * nói" thì khách vào tìm cái không có. Bật cờ lại là tên cũ tự trở về.
- */
 const T = {
-  vi: { title: "Nhân bản giọng nói", titleNoClone: "Đọc văn bản thành giọng nói" },
-  en: { title: "Voice cloning", titleNoClone: "Text to speech" },
+  vi: { title: "Đọc văn bản thành giọng nói" },
+  en: { title: "Text to speech" },
 } as const;
 
 export default async function VoiceClonePage() {
@@ -28,7 +23,7 @@ export default async function VoiceClonePage() {
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/50">
           <AudioLines className="h-5 w-5 text-primary-600 dark:text-primary-400" />
         </span>
-        {VOICE_CLONE_ENABLED ? t.title : t.titleNoClone}
+        {t.title}
       </h1>
       <VoiceCloneClient lang={lang} />
     </div>
