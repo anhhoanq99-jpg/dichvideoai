@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioLines, Download, Loader2, Mic2, Play, Trash2, Upload } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
+import { VOICE_CLONE_ENABLED } from "@/lib/features";
 import { fieldLabelClass, inputClass, selectClass } from "@/components/ui/form-styles";
 import {
   DEFAULT_VOICE_SELECTION,
@@ -17,6 +18,8 @@ import { Button } from "@/components/ui/button";
 const T = {
   vi: {
     hint: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được. Nhân bản giọng riêng cần gói ElevenLabs trả phí.",
+    // dùng khi VOICE_CLONE_ENABLED = false: không nhắc tới nhân bản nữa
+    hintNoClone: "Nhập văn bản, chọn 1 trong hàng trăm giọng có sẵn (322 giọng thường + 40 giọng Google + Adam… miễn phí) — AI đọc thành file âm thanh tải về được.",
     myVoices: "Giọng của tôi",
     cloneTitle: "Nhân bản giọng mới",
     clonePaidNote:
@@ -41,6 +44,7 @@ const T = {
   },
   en: {
     hint: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file. Cloning your own voice needs a paid ElevenLabs plan.",
+    hintNoClone: "Type text, pick from hundreds of ready voices (322 standard + 40 Google + Adam… free) — AI reads it into a downloadable audio file.",
     myVoices: "My voices",
     cloneTitle: "Clone a new voice",
     clonePaidNote:
@@ -186,9 +190,13 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
 
   return (
     <div className="space-y-4 pb-8">
-      <p className="text-xs text-neutral-400">{t.hint}</p>
+      <p className="text-xs text-neutral-400">
+        {VOICE_CLONE_ENABLED ? t.hint : t.hintNoClone}
+      </p>
 
-      {/* nhân bản giọng mới + giọng của tôi */}
+      {/* Nhân bản giọng mới + giọng của tôi — ẩn hẳn khi tính năng tạm dừng.
+          Giữ nguyên code thay vì xoá: bật lại chỉ cần đổi một cờ. */}
+      {VOICE_CLONE_ENABLED && (
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
         <p className="flex items-center gap-2 text-sm font-semibold">
           <Mic2 className="h-4 w-4 text-primary-500" /> {t.cloneTitle}
@@ -274,6 +282,7 @@ export function VoiceCloneClient({ lang = "vi" }: { lang?: Lang }) {
           {cloning ? t.cloning : t.cloneBtn}
         </button>
       </div>
+      )}
 
       {/* đọc văn bản */}
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">

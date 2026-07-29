@@ -4,6 +4,7 @@ import { clonedVoices } from "@dichvideo/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { jsonError } from "@/lib/api-helpers";
+import { VOICE_CLONE_ENABLED } from "@/lib/features";
 
 export const maxDuration = 60;
 
@@ -34,6 +35,16 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return jsonError("Chưa đăng nhập", 401);
+
+  // Tắt ở SERVER chứ không chỉ giấu nút: giấu giao diện mà để endpoint mở thì
+  // vẫn gọi thẳng API được, và mỗi lần gọi là một lượt request tới ElevenLabs.
+  if (!VOICE_CLONE_ENABLED) {
+    return jsonError(
+      "Tính năng nhân bản giọng riêng đang tạm dừng. Bạn vẫn dùng được hàng trăm giọng có sẵn ở mục Đọc văn bản.",
+      503,
+    );
+  }
+
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return jsonError("Chưa cấu hình ELEVENLABS_API_KEY", 500);
 

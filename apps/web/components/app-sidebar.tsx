@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BrandLogo, BRAND_TAGLINE } from "@/components/brand-logo";
 import type { Lang } from "@/lib/i18n";
+import { VOICE_CLONE_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 
 /* Nav nhóm theo mục kiểu veed.io: "Công cụ" (làm việc) và "Quản lý" (dữ liệu) */
@@ -34,8 +35,9 @@ const NAV_GROUPS = [
       },
       {
         href: "/voice-clone",
-        vi: "Nhân bản giọng nói",
-        en: "Voice cloning",
+        // tắt nhân bản → menu gọi đúng thứ trang còn làm được (xem lib/features.ts)
+        vi: VOICE_CLONE_ENABLED ? "Nhân bản giọng nói" : "Đọc văn bản thành giọng",
+        en: VOICE_CLONE_ENABLED ? "Voice cloning" : "Text to speech",
         icon: AudioLines,
       },
     ],
