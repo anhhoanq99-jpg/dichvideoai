@@ -2,6 +2,7 @@
 
 import { BookOpen } from "lucide-react";
 import {
+  CREDIT_PRICING,
   TARGET_LANGS,
   TRANSLATION_STYLES,
   type TargetLangId,
@@ -13,18 +14,33 @@ import type { Lang } from "@/lib/i18n";
 import { sourceLangOptions } from "@/lib/source-langs";
 import { cn } from "@/lib/utils";
 
+/**
+ * OCR đắt hơn STT bao nhiêu lần — tính từ ĐƠN GIÁ THẬT thay vì gõ số cứng, để
+ * nhãn "rẻ hơn N lần" không bao giờ nói lệch bảng giá khi đổi giá.
+ */
+const OCR_TIMES_PRICIER = Math.round(
+  CREDIT_PRICING.ocrPerMin / CREDIT_PRICING.sttPerMin,
+);
+
 const T = {
   vi: {
-    sourceOptions: [
+    /**
+     * Âm thanh (STT) ĐỨNG TRƯỚC và là mặc định: dịch sát văn nói hơn, và chạy
+     * Groq Whisper (miễn phí) thay vì Gemini nên rẻ hơn nhiều lần cho cả khách
+     * lẫn mình. OCR chỉ cần khi video có chữ gắn cứng trên hình.
+     */
+    sourceOptions: (times: number) => [
+      {
+        value: "stt" as const,
+        label: "Âm thanh — video có tiếng nói",
+        hint: `AI nghe giọng nói và tạo phụ đề — bám văn nói tự nhiên hơn, rẻ hơn OCR ${times} lần`,
+        badge: "Ưu tiên dùng",
+      },
       {
         value: "ocr" as const,
         label: "OCR — video có chữ trên hình",
-        hint: "AI đọc phụ đề gắn cứng trên khung hình",
-      },
-      {
-        value: "stt" as const,
-        label: "Âm thanh — video chỉ có tiếng nói",
-        hint: "AI nghe giọng nói và tạo phụ đề",
+        hint: "AI đọc phụ đề gắn cứng trên khung hình — dùng khi video không có tiếng nói",
+        badge: null,
       },
     ],
     sourceLang: "Ngôn ngữ gốc",
@@ -37,16 +53,18 @@ const T = {
       "Mỗi dòng một quy tắc, ví dụ:\n咪 = Mi (tên mèo, xưng hô: hoàng thượng)\n主人 = con sen",
   },
   en: {
-    sourceOptions: [
+    sourceOptions: (times: number) => [
+      {
+        value: "stt" as const,
+        label: "Audio — video has speech",
+        hint: `AI listens to the speech and generates subtitles — closer to natural speech, ${times}× cheaper than OCR`,
+        badge: "Recommended",
+      },
       {
         value: "ocr" as const,
         label: "OCR — video has on-screen text",
-        hint: "AI reads hardcoded subtitles from the frames",
-      },
-      {
-        value: "stt" as const,
-        label: "Audio — speech only",
-        hint: "AI listens to the speech and generates subtitles",
+        hint: "AI reads hardcoded subtitles from the frames — use when there is no speech",
+        badge: null,
       },
     ],
     sourceLang: "Source language",
@@ -72,7 +90,8 @@ export interface UploadPipelineValues {
 }
 
 export const DEFAULT_PIPELINE_VALUES: UploadPipelineValues = {
-  method: "ocr",
+  // mặc định = STT: gắn nhãn "Ưu tiên dùng" mà vẫn chọn sẵn OCR thì tự mâu thuẫn
+  method: "stt",
   sourceLang: "",
   targetLang: "vi",
   style: "natural",
@@ -108,7 +127,7 @@ export function PipelineSettingsCard({
   return (
     <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="grid gap-3 sm:grid-cols-2">
-        {t.sourceOptions.map((o) => (
+        {t.sourceOptions(OCR_TIMES_PRICIER).map((o) => (
           <button
             key={o.value}
             type="button"
@@ -116,7 +135,14 @@ export function PipelineSettingsCard({
             onClick={() => onChange({ method: o.value })}
             className={optionCardClass(values.method === o.value)}
           >
-            <span className="block font-medium">{o.label}</span>
+            <span className="flex flex-wrap items-center gap-2 font-medium">
+              {o.label}
+              {o.badge && (
+                <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+                  {o.badge}
+                </span>
+              )}
+            </span>
             <span className="block text-xs text-neutral-500 dark:text-neutral-400">
               {o.hint}
             </span>
