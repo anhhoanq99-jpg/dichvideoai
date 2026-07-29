@@ -56,7 +56,7 @@ const T = {
     welcomeTitle: "Chào bạn! Tài khoản đã có sẵn xu để dùng thử",
     welcomeBody: (xu: string, phut: string) =>
       `Bạn đang có ${xu} xu — đủ Việt hóa trọn gói khoảng ${phut} phút video. Xu không bao giờ hết hạn.`,
-    welcomeHint: "Chưa có video sẵn? Dán link YouTube/TikTok/Facebook ở ô bên dưới là làm được ngay.",
+    welcomeHint: "Kéo thả video từ máy vào ô bên dưới là bắt đầu được ngay.",
     errFormat: (name: string) =>
       `"${name}": định dạng không hỗ trợ (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": vượt giới hạn 2GB.`,
@@ -75,7 +75,7 @@ const T = {
     welcomeBody: (xu: string, phut: string) =>
       `You have ${xu} credits — enough to fully localize about ${phut} minutes of video. Credits never expire.`,
     welcomeHint:
-      "No video handy? Paste a YouTube/TikTok/Facebook link in the box below.",
+      "Drag a video from your computer into the box below to get started.",
     errFormat: (name: string) =>
       `"${name}": unsupported format (MP4, MOV, MKV, WebM).`,
     errSize: (name: string) => `"${name}": exceeds the 2GB limit.`,
@@ -296,15 +296,9 @@ export function UploadPageClient({
         lang={lang}
       />
 
-      {/* Nhập từ đường link (Douyin, Bilibili, YouTube…) */}
-      <LinkImportCard
-        buildSettings={() => toPipelineSettings(pipeline)}
-        disabled={running}
-        initialUrl={initialUrl}
-        lang={lang}
-      />
-
-      {/* Khu thả file */}
+      {/* Khu thả file — ĐỂ TRƯỚC ô dán link: tải file lên là đường chắc ăn, còn
+          nhập bằng link phụ thuộc trang nguồn có cho tải hay không nên chỉ là
+          phương án phụ (ô link nằm dưới cùng). */}
       <label
         onDragOver={(e) => {
           e.preventDefault();
@@ -392,6 +386,15 @@ export function UploadPageClient({
           {localError ?? (state.phase === "error" ? state.message : "")}
         </p>
       )}
+
+      {/* Phương án phụ: nhập từ đường link (Douyin, Bilibili, YouTube…). Đặt sau
+          TOÀN BỘ luồng tải file để không chen giữa ô kéo thả và nút Bắt Đầu. */}
+      <LinkImportCard
+        buildSettings={() => toPipelineSettings(pipeline)}
+        disabled={running}
+        initialUrl={initialUrl}
+        lang={lang}
+      />
     </div>
   );
 }

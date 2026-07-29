@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Link2, Loader2, Play } from "lucide-react";
+import { Link2, Loader2, Play, TriangleAlert } from "lucide-react";
 import { detectVideoSource, isImportableUrl } from "@dichvideo/shared";
 import type { PipelineSettings } from "@/hooks/use-multipart-upload";
 import { httpError, readJson } from "@/lib/http-json";
@@ -13,7 +13,7 @@ const T = {
     title: "Hoặc dán link video",
     placeholder:
       "https://v.douyin.com/… — Douyin, Kuaishou, Bilibili, TikTok, YouTube… mỗi dòng một link",
-    hint: "Hỗ trợ ~1.800 trang video. Hệ thống tự tải video về rồi chạy pipeline như video upload tay — tải link miễn phí.",
+    hint: "Nhiều trang chặn tải tự động (bắt đăng nhập, chống bot, giới hạn khu vực) nên KHÔNG phải link nào cũng lấy được. Chắc ăn nhất: tự tải video về máy rồi kéo thả ở ô phía trên. Thử link vẫn miễn phí.",
     submit: "Tải & xử lý",
     importing: "Đang gửi…",
     badLink: (line: string) => `Link không hợp lệ: ${line}`,
@@ -25,7 +25,7 @@ const T = {
     title: "Or paste video links",
     placeholder:
       "https://v.douyin.com/… — Douyin, Kuaishou, Bilibili, TikTok, YouTube… one link per line",
-    hint: "~1,800 sites supported. The system downloads the video and runs the same pipeline as a manual upload — importing is free.",
+    hint: "Many sites block automated downloads (login walls, bot checks, regional limits), so NOT every link works. The reliable route: download the video yourself and drop it in the box above. Trying a link is still free.",
     submit: "Import & process",
     importing: "Submitting…",
     badLink: (line: string) => `Invalid link: ${line}`,
@@ -153,7 +153,12 @@ export function LinkImportCard({
             </>
           )}
         </button>
-        <p className="flex-1 text-xs text-neutral-400">{t.hint}</p>
+        {/* Ghi chú màu cảnh báo, KHÔNG phải chữ xám mờ: đây là thứ khách cần đọc
+            TRƯỚC khi dán link, không phải chú thích cho có. */}
+        <p className="flex flex-1 items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300/90">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{t.hint}</span>
+        </p>
       </div>
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
