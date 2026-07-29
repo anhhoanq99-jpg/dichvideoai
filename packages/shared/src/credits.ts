@@ -1,11 +1,9 @@
 /** Credits tặng khi đăng ký — đủ Việt hóa thử ~2 video ngắn. */
 export const SIGNUP_TRIAL_CREDITS = 10_000;
 
-/** Neo giá trị: 1 credit = 1 VND (100.000đ = 100.000 credits) — cùng thang đối thủ. */
-export const VND_PER_CREDIT = 1;
-
 /**
- * Đơn giá credit theo loại job — đặt theo mặt bằng thị trường
+ * Đơn giá credit theo loại job. NEO GIÁ TRỊ: 1 xu = 1 VND (100.000đ = 100.000 xu,
+ * cùng thang đối thủ) — mọi con số dưới đây vừa là xu vừa là đồng. — đặt theo mặt bằng thị trường
  * (đối thủ: OCR ~300/phút, dịch 5/dòng, lồng tiếng 500-700/phút).
  */
 export const CREDIT_PRICING = {

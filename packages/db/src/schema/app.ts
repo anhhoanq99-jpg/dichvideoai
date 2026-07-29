@@ -11,45 +11,30 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import {
+  CREDIT_REASONS,
+  JOB_STATUSES,
+  JOB_TYPES,
+  VIDEO_STATUSES,
+} from "@dichvideo/shared";
 import { user } from "./auth";
 
-export const videoStatus = pgEnum("video_status", [
-  "uploading",
-  "uploaded",
-  "processing",
-  "ready",
-  "failed",
-]);
+/**
+ * Enum của DB lấy THẲNG từ danh sách trong `@dichvideo/shared` — trước đây mỗi
+ * danh sách được gõ lại ở đây một bản y hệt. Thêm một trạng thái/loại job vào
+ * shared mà quên sửa bản chép ở đây thì code chạy được nhưng DB từ chối giá trị
+ * lạ ngay lúc ghi — loại lỗi chỉ lộ ra trên production, đúng vào job của khách.
+ * Nay chỉ còn MỘT nơi khai báo, TypeScript tự bắt nếu lệch.
+ */
+export const videoStatus = pgEnum("video_status", VIDEO_STATUSES);
 
 export const subtitleKind = pgEnum("subtitle_kind", ["original", "translated"]);
 
-export const jobType = pgEnum("job_type", [
-  "import",
-  "probe",
-  "stt",
-  "ocr",
-  "translate",
-  "render",
-  "dub",
-]);
+export const jobType = pgEnum("job_type", JOB_TYPES);
 
-export const jobStatus = pgEnum("job_status", [
-  "queued",
-  "active",
-  "done",
-  "failed",
-  "cancelled",
-]);
+export const jobStatus = pgEnum("job_status", JOB_STATUSES);
 
-export const creditReason = pgEnum("credit_reason", [
-  "signup_trial",
-  "topup",
-  "job_charge",
-  "job_refund",
-  "admin_adjust",
-  // credit tặng (signup_trial) hết hạn sau 7 ngày với tài khoản chưa nạp
-  "trial_expired",
-]);
+export const creditReason = pgEnum("credit_reason", CREDIT_REASONS);
 
 export const videos = pgTable(
   "videos",
@@ -174,23 +159,6 @@ export const creditLedger = pgTable(
      */
     uniqueIndex("credit_ledger_ref_uidx").on(t.refType, t.refId, t.reason),
   ],
-);
-
-/** Giọng nói nhân bản của user (Instant Voice Cloning — hiện qua ElevenLabs). */
-export const clonedVoices = pgTable(
-  "cloned_voices",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull().default("elevenlabs"),
-    /** voice_id phía provider — dùng khi gọi TTS/xóa */
-    providerVoiceId: text("provider_voice_id").notNull(),
-    name: text("name").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (t) => [index("cloned_voices_user_idx").on(t.userId)],
 );
 
 /** Bài đăng cộng đồng — hỏi đáp / chia sẻ kinh nghiệm, bình luận trao đổi bên dưới. */

@@ -1,0 +1,1 @@
+DROP TABLE "cloned_voices" CASCADE;
