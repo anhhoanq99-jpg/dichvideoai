@@ -1,12 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Mic, MicOff, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import {
   MAX_COVER_REGIONS,
   opacityToHexAlpha,
-  segmentIndexAt,
-  tokenizeAccents,
   type CoverMode,
   type CoverRegion,
   type SubtitleSegment,
@@ -14,6 +11,16 @@ import {
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useDubPreview } from "@/hooks/use-dub-preview";
+import { useLogoGesture } from "@/hooks/use-logo-gesture";
+import { AccentedWords } from "./accented-words";
+import { PreviewControls } from "./preview-controls";
+import {
+  LOGO_CORNER,
+  activeSegmentAt,
+  clamp01,
+  insideBox,
+  type Gesture,
+} from "./preview-geometry";
 import type { RenderSettings } from "./render-settings";
 
 const T = {
@@ -60,51 +67,6 @@ const FONT_CSS_ID = "render-preview-fonts";
 const FONT_CSS_URL =
   "https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&family=Oswald:wght@400;700&family=Baloo+2:wght@400;700&family=Bungee&family=Paytone+One&family=Lobster&family=Patrick+Hand&display=swap";
 
-/** Vẽ câu theo từng từ: *từ nhấn* tô màu accent + in đậm; reveal = từ hiện đúng nhịp đọc. */
-function AccentedWords({
-  text,
-  accentColor,
-  reveal,
-  durMs,
-}: {
-  text: string;
-  accentColor: string;
-  reveal: boolean;
-  durMs: number;
-}) {
-  const tokens = tokenizeAccents(text);
-  const totalChars = tokens.reduce((sum, t) => sum + t.text.length, 0) || 1;
-  // offset ký tự tích lũy TRƯỚC mỗi từ (n nhỏ nên O(n²) vô hại; không mutate biến)
-  const charOffsets = tokens.map((_, i) =>
-    tokens.slice(0, i).reduce((sum, t) => sum + t.text.length, 0),
-  );
-  return (
-    <>
-      {tokens.map((tok, i) => {
-        // delay theo tỉ lệ ký tự — cùng công thức chia thời gian với bản xuất ASS
-        const delayMs = (charOffsets[i] / totalChars) * durMs;
-        return (
-          <span
-            key={i}
-            style={{
-              ...(tok.accent ? { color: accentColor, fontWeight: 700 } : {}),
-              ...(reveal
-                ? {
-                    opacity: 0,
-                    animation: `sub-reveal 0.06s linear ${Math.round(delayMs)}ms forwards`,
-                  }
-                : {}),
-            }}
-          >
-            {tok.text}
-            {i < tokens.length - 1 ? " " : ""}
-          </span>
-        );
-      })}
-    </>
-  );
-}
-
 interface RenderPreviewProps {
   previewUrl: string;
   /** phụ đề đã dịch — hiển thị đúng câu theo thời điểm video */
@@ -148,41 +110,6 @@ interface RenderPreviewProps {
     layout: { pos?: { x: number; y: number }; size?: number },
   ) => void;
   lang?: Lang;
-}
-
-/** vị trí 4 góc cho logo trên khung preview */
-const LOGO_CORNER: Record<string, React.CSSProperties> = {
-  tl: { top: "3%", left: "2%" },
-  tr: { top: "3%", right: "2%" },
-  bl: { bottom: "3%", left: "2%" },
-  br: { bottom: "3%", right: "2%" },
-};
-
-type Gesture =
-  | { kind: "draw"; start: { x: number; y: number } }
-  | { kind: "move-region"; index: number; grab: { dx: number; dy: number } }
-  | { kind: "resize-region"; index: number }
-  | { kind: "move-sub"; grab: { dx: number; dy: number } }
-  // ô che chữ gốc gắn theo dòng phụ đề đang chạy
-  | { kind: "move-line-cover"; grab: { dx: number; dy: number } }
-  | { kind: "resize-line-cover" }
-  // dòng phụ đề có vị trí/cỡ chữ riêng
-  | { kind: "move-line-sub"; grab: { dx: number; dy: number } }
-  | { kind: "resize-line-sub"; startX: number; startSize: number };
-
-function clamp01(n: number) {
-  return Math.min(1, Math.max(0, n));
-}
-
-function insideBox(p: { x: number; y: number }, b: CoverRegion) {
-  return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
-}
-
-/** tìm câu đang hiển thị tại thời điểm ms (segments đã sắp theo startMs) */
-/** Câu đang hiển thị tại mốc ms — null khi đang ở khoảng lặng. */
-function activeSegmentAt(segments: SubtitleSegment[], ms: number) {
-  const idx = segmentIndexAt(segments, ms);
-  return idx >= 0 ? segments[idx] : null;
 }
 
 /**
@@ -229,74 +156,14 @@ export function RenderPreview({
 
   // âm thanh: tiếng gốc + nghe thử lồng tiếng theo câu (giọng thường, miễn phí)
   const [soundOn, setSoundOn] = useState(true);
-  // kéo/resize logo trực tiếp trên khung preview
+  // kéo/resize logo trực tiếp trên khung preview — xem hooks/use-logo-gesture.ts
   const logoRef = useRef<HTMLDivElement>(null);
-  const logoGesture = useRef<
-    | null
-    | { kind: "move"; grabDX: number; grabDY: number }
-    | { kind: "resize"; startWidth: number; startFontSize: number }
-  >(null);
-
-  function handleLogoPointerDown(e: React.PointerEvent) {
-    if (!onSettingsChange) return;
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const rect = logoRef.current!.getBoundingClientRect();
-    logoGesture.current = {
-      kind: "move",
-      grabDX: e.clientX - rect.left,
-      grabDY: e.clientY - rect.top,
-    };
-  }
-
-  function handleLogoResizeDown(e: React.PointerEvent) {
-    if (!onSettingsChange) return;
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const rect = logoRef.current!.getBoundingClientRect();
-    logoGesture.current = {
-      kind: "resize",
-      startWidth: rect.width,
-      startFontSize: settings.logoSize,
-    };
-  }
-
-  function handleLogoPointerMove(e: React.PointerEvent) {
-    const gesture = logoGesture.current;
-    const box = boxRef.current?.getBoundingClientRect();
-    const rect = logoRef.current?.getBoundingClientRect();
-    if (!gesture || !box || !rect || !onSettingsChange) return;
-    if (gesture.kind === "move") {
-      const freeW = Math.max(1, box.width - rect.width);
-      const freeH = Math.max(1, box.height - rect.height);
-      onSettingsChange({
-        logoFx: clamp01((e.clientX - box.left - gesture.grabDX) / freeW),
-        logoFy: clamp01((e.clientY - box.top - gesture.grabDY) / freeH),
-      });
-    } else {
-      const width = Math.max(12, e.clientX - rect.left);
-      if (settings.logoType === "image") {
-        onSettingsChange({
-          logoScale: Math.round(
-            Math.min(60, Math.max(3, (width / box.width) * 100)),
-          ),
-        });
-      } else {
-        onSettingsChange({
-          logoSize: Math.round(
-            Math.min(
-              96,
-              Math.max(12, gesture.startFontSize * (width / gesture.startWidth)),
-            ),
-          ),
-        });
-      }
-    }
-  }
-
-  function handleLogoPointerUp() {
-    logoGesture.current = null;
-  }
+  const logoGesture = useLogoGesture({
+    boxRef,
+    logoRef,
+    settings,
+    onSettingsChange,
+  });
 
   useEffect(() => {
     if (document.getElementById(FONT_CSS_ID)) return;
@@ -767,9 +634,9 @@ export function RenderPreview({
         {settings.logoOn && (
           <div
             ref={logoRef}
-            onPointerDown={handleLogoPointerDown}
-            onPointerMove={handleLogoPointerMove}
-            onPointerUp={handleLogoPointerUp}
+            onPointerDown={logoGesture.onPointerDown}
+            onPointerMove={logoGesture.onPointerMove}
+            onPointerUp={logoGesture.onPointerUp}
             className={cn(
               "group absolute touch-none",
               onSettingsChange ? "cursor-move" : "pointer-events-none",
@@ -807,7 +674,7 @@ export function RenderPreview({
             {/* ô kéo đổi kích thước — hiện khi rê chuột vào logo */}
             {onSettingsChange && (
               <span
-                onPointerDown={handleLogoResizeDown}
+                onPointerDown={logoGesture.onResizeDown}
                 className="absolute -bottom-1.5 -right-1.5 hidden h-3 w-3 cursor-nwse-resize rounded-sm border border-white bg-primary-500 group-hover:block"
               />
             )}
@@ -815,90 +682,29 @@ export function RenderPreview({
         )}
       </div>
 
-      {/* điều khiển phát — tự làm để không vướng lớp kéo thả phía trên */}
-      <div className="mt-2 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700"
-          aria-label={playing ? t.pause : t.play}
-        >
-          {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={durationMs || 1}
-          value={currentMs}
-          onChange={(e) => {
-            const ms = Number(e.target.value);
-            setCurrentMs(ms);
-            if (videoRef.current) videoRef.current.currentTime = ms / 1000;
-          }}
-          className="w-full"
-        />
-        <span className="shrink-0 font-mono text-xs text-neutral-400">
-          {Math.floor(currentMs / 60000)}:
-          {String(Math.floor((currentMs % 60000) / 1000)).padStart(2, "0")}
-        </span>
-        <button
-          type="button"
-          onClick={() => setSoundOn((v) => !v)}
-          title={soundOn ? t.muteOrig : t.unmuteOrig}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-        >
-          {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        </button>
-        {dubVoice && (
-          <button
-            type="button"
-            onClick={() => {
-              unlockDubAudio();
-              setDubMuted((v) => !v);
-            }}
-            disabled={!dubSupported}
-            title={
-              !dubSupported ? t.dubUnsupported : dubActive ? t.dubOff : t.dubOn
-            }
-            className={cn(
-              "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium disabled:opacity-40",
-              dubActive
-                ? "border-success-400 bg-success-50 text-success-700 dark:border-success-700 dark:bg-success-950/40 dark:text-success-300"
-                : "border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800",
-            )}
-          >
-            {dubActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-            {t.dubBtn}
-          </button>
-        )}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <p className="text-xs text-neutral-400">
-          {t.hintBase}
-          {covering ? t.hintCover(MAX_COVER_REGIONS) : "."}
-        </p>
-        {covering &&
-          regions.map((_, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onRegionsChange(regions.filter((_, k) => k !== idx))}
-              className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300"
-            >
-              {t.region} {idx + 1} <X className="h-3 w-3" />
-            </button>
-          ))}
-        {covering && regions.length > 1 && (
-          <button
-            type="button"
-            onClick={() => onRegionsChange([])}
-            className="text-xs text-neutral-500 underline hover:text-neutral-700 dark:hover:text-neutral-300"
-          >
-            {t.clearAll}
-          </button>
-        )}
-      </div>
+      <PreviewControls
+        t={t}
+        playing={playing}
+        currentMs={currentMs}
+        durationMs={durationMs}
+        onTogglePlay={togglePlay}
+        onSeek={(ms) => {
+          setCurrentMs(ms);
+          if (videoRef.current) videoRef.current.currentTime = ms / 1000;
+        }}
+        soundOn={soundOn}
+        onToggleSound={() => setSoundOn((v) => !v)}
+        dubVoice={dubVoice}
+        dubSupported={dubSupported}
+        dubActive={dubActive}
+        onToggleDub={() => {
+          unlockDubAudio();
+          setDubMuted((v) => !v);
+        }}
+        covering={covering}
+        regions={regions}
+        onRegionsChange={onRegionsChange}
+      />
     </div>
   );
 }
