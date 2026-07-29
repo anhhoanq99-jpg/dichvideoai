@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AudioLines, ScanText } from "lucide-react";
+import { OCR_TIMES_PRICIER_THAN_STT } from "@dichvideo/shared";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { JobError, JobProgress } from "@/components/jobs/job-ui";
 import { optionCardClass, selectClass } from "@/components/ui/form-styles";
@@ -14,9 +15,11 @@ const T = {
     progressStt: "Đang nhận dạng giọng nói…",
     progressOcr: "Đang đọc phụ đề trên hình…",
     sttLabel: "Nhận dạng giọng nói (STT)",
-    sttHint: "Video có lời thoại rõ — nhanh và rẻ nhất",
+    sttHint: (times: number) =>
+      `Video có lời thoại rõ — nhanh nhất và rẻ hơn OCR ${times} lần`,
+    sttBadge: "Ưu tiên dùng",
     ocrLabel: "Đọc phụ đề gắn cứng (OCR)",
-    ocrHint: "Video đã có phụ đề in trên hình",
+    ocrHint: "Video đã có phụ đề in trên hình — dùng khi không có tiếng nói",
     sourceLang: "Ngôn ngữ gốc:",
     errStart: "Không bắt đầu được trích xuất",
     start: "Bắt đầu trích xuất",
@@ -27,9 +30,11 @@ const T = {
     progressStt: "Recognizing speech…",
     progressOcr: "Reading on-screen subtitles…",
     sttLabel: "Speech recognition (STT)",
-    sttHint: "Videos with clear dialogue — fastest and cheapest",
+    sttHint: (times: number) =>
+      `Videos with clear dialogue — fastest, and ${times}× cheaper than OCR`,
+    sttBadge: "Recommended",
     ocrLabel: "Hardcoded subtitle reading (OCR)",
-    ocrHint: "Videos with subtitles burned into the frames",
+    ocrHint: "Videos with subtitles burned into the frames — use when there is no speech",
     sourceLang: "Source language:",
     errStart: "Could not start extraction",
     start: "Start extraction",
@@ -80,11 +85,14 @@ export function ExtractPanel({
             >
               <AudioLines className="mt-0.5 h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
               <span>
-                <span className="block text-sm font-medium">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
                   {t.sttLabel}
+                  <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+                    {t.sttBadge}
+                  </span>
                 </span>
                 <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">
-                  {t.sttHint}
+                  {t.sttHint(OCR_TIMES_PRICIER_THAN_STT)}
                 </span>
               </span>
             </button>

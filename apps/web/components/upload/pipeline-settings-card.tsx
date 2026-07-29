@@ -2,7 +2,7 @@
 
 import { BookOpen } from "lucide-react";
 import {
-  CREDIT_PRICING,
+  OCR_TIMES_PRICIER_THAN_STT,
   TARGET_LANGS,
   TRANSLATION_STYLES,
   type TargetLangId,
@@ -13,14 +13,6 @@ import type { PipelineSettings } from "@/hooks/use-multipart-upload";
 import type { Lang } from "@/lib/i18n";
 import { sourceLangOptions } from "@/lib/source-langs";
 import { cn } from "@/lib/utils";
-
-/**
- * OCR đắt hơn STT bao nhiêu lần — tính từ ĐƠN GIÁ THẬT thay vì gõ số cứng, để
- * nhãn "rẻ hơn N lần" không bao giờ nói lệch bảng giá khi đổi giá.
- */
-const OCR_TIMES_PRICIER = Math.round(
-  CREDIT_PRICING.ocrPerMin / CREDIT_PRICING.sttPerMin,
-);
 
 const T = {
   vi: {
@@ -127,7 +119,7 @@ export function PipelineSettingsCard({
   return (
     <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="grid gap-3 sm:grid-cols-2">
-        {t.sourceOptions(OCR_TIMES_PRICIER).map((o) => (
+        {t.sourceOptions(OCR_TIMES_PRICIER_THAN_STT).map((o) => (
           <button
             key={o.value}
             type="button"

@@ -34,6 +34,15 @@ export const CREDIT_PRICING = {
 } as const;
 
 /**
+ * OCR đắt gấp mấy lần STT — nguồn duy nhất cho nhãn "rẻ hơn N lần" ở mọi ô chọn
+ * nguồn phụ đề (trang upload + trang trích xuất). Tính từ đơn giá thật để đổi
+ * bảng giá một chỗ là mọi nhãn đổi theo, không bao giờ quảng cáo sai.
+ */
+export const OCR_TIMES_PRICIER_THAN_STT = Math.round(
+  CREDIT_PRICING.ocrPerMin / CREDIT_PRICING.sttPerMin,
+);
+
+/**
  * Khuyến mãi LẦN NẠP ĐẦU — mồi khách dùng thử: nạp từ 50k trở lên, lần đầu tiên
  * được tặng thêm 20.000 xu (cộng DỒN với % nạp nhiều bên dưới). Áp đúng một lần
  * cho mỗi tài khoản (webhook kiểm tra chưa có lượt nạp nào trước đó).

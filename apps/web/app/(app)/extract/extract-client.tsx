@@ -3,7 +3,11 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, FileText, Loader2, Play, Trash2, XCircle } from "lucide-react";
-import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@dichvideo/shared";
+import {
+  OCR_TIMES_PRICIER_THAN_STT,
+  UPLOAD_ALLOWED_TYPES,
+  UPLOAD_MAX_BYTES,
+} from "@dichvideo/shared";
 import {
   useMultipartUpload,
   type PipelineSettings,
@@ -17,16 +21,19 @@ import { cn } from "@/lib/utils";
 
 const T = {
   vi: {
-    sourceOptions: [
-      {
-        value: "ocr" as const,
-        label: "OCR — chữ trên hình",
-        hint: "Đọc phụ đề gắn cứng trong khung hình",
-      },
+    // Âm thanh (STT) đứng trước & là mặc định — xem pipeline-settings-card.tsx
+    sourceOptions: (times: number) => [
       {
         value: "stt" as const,
         label: "Âm thanh — giọng nói",
-        hint: "Nghe audio và tạo phụ đề kèm mốc thời gian",
+        hint: `Nghe audio và tạo phụ đề kèm mốc thời gian — rẻ hơn OCR ${times} lần`,
+        badge: "Ưu tiên dùng",
+      },
+      {
+        value: "ocr" as const,
+        label: "OCR — chữ trên hình",
+        hint: "Đọc phụ đề gắn cứng trong khung hình — dùng khi video không có tiếng nói",
+        badge: null,
       },
     ],
     title: "Trích xuất phụ đề",
@@ -40,16 +47,18 @@ const T = {
     start: "Bắt đầu trích xuất",
   },
   en: {
-    sourceOptions: [
-      {
-        value: "ocr" as const,
-        label: "OCR — on-screen text",
-        hint: "Reads hardcoded subtitles from the frames",
-      },
+    sourceOptions: (times: number) => [
       {
         value: "stt" as const,
         label: "Audio — speech",
-        hint: "Listens to the audio and creates timestamped subtitles",
+        hint: `Listens to the audio and creates timestamped subtitles — ${times}× cheaper than OCR`,
+        badge: "Recommended",
+      },
+      {
+        value: "ocr" as const,
+        label: "OCR — on-screen text",
+        hint: "Reads hardcoded subtitles from the frames — use when there is no speech",
+        badge: null,
       },
     ],
     title: "Extract subtitles",
@@ -70,7 +79,8 @@ type FileStatus = "waiting" | "uploading" | "done" | "error";
 export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
   const t = T[lang];
   const { state, upload } = useMultipartUpload();
-  const [method, setMethod] = useState<"ocr" | "stt">("ocr");
+  // mặc định = STT cho khớp nhãn "Ưu tiên dùng" (giống trang upload)
+  const [method, setMethod] = useState<"ocr" | "stt">("stt");
   const [sourceLang, setSourceLang] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
@@ -128,7 +138,7 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
 
       <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
         <div className="grid gap-3 sm:grid-cols-2">
-          {t.sourceOptions.map((o) => (
+          {t.sourceOptions(OCR_TIMES_PRICIER_THAN_STT).map((o) => (
             <button
               key={o.value}
               type="button"
@@ -141,7 +151,14 @@ export function ExtractPageClient({ lang = "vi" }: { lang?: Lang }) {
                   : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-700",
               )}
             >
-              <span className="block font-medium">{o.label}</span>
+              <span className="flex flex-wrap items-center gap-2 font-medium">
+                {o.label}
+                {o.badge && (
+                  <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+                    {o.badge}
+                  </span>
+                )}
+              </span>
               <span className="block text-xs text-neutral-500 dark:text-neutral-400">
                 {o.hint}
               </span>
