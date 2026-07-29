@@ -218,8 +218,12 @@ export async function synthesizeGCloudClip(input: {
   return {
     file,
     usage: [
-      // trong hạn mức free hằng tháng — chưa tính chi phí
-      { provider: "gcloud", metric: "chars", quantity: input.text.length, costUsdMicros: 0 },
+      {
+        provider: "gcloud",
+        metric: "chars",
+        quantity: input.text.length,
+        costUsdMicros: input.text.length * PRICING.gcloudTtsPerChar,
+      },
     ],
   };
 }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  dubTierOf,
   estimateJobCredits,
-  isPremiumVoice,
   isValidVoiceId,
 } from "@dichvideo/shared";
 import {
@@ -63,7 +63,7 @@ export async function POST(
     session.user.id,
     estimateJobCredits("dub", {
       durationSec: video.durationSec,
-      premiumVoice: isPremiumVoice(voice),
+      dubTier: dubTierOf(voice),
     }),
   );
   if (credits.response) return credits.response;

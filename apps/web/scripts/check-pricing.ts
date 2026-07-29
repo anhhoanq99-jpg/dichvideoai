@@ -6,8 +6,8 @@
 import {
   CREDIT_PRICING,
   SIGNUP_TRIAL_CREDITS,
+  dubTierOf,
   estimateJobCredits,
-  isPremiumVoice,
 } from "@dichvideo/shared";
 
 let bad = 0;
@@ -17,19 +17,29 @@ const check = (label: string, got: unknown, want: unknown) => {
   console.log(`${ok ? "OK " : "LOI"} ${label}: ${JSON.stringify(got)} (mong doi ${JSON.stringify(want)})`);
 };
 
-console.log("=== Giong nao tinh gia cao cap ===");
-check("Gemini", isPremiumVoice("gemini:Kore"), true);
-check("ElevenLabs (truoc day bi tinh gia Edge)", isPremiumVoice("eleven:pNInz6obpgDQGcFmaJgB"), true);
-check("Edge mien phi", isPremiumVoice("vi-VN-HoaiMyNeural"), false);
-check("SubdubAI/Google", isPremiumVoice("gcloud:vi-VN-Chirp3-HD-Aoede"), false);
+console.log("=== Bac gia cua tung nguon giong ===");
+check("Edge (mien phi that)", dubTierOf("vi-VN-HoaiMyNeural"), "basic");
+check("Google Chirp3-HD (truoc day bi tinh gia Edge)", dubTierOf("gcloud:vi-VN-Chirp3-HD-Aoede"), "hd");
+check("Gemini", dubTierOf("gemini:Kore"), "premium");
+check("ElevenLabs (truoc day bi tinh gia Edge)", dubTierOf("eleven:pNInz6obpgDQGcFmaJgB"), "premium");
 
 console.log("\n=== Gia long tieng 10 phut ===");
 const tenMin = { durationSec: 600 };
-const edge = estimateJobCredits("dub", tenMin);
-const premium = estimateJobCredits("dub", { ...tenMin, premiumVoice: true });
-check("giong thuong", edge, 10 * CREDIT_PRICING.dubEdgePerMin);
-check("giong cao cap", premium, 10 * CREDIT_PRICING.dubGeminiPerMin);
-console.log(`   ElevenLabs 10 phut: ${edge} xu -> ${premium} xu (+${premium - edge})`);
+const basic = estimateJobCredits("dub", tenMin);
+const hd = estimateJobCredits("dub", { ...tenMin, dubTier: "hd" as const });
+const premium = estimateJobCredits("dub", { ...tenMin, dubTier: "premium" as const });
+check("giong co ban (mac dinh)", basic, 10 * CREDIT_PRICING.dubEdgePerMin);
+check("giong HD", hd, 10 * CREDIT_PRICING.dubGCloudPerMin);
+check("giong cao cap", premium, 10 * CREDIT_PRICING.dubPremiumPerMin);
+console.log(`   10 phut: co ban ${basic} xu | HD ${hd} xu | cao cap ${premium} xu`);
+
+// Chi phi that de doi chieu — HD phai BAN cao hon CHI, khong duoc lo ngam nua.
+const GCLOUD_USD_PER_1M_CHARS = 30;
+const CHARS_PER_MIN = 900; // TARGET_CPS=15 trong translate.ts
+const VND_PER_USD = 26_000;
+const hdCostPerMin = (CHARS_PER_MIN * GCLOUD_USD_PER_1M_CHARS / 1_000_000) * VND_PER_USD;
+console.log(`   HD: ban ${CREDIT_PRICING.dubGCloudPerMin}d/phut, chi phi that ~${Math.round(hdCostPerMin)}d/phut`);
+check("gia HD phu duoc chi phi that", CREDIT_PRICING.dubGCloudPerMin > hdCostPerMin, true);
 
 console.log("\n=== Loi chao nguoi dung moi ===");
 const FULL = CREDIT_PRICING.ocrPerMin + CREDIT_PRICING.renderPerMin +

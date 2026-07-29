@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Clapperboard, Download, FileText, Sparkles, Wallet } from "lucide-react";
 import {
   FIRST_TOPUP_PROMO,
+  dubTierOf,
   estimateJobCredits,
-  isPremiumVoice,
   topupCredits,
   type CoverRegion,
   type JobStatus,
@@ -177,7 +177,7 @@ export function ExportModal({
     dub.enabled && durationSec
       ? estimateJobCredits("dub", {
           durationSec,
-          premiumVoice: isPremiumVoice(resolveVoice(dub.selection)),
+          dubTier: dubTierOf(resolveVoice(dub.selection)),
         })
       : 0;
 

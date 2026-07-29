@@ -47,7 +47,12 @@ Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
 - **Giọng nói**: catalog `packages/shared/src/dub-presets.ts` — Edge (322, free) · Google Cloud (40, có Chirp3-HD)
   · ElevenLabs (14 premade) · Gemini (premium). Prefix id: `gcloud:` `eleven:` `gemini:`; validate `isValidVoiceId()`.
   Nhãn hiển thị đặt theo THƯƠNG HIỆU MÌNH, không lộ tên nhà cung cấp (Google → "SubdubAI", v.v.).
-  Mặc định = `gcloud` (Chirp3-HD). Hết hạn mức Google → cả job tự hạ xuống Edge, xem `edgeFallbackVoice()`.
+  **Mặc định = `edge`** (đổi 30/07/2026, trước là `gcloud`): Edge là nguồn DUY NHẤT miễn phí thật,
+  còn Google chỉ free 1tr ký tự/tháng rồi tính $30/1M (~700đ/phút thoại) — để nó làm mặc định là
+  dồn toàn bộ chi phí đó vào bậc giá rẻ nhất. Hết hạn mức Google → job tự hạ xuống Edge (`edgeFallbackVoice()`).
+- **Giá lồng tiếng có BA bậc**, tra bằng `dubTierOf(voiceId)` — khai báo đúng một chỗ, đừng chép lại:
+  `basic` Edge 500 xu/phút (chi phí 0) · `hd` Google 1.200 (chi phí ~700) · `premium` Gemini/ElevenLabs
+  8.000 (chi phí ~7.000). Thêm nguồn giọng mới mà quên gắn bậc = bán dưới giá vốn, không ai báo động.
   ĐÃ GỠ (23/07/2026, chất lượng kém + không dùng được): VieNeu, Kokoro, Viettel AI, FPT.AI —
   cùng service Python `services/tts-local`. Dữ liệu usage_events cũ vẫn còn nhãn của chúng.
 - **Render/ASS**: `packages/shared/src/ass-builder.ts` sinh .ass (hiệu ứng chữ + màu nhấn `*từ*`); worker `render.ts`

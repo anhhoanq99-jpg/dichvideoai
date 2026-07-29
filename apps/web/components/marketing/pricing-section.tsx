@@ -15,8 +15,9 @@ const T = {
       { label: "Tách phụ đề cứng trên hình", price: `${CREDIT_PRICING.ocrPerMin} xu/phút` },
       { label: "Dịch AI sang tiếng Việt", price: `${CREDIT_PRICING.translatePerLine} xu/dòng` },
       { label: "Render phụ đề + che chữ gốc", price: `${CREDIT_PRICING.renderPerMin} xu/phút` },
-      { label: "Lồng tiếng — giọng thường", price: `${CREDIT_PRICING.dubEdgePerMin} xu/phút` },
-      { label: "Lồng tiếng — giọng cao cấp", price: `${CREDIT_PRICING.dubGeminiPerMin} xu/phút` },
+      { label: "Lồng tiếng — giọng cơ bản", price: `${CREDIT_PRICING.dubEdgePerMin} xu/phút` },
+      { label: "Lồng tiếng — giọng HD", price: `${CREDIT_PRICING.dubGCloudPerMin} xu/phút` },
+      { label: "Lồng tiếng — giọng cao cấp", price: `${CREDIT_PRICING.dubPremiumPerMin} xu/phút` },
     ],
     examplePrefix:
       "Ví dụ: video 5 phút, 60 câu — tách chữ trên hình + dịch + render + lồng tiếng thường ≈",
@@ -35,8 +36,9 @@ const T = {
       { label: "Hardcoded on-screen subtitle extraction", price: `${CREDIT_PRICING.ocrPerMin} credits/min` },
       { label: "AI translation", price: `${CREDIT_PRICING.translatePerLine} credits/line` },
       { label: "Subtitle render + original text masking", price: `${CREDIT_PRICING.renderPerMin} credits/min` },
-      { label: "Dubbing — standard voices", price: `${CREDIT_PRICING.dubEdgePerMin} credits/min` },
-      { label: "Dubbing — premium voices", price: `${CREDIT_PRICING.dubGeminiPerMin} credits/min` },
+      { label: "Dubbing — basic voices", price: `${CREDIT_PRICING.dubEdgePerMin} credits/min` },
+      { label: "Dubbing — HD voices", price: `${CREDIT_PRICING.dubGCloudPerMin} credits/min` },
+      { label: "Dubbing — premium voices", price: `${CREDIT_PRICING.dubPremiumPerMin} credits/min` },
     ],
     examplePrefix:
       "Example: a 5-minute video with 60 lines — on-screen extraction + translation + render + standard dubbing ≈",

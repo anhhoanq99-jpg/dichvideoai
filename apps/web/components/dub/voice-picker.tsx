@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Loader2, Play } from "lucide-react";
 import {
+  DUB_VOICES,
   EDGE_VOICES,
   ELEVEN_VOICES,
   GCLOUD_VOICES,
@@ -26,8 +27,8 @@ const T = {
     providerOptions: [
       // Nhãn ĐẶT THEO THƯƠNG HIỆU MÌNH, không lộ tên nhà cung cấp thật.
       // Thứ tự cố ý: giọng khuyên dùng lên đầu.
-      { value: "gcloud", label: `SubdubAI — Việt, rõ ràng (Nên dùng) (${GCLOUD_VOICES.length})` },
-      { value: "edge", label: "Cơ bản — miễn phí, mọi thứ tiếng (322)" },
+      { value: "edge", label: "Cơ bản — miễn phí, mọi thứ tiếng (Nên dùng) (322)" },
+      { value: "gcloud", label: `SubdubAI — Việt, rõ ràng hơn (${GCLOUD_VOICES.length})` },
       { value: "gemini", label: `Cao cấp — Việt diễn cảm (${GEMINI_VOICES.length})` },
       { value: "eleven", label: `Eleven — giọng Âu Mỹ (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
@@ -48,8 +49,8 @@ const T = {
   },
   en: {
     providerOptions: [
-      { value: "gcloud", label: `SubdubAI — Vietnamese, crisp (Recommended) (${GCLOUD_VOICES.length})` },
-      { value: "edge", label: "Basic — free, every language (322)" },
+      { value: "edge", label: "Basic — free, every language (Recommended) (322)" },
+      { value: "gcloud", label: `SubdubAI — Vietnamese, crisper (${GCLOUD_VOICES.length})` },
       { value: "gemini", label: `Premium — expressive Vietnamese (${GEMINI_VOICES.length})` },
       { value: "eleven", label: `Eleven — Western voices (${ELEVEN_VOICES.length})` },
     ] as { value: VoiceProvider; label: string }[],
@@ -71,17 +72,19 @@ const T = {
 } as const;
 
 /**
- * Mặc định = SubdubAI (Google Cloud Chirp3-HD), giọng khuyên dùng.
- * `locale` vẫn để vi-VN vì ô chọn quốc gia chỉ hiện với nguồn Cơ bản (Edge) —
- * giữ sẵn để khách đổi sang Cơ bản là có ngay tiếng Việt, khỏi phải chọn lại.
- * LƯU Ý: nguồn này ăn hạn mức GOOGLE_TTS_API_KEY (free 1-4tr ký tự/tháng),
- * khác Edge miễn phí hẳn — hết hạn mức là ảnh hưởng MỌI khách chưa đổi giọng.
+ * Mặc định = Cơ bản (Edge TTS) — nguồn DUY NHẤT miễn phí thật, không hạn mức.
+ *
+ * Trước đây mặc định là SubdubAI (Google Cloud Chirp3-HD). Đổi ngày 30/07/2026:
+ * Google chỉ cho 1 triệu ký tự/tháng miễn phí rồi tính $30/1M (~700đ/phút thoại),
+ * trong khi giọng mặc định là thứ MỌI khách chưa đổi giọng đều dùng — tức là
+ * toàn bộ chi phí đó đổ vào bậc giá rẻ nhất. Nay Google thành bản nâng cấp có
+ * giá riêng (dubGCloudPerMin), còn mặc định trả về nguồn không tốn tiền.
  */
 export const DEFAULT_VOICE_SELECTION: VoiceSelection = {
-  provider: "gcloud",
+  provider: "edge",
   locale: "vi-VN",
   gender: "all",
-  voice: GCLOUD_VOICES[0].id,
+  voice: DUB_VOICES[0].id,
 };
 
 /** Tên quốc gia tiếng Việt từ mã locale ("ja-JP" → "Nhật Bản"). */

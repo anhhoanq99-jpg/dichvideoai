@@ -1,3 +1,4 @@
+import type { DubTier } from "./credits";
 import { EDGE_VOICE_IDS } from "./edge-voices";
 
 /** Giọng lồng tiếng — Edge TTS (miễn phí). Provider trả phí thêm sau. */
@@ -178,17 +179,23 @@ export function hasWideTtsQuota(id: string): boolean {
 }
 
 /**
- * Giọng tính giá CAO CẤP khi lồng tiếng — nguồn tính tiền theo từng ký tự.
+ * Bậc giá lồng tiếng của một giọng — nguồn DUY NHẤT quyết định tính bao nhiêu xu.
  *
- * Trước đây "cao cấp" nghĩa là "đúng Gemini", và định nghĩa đó bị chép lại ở 4
- * nơi (worker trừ xu, 2 chỗ hiển thị giá, route tạo job). Hệ quả: lồng tiếng
- * bằng ElevenLabs — nguồn ĐẮT NHẤT — lại bị tính đúng bằng giá Edge miễn phí.
- * Gom về một hàm để không nơi nào lệch nơi nào nữa.
+ * Trước đây chỉ có hai bậc (thường / cao cấp) và định nghĩa bị chép ở 4 nơi
+ * (worker trừ xu, 2 chỗ hiển thị giá, route tạo job). Hệ quả lần 1: ElevenLabs —
+ * nguồn ĐẮT NHẤT — bị tính bằng giá Edge miễn phí. Lần 2: Google Cloud
+ * (Chirp3-HD, $30/1M ký tự sau hạn mức free) cũng bị gộp vào giá Edge → lỗ ngầm.
  *
+ * Nay ba bậc, tra từ NGUỒN của giọng, khai báo đúng một chỗ:
+ *  - `basic`   Edge — miễn phí thật, không hạn mức
+ *  - `hd`      Google Cloud — free 1tr ký tự/tháng rồi tính tiền
+ *  - `premium` Gemini / ElevenLabs — tính tiền theo ký tự ngay từ đầu
  */
-export function isPremiumVoice(id: string): boolean {
+export function dubTierOf(id: string): DubTier {
   const p = voiceProvider(id);
-  return p === "gemini" || p === "eleven";
+  if (p === "gemini" || p === "eleven") return "premium";
+  if (p === "gcloud") return "hd";
+  return "basic";
 }
 
 /** Id giọng thuộc một trong các catalog đã hỗ trợ — dùng validate mọi API. */

@@ -8,8 +8,8 @@ import {
   type Db,
 } from "@dichvideo/db";
 import {
+  dubTierOf,
   estimateJobCredits,
-  isPremiumVoice,
   type JobPayload,
   type JobType,
 } from "@dichvideo/shared";
@@ -46,8 +46,9 @@ export async function chargeJobStart(db: Db, payload: JobPayload, type: JobType)
   const credits = estimateJobCredits(type, {
     durationSec: video?.durationSec,
     lines,
-    premiumVoice:
-      type === "dub" && isPremiumVoice(String(payload.params.voice ?? "")),
+    ...(type === "dub"
+      ? { dubTier: dubTierOf(String(payload.params.voice ?? "")) }
+      : {}),
   });
   if (credits <= 0) return;
 

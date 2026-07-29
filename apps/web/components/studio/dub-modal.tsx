@@ -2,7 +2,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { Mic } from "lucide-react";
-import { estimateJobCredits, isPremiumVoice } from "@dichvideo/shared";
+import { dubRatePerMin, dubTierOf, estimateJobCredits } from "@dichvideo/shared";
 import { Modal } from "@/components/ui/modal";
 import { fieldLabelClass } from "@/components/ui/form-styles";
 import type { Lang } from "@/lib/i18n";
@@ -32,8 +32,9 @@ const T = {
     dubNote:
       "Giọng gốc tự hạ xuống đúng lúc AI đọc để không chồng tiếng; giữa các câu vẫn giữ nhạc nền. Nghe thử ngay trên khung video (nút “Lồng tiếng” cạnh thanh tua).",
     estTitle: "Ước tính chi phí lồng tiếng",
-    estLine: (min: number, price: string, premium: boolean) =>
-      `Thời lượng video: ~${min} phút · Đơn giá: ${price} xu/phút (giọng ${premium ? "cao cấp" : "thường"})`,
+    estLine: (min: number, price: string, tierName: string) =>
+      `Thời lượng video: ~${min} phút · Đơn giá: ${price} xu/phút (giọng ${tierName})`,
+    tierNames: { basic: "cơ bản", hd: "HD", premium: "cao cấp" },
     estTotalSuffix: "xu — chỉ trừ khi bấm Xuất File",
     dubDisabledHint:
       "Tích ô trên để lồng tiếng khi xuất — các thiết lập bên dưới vẫn chỉnh và nghe thử được ngay.",
@@ -56,8 +57,9 @@ const T = {
     dubNote:
       "The original voice is lowered exactly while the AI speaks so voices don't overlap; background music stays between lines. Preview right on the video frame (the “Dubbing” button next to the seek bar).",
     estTitle: "Dubbing cost estimate",
-    estLine: (min: number, price: string, premium: boolean) =>
-      `Video length: ~${min} min · Rate: ${price} credits/min (${premium ? "premium" : "standard"} voice)`,
+    estLine: (min: number, price: string, tierName: string) =>
+      `Video length: ~${min} min · Rate: ${price} credits/min (${tierName} voice)`,
+    tierNames: { basic: "standard", hd: "HD", premium: "premium" },
     estTotalSuffix: "credits — only charged when you press Export",
     dubDisabledHint:
       "Tick the box above to dub on export — the settings below can still be adjusted and previewed right away.",
@@ -243,15 +245,15 @@ export function DubModal({ dub, setDub, durationSec, onClose, lang = "vi" }: Dub
               <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-300">
                 {t.estLine(
                   Math.max(1, Math.ceil(durationSec / 60)),
-                  dub.selection.provider === "gemini" ? "700" : "500",
-                  dub.selection.provider === "gemini",
+                  dubRatePerMin(dubTierOf(resolveVoice(dub.selection))).toLocaleString("vi-VN"),
+                  t.tierNames[dubTierOf(resolveVoice(dub.selection))],
                 )}
               </p>
               <p className="mt-0.5 text-sm font-bold text-amber-700 dark:text-amber-300">
                 ={" "}
                 {estimateJobCredits("dub", {
                   durationSec,
-                  premiumVoice: isPremiumVoice(resolveVoice(dub.selection)),
+                  dubTier: dubTierOf(resolveVoice(dub.selection)),
                 }).toLocaleString("vi-VN")}{" "}
                 {t.estTotalSuffix}
               </p>

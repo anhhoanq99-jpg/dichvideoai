@@ -21,17 +21,52 @@ export const CREDIT_PRICING = {
   /** render phụ đề + che chữ — theo phút video */
   renderPerMin: 50,
   renderMin: 20,
-  /** lồng tiếng giọng thường (Edge/Google) — theo phút video. Chi phí thật ≈ 0 → lãi. */
+  /**
+   * Lồng tiếng giọng CƠ BẢN (Microsoft Edge TTS) — theo phút video.
+   * Đây là nguồn DUY NHẤT miễn phí thật: không hạn mức, chi phí = 0 → lãi 100%.
+   */
   dubEdgePerMin: 500,
   /**
-   * Lồng tiếng giọng CAO CẤP (ElevenLabs) — theo phút video.
-   * Giá thật ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại; đặt 8.000 để bù
-   * chi phí + lãi nhẹ. Trước đây 700 → LỖ ~9× mỗi phút. (Tên biến giữ nguyên để
-   * không phải sửa nơi tham chiếu; áp cho mọi giọng premium — xem isPremiumVoice.)
+   * Lồng tiếng giọng HD (Google Cloud Chirp3-HD) — theo phút video.
+   *
+   * Google cho 1 TRIỆU ký tự/tháng miễn phí rồi tính $30/1M. Văn nói tiếng Việt
+   * ~900 ký tự/phút (TARGET_CPS=15 trong translate.ts) → chi phí thật ~700đ/phút
+   * sau khi hết hạn mức.
+   *
+   * Trước đây nguồn này bị gộp chung ô giá với Edge ở 500đ/phút → LỖ ~200đ mỗi
+   * phút, mà không nơi nào báo động vì chi phí gcloud đang được ghi nhận = 0
+   * trong usage_events. Đúng vết xe đổ của ElevenLabs (xem dubPremiumPerMin).
    */
-  dubGeminiPerMin: 8_000,
+  dubGCloudPerMin: 1_200,
+  /**
+   * Lồng tiếng giọng CAO CẤP (ElevenLabs / Gemini) — theo phút video.
+   * Giá thật ElevenLabs ~$0,30/1.000 ký tự ≈ 6.500đ/phút thoại; đặt 8.000 để bù
+   * chi phí + lãi nhẹ. Trước đây 700 → LỖ ~9× mỗi phút.
+   */
+  dubPremiumPerMin: 8_000,
   dubMin: 100,
 } as const;
+
+/**
+ * Bậc giá lồng tiếng — quyết định bởi NGUỒN của giọng, không phải tên giọng.
+ * Tra bậc từ id giọng bằng `dubTierOf()` trong dub-presets.ts.
+ */
+export type DubTier = "basic" | "hd" | "premium";
+
+const DUB_RATE_PER_MIN: Record<DubTier, number> = {
+  basic: CREDIT_PRICING.dubEdgePerMin,
+  hd: CREDIT_PRICING.dubGCloudPerMin,
+  premium: CREDIT_PRICING.dubPremiumPerMin,
+};
+
+/**
+ * Đơn giá lồng tiếng (xu/phút) của một bậc — để giao diện hiện giá mà không gõ
+ * số cứng. Trước đây hộp Lồng tiếng ghi thẳng "700"/"500" trong chuỗi, lệch hẳn
+ * bảng giá thật sau khi nâng giá cao cấp lên 8.000.
+ */
+export function dubRatePerMin(tier: DubTier): number {
+  return DUB_RATE_PER_MIN[tier];
+}
 
 /**
  * OCR đắt gấp mấy lần STT — nguồn duy nhất cho nhãn "rẻ hơn N lần" ở mọi ô chọn
@@ -107,7 +142,7 @@ export function topupPacks(): TopupPack[] {
 /** Ước tính credit cho một job — dùng chung cho worker (trừ tiền) và web (hiển thị). */
 export function estimateJobCredits(
   type: "import" | "probe" | "stt" | "ocr" | "translate" | "render" | "dub",
-  input: { durationSec?: number | null; lines?: number; premiumVoice?: boolean },
+  input: { durationSec?: number | null; lines?: number; dubTier?: DubTier },
 ): number {
   const minutes = Math.max(1, Math.ceil((input.durationSec ?? 0) / 60));
   switch (type) {
@@ -129,9 +164,7 @@ export function estimateJobCredits(
       return Math.max(
         CREDIT_PRICING.dubMin,
         minutes *
-          (input.premiumVoice
-            ? CREDIT_PRICING.dubGeminiPerMin
-            : CREDIT_PRICING.dubEdgePerMin),
+          DUB_RATE_PER_MIN[input.dubTier ?? "basic"],
       );
   }
 }

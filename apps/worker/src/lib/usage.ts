@@ -29,6 +29,15 @@ export const PRICING = {
   /** Gemini 2.5 Flash TTS: text input ($0.50 / 1M), audio output ($10 / 1M tok) */
   geminiTtsInPerTok: 0.5e6 / 1_000_000,
   geminiTtsOutPerTok: 10e6 / 1_000_000,
+  /**
+   * Google Cloud TTS Chirp3-HD: $30 / 1 TRIỆU ký tự.
+   *
+   * Ghi theo GIÁ NIÊM YẾT, cố ý KHÔNG trừ 1tr ký tự miễn phí mỗi tháng: hạn mức
+   * free là thứ dùng hết rồi thôi, còn đây là chi phí biên của ký tự tiếp theo —
+   * cái cần nhìn khi định giá. Trước đây ghi thẳng 0 nên bảng Quản trị không bao
+   * giờ thấy nguồn này tốn tiền, dù nó là giọng mặc định của mọi khách.
+   */
+  gcloudTtsPerChar: 30e6 / 1_000_000,
 } as const;
 
 export async function recordUsage(jobId: string, records: UsageRecord[]) {
