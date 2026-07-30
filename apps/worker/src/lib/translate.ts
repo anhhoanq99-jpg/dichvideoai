@@ -278,12 +278,16 @@ async function buildStoryBrief(
     const text = await generate(ctx, {
       prompt:
         "Đọc toàn bộ lời thoại/phụ đề sau và trả về bản tóm tắt NGẮN phục vụ dịch thuật, gồm:\n" +
-        "1. Thể loại + bối cảnh + tông giọng (2-3 câu).\n" +
+        "1. THỜI ĐẠI + thể loại + tông giọng (2-3 câu). Ghi RÕ một trong: cổ trang/kiếm hiệp/\n" +
+        "   cung đình · hiện đại đời thường · công sở-trang trọng · hoạt hình-thiếu nhi · khác.\n" +
+        "   Kèm BỘ ĐẠI TỪ chốt cho thời đại đó (vd cổ trang: ta – ngươi – hắn – nàng – huynh – muội).\n" +
         "2. MẠCH TRUYỆN: chuyện gì xảy ra từ đầu tới cuối (3-5 gạch đầu dòng) — để dịch câu\n" +
         "   mơ hồ biết chọn nghĩa nào cho khớp diễn biến.\n" +
         "3. Các nhân vật chính và QUAN HỆ giữa họ (vai vế, thân/sơ, trên/dưới) → đề xuất cách\n" +
         "   xưng hô tiếng Việt cho TỪNG CẶP nhân vật (anh-em, tao-mày, ta-ngươi, cậu-tớ...).\n" +
-        "4. Thuật ngữ/tên riêng lặp lại cần dịch nhất quán.\n" +
+        "4. BẢNG TÊN RIÊNG bắt buộc — liệt kê MỌI tên người, địa danh, chức danh, môn phái xuất\n" +
+        "   hiện trong thoại, dạng `nguyên văn = bản dịch` (vd `黄锦 = Hoàng Cẩm`). Tên Trung/Nhật/Hàn\n" +
+        "   phiên Hán-Việt. Đây là bảng để bước dịch tra cứu, thiếu tên nào là bước sau dịch sai tên đó.\n" +
         "5. Những câu dễ dịch sai vì đa nghĩa hoặc phụ thuộc bối cảnh — ghi rõ nên hiểu thế nào.\n" +
         styleHint +
         "Chỉ trả về nội dung tóm tắt, tối đa 400 từ.\n\n" +
@@ -355,11 +359,23 @@ export async function translateSegments(
     groq: groqKey ? new Groq({ apiKey: groqKey }) : null,
     keys,
     keyIdx: 0,
-    // MẶC ĐỊNH Groq (miễn phí) cho rẻ. Trước đây ưu tiên Gemini vì chất lượng,
-    // nhưng token "thinking" của model suy luận đốt tiền quá mức — chuyển Groq làm
-    // chính, Gemini thành DỰ PHÒNG (dùng khi Groq hết hạn ngày). Không có key Groq
-    // thì chạy thẳng Gemini.
-    provider: groqKey ? "groq" : "gemini",
+    /**
+     * MẶC ĐỊNH Groq (miễn phí). Trước đây ưu tiên Gemini vì chất lượng, nhưng token
+     * "thinking" của model suy luận đốt tiền quá mức → chuyển Groq làm chính, Gemini
+     * thành dự phòng (dùng khi Groq hết hạn ngày). Không có key Groq thì chạy Gemini.
+     *
+     * ĐỔI SANG GEMINI: đặt `TRANSLATE_PROVIDER=gemini` trong .env rồi restart worker.
+     * Gemini dịch tiếng Trung/Nhật sang Việt tốt hơn Llama rõ rệt (giữ tên riêng,
+     * bám xưng hô theo thời đại). Token "thinking" đã tắt (`thinkingBudget: 0`) nên
+     * chi phí không còn như trước — xem lại bằng `scripts/check-cost-projection.ts`
+     * sau vài job để biết biên lãi thực tế trước khi giữ luôn.
+     */
+    provider:
+      process.env.TRANSLATE_PROVIDER === "gemini" && keys.length > 0
+        ? "gemini"
+        : groqKey
+          ? "groq"
+          : "gemini",
     geminiModel:
       // gemini-3-flash-preview: ĐÃ ĐO bằng key thật — 3/3 lượt thành công.
       // KHÔNG dùng gemini-3.5-flash (luôn 503 "high demand" ở bậc miễn phí) và
@@ -400,7 +416,14 @@ export async function translateSegments(
     "tiếng sẽ bị ép đọc nhanh nghe gấp gáp nếu câu dài. Cách đạt: dùng văn nói tự nhiên, cô đọng; " +
     "bỏ từ đệm/lặp/hô ngữ thừa; chọn từ ngắn nghĩa tương đương. Giữ TRỌN Ý CHÍNH — thà lược chi " +
     "tiết phụ còn hơn để câu vượt `max`. Đây là ràng buộc ưu tiên cao, chỉ sau việc đúng nghĩa.\n" +
-    "- Đồng nhất tên nhân vật và xưng hô xuyên suốt theo bản tóm tắt ngữ cảnh.\n" +
+    "- GIỮ NGUYÊN TÊN RIÊNG: tên người, địa danh, chức danh, môn phái, biệt hiệu PHẢI xuất hiện " +
+    "trong bản dịch, KHÔNG được lược bỏ hay thay bằng đại từ trống. Tên Trung/Nhật/Hàn → phiên " +
+    "Hán-Việt (黄锦 → Hoàng Cẩm, 张伟 → Trương Vĩ) và dùng NHẤT QUÁN đúng một cách viết cả phim. " +
+    "Câu gốc có tên mà bản dịch chỉ còn 'tôi/hắn/cô ta' là DỊCH SAI.\n" +
+    "- XƯNG HÔ THEO ĐÚNG BỐI CẢNH đã nêu trong bản tóm tắt, không mặc định 'tôi/bạn': " +
+    "cổ trang/kiếm hiệp/cung đình dùng ta – ngươi – hắn – nàng – chàng – muội – huynh; " +
+    "hiện đại đời thường dùng tôi – cậu – tớ – anh – em; trang trọng dùng tôi – ông/bà/quý vị. " +
+    "Dùng sai thời đại làm hỏng không khí phim.\n" +
     "- Không thêm ghi chú, giải thích hay ký tự thừa.";
   if (brief) system += `\n\nNGỮ CẢNH TOÀN PHIM:\n${brief}`;
   if (input.glossary?.trim()) {

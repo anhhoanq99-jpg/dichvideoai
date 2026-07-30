@@ -12,10 +12,13 @@ export const STYLE_INSTRUCTIONS: Record<TranslationStyleId, string> = {
     "- Đảo lại trật tự câu cho đúng cách người Việt diễn đạt; câu ngắn gọn như lời thoại phim lồng tiếng.\n" +
     "- Giữ đúng cảm xúc: giận thì gắt, đùa thì tếu, buồn thì trầm — chọn từ theo sắc thái nhân vật.\n" +
     "- Thành ngữ/tục ngữ gốc → thay bằng thành ngữ Việt tương đương, không dịch nghĩa đen.\n" +
-    "Ví dụ mức chất lượng yêu cầu (tự đặt, minh họa cách diễn đạt):\n" +
+    "Ví dụ dưới đây minh họa ĐỘ TỰ NHIÊN, KHÔNG phải mẫu xưng hô — đại từ luôn lấy theo thời đại " +
+    "trong bản tóm tắt (phim cổ trang phải là ta/ngươi/hắn/nàng, tuyệt đối không 'tôi/bạn'):\n" +
     '- DỞ: "Tôi không thể tin điều này đang xảy ra" → HAY: "Không thể tin nổi luôn á!"\n' +
     '- DỞ: "Bạn có muốn đi cùng với tôi không?" → HAY: "Đi với tớ không?"\n' +
-    '- DỞ: "Điều đó không phải là vấn đề của tôi" → HAY: "Việc đó đâu liên quan gì đến tôi."',
+    '- DỞ: "Điều đó không phải là vấn đề của tôi" → HAY: "Việc đó đâu liên quan gì đến tôi."\n' +
+    '- DỞ (mất tên, sai thời đại): "Hôm nay tôi nhất định sẽ lật tẩy tên lừa đảo"\n' +
+    '  → HAY (cổ trang): "Hôm nay ta, Hoàng Cẩm, quyết vạch trần bộ mặt thật của tên bịp bợm đó!"',
   "gioi-tre":
     "Dịch theo phong cách GIỚI TRẺ Việt Nam trên mạng xã hội: hài hước, tếu táo, cà khịa nhẹ nhàng đúng lúc. " +
     "Dùng từ lóng/từ hot phổ biến (xỉu ngang, ảo thật đấy, đỉnh nóc, ét ô ét, u là trời, khum, chằm Zn...) NHƯNG đúng ngữ cảnh và không lạm dụng đến mức khó hiểu hay sai nghĩa. " +
