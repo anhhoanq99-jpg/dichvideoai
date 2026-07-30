@@ -2,20 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  Check,
-  Droplets,
-  Loader2,
-  Mic,
-  Plus,
-  Replace,
-  Save,
-  Sparkles,
-  Stamp,
-  TriangleAlert,
-  Type,
-  Upload,
-} from "lucide-react";
+import { Plus, Replace, Stamp, TriangleAlert } from "lucide-react";
 import {
   segmentIndexAtOrBefore,
   type CoverMode,
@@ -45,6 +32,7 @@ import { LogoFields } from "@/components/render/logo-fields";
 import { SegmentTable } from "@/components/editor/segment-table";
 import { DEFAULT_VOICE_SELECTION, resolveVoice } from "@/components/dub/voice-picker";
 import type { DubConfig } from "./export-modal";
+import { StudioToolbar } from "./studio-toolbar";
 
 /**
  * Các modal chỉ mở khi người dùng bấm nút, nhưng trước đây vẫn bị tải + phân
@@ -80,14 +68,6 @@ function preloadStudioModals() {
   void loadPresets();
   void loadAddSegment();
 }
-
-const SAVE_ICONS = {
-  saved: Check,
-  dirty: Loader2,
-  saving: Loader2,
-  conflict: TriangleAlert,
-  error: TriangleAlert,
-} as const;
 
 const T = {
   vi: {
@@ -397,11 +377,6 @@ export function StudioShell({
     setActiveIndex((prev) => (prev === idx ? prev : idx));
   }, [segments]);
 
-  const SaveIcon = SAVE_ICONS[saveState];
-
-  const toolbarButton =
-    "flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
-
   return (
     /**
      * ĐIỆN THOẠI: để trang cuộn tự nhiên, KHÔNG khóa chiều cao.
@@ -425,60 +400,13 @@ export function StudioShell({
           </span>
         </a>
       )}
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-auto flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-          <SaveIcon
-            className={`h-3.5 w-3.5 ${saveState === "saving" || saveState === "dirty" ? "animate-spin" : ""}`}
-          />
-          {t.saveLabels[saveState]}
-          <button
-            type="button"
-            onClick={saveNow}
-            className="ml-1 rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            {t.saveNow}
-          </button>
-        </span>
-
-        <button
-          type="button"
-          onClick={(e) => openModal("retranslate", e)}
-          className="flex items-center gap-1.5 rounded-md bg-accent-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-accent-700"
-        >
-          <Sparkles className="h-3.5 w-3.5" /> {t.aiTranslate}
-        </button>
-        <button type="button" onClick={(e) => openModal("cover", e)} className={toolbarButton}>
-          <Droplets className="h-3.5 w-3.5" /> {t.blurBtn}
-        </button>
-        <button type="button" onClick={(e) => openModal("style", e)} className={toolbarButton}>
-          <Type className="h-3.5 w-3.5" /> {t.subtitleBtn}
-        </button>
-        <button type="button" onClick={(e) => openModal("logo", e)} className={toolbarButton}>
-          <Stamp className="h-3.5 w-3.5" /> {t.logoBtn}
-        </button>
-        <button
-          type="button"
-          onClick={(e) => openModal("dub", e)}
-          className={cn(
-            toolbarButton,
-            dub.enabled &&
-              "border-success-400 text-success-700 dark:border-success-700 dark:text-success-300",
-          )}
-        >
-          <Mic className="h-3.5 w-3.5" /> {t.dubBtn}{dub.enabled ? t.dubBtnOn : ""}
-        </button>
-        <button type="button" onClick={(e) => openModal("presets", e)} className={toolbarButton}>
-          <Save className="h-3.5 w-3.5" /> {t.presetsBtn}
-        </button>
-        <button
-          type="button"
-          onClick={(e) => openModal("export", e)}
-          className="flex items-center gap-1.5 rounded-md bg-success-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-success-800"
-        >
-          <Upload className="h-3.5 w-3.5" /> {t.exportBtn}
-        </button>
-      </div>
+      <StudioToolbar
+        t={t}
+        saveState={saveState}
+        onSaveNow={saveNow}
+        onOpenModal={openModal}
+        dubEnabled={dub.enabled}
+      />
 
       {/* màn nhỏ xếp dọc (preview trên, bảng dưới); từ lg trở lên chia 2 cột */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:overflow-visible">

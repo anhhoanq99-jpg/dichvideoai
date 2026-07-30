@@ -62,10 +62,30 @@ const T = {
   },
 } as const;
 
-/** Nạp các font render từ Google Fonts để preview đúng mặt chữ (chỉ khi mở preview). */
-const FONT_CSS_ID = "render-preview-fonts";
-const FONT_CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&family=Oswald:wght@400;700&family=Baloo+2:wght@400;700&family=Bungee&family=Paytone+One&family=Lobster&family=Patrick+Hand&display=swap";
+/**
+ * Nạp font render từ Google Fonts để preview đúng mặt chữ.
+ *
+ * Chỉ tải ĐÚNG BỘ ĐANG CHỌN, không tải cả 10 bộ như trước: preview chỉ vẽ bằng
+ * một `settings.font` tại một thời điểm, mà mỗi bộ có subset tiếng Việt khá nặng
+ * — tải cả 10 là ném đi vài trăm KB mỗi lần mở studio. Đổi font thì nạp thêm bộ
+ * mới và GIỮ bộ cũ trong <head>, nên bấm qua lại giữa vài font không tải lại.
+ */
+const FONT_CSS_ID = "render-preview-font";
+
+/** Bộ chữ có sẵn nét đậm — bộ chỉ một nét mà xin wght@700 thì Google trả 400. */
+const FONTS_WITH_BOLD = new Set([
+  "Be Vietnam Pro",
+  "Montserrat",
+  "Noto Sans",
+  "Oswald",
+  "Baloo 2",
+]);
+
+function fontCssUrl(family: string): string {
+  const name = family.replace(/ /g, "+");
+  const weights = FONTS_WITH_BOLD.has(family) ? ":wght@400;700" : "";
+  return `https://fonts.googleapis.com/css2?family=${name}${weights}&display=swap`;
+}
 
 interface RenderPreviewProps {
   previewUrl: string;
@@ -166,13 +186,15 @@ export function RenderPreview({
   });
 
   useEffect(() => {
-    if (document.getElementById(FONT_CSS_ID)) return;
+    // id gắn theo tên bộ chữ → mỗi bộ chỉ chèn <link> một lần, đổi qua lại không tải lại
+    const id = `${FONT_CSS_ID}-${settings.font.replace(/\s/g, "-")}`;
+    if (document.getElementById(id)) return;
     const link = document.createElement("link");
-    link.id = FONT_CSS_ID;
+    link.id = id;
     link.rel = "stylesheet";
-    link.href = FONT_CSS_URL;
+    link.href = fontCssUrl(settings.font);
     document.head.appendChild(link);
-  }, []);
+  }, [settings.font]);
 
   const updatePreviewScale = useCallback(() => {
     const boxWidth = boxRef.current?.getBoundingClientRect().width;
