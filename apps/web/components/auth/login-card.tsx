@@ -36,6 +36,8 @@ const T = {
     errLogin: "Email hoặc mật khẩu không đúng",
     errSignup: "Không tạo được tài khoản — email có thể đã dùng",
     banned: "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ hỗ trợ nếu cần trợ giúp.",
+    checkInbox: (email: string) =>
+      `Đã gửi link xác minh tới ${email}. Mở hộp thư (nhớ xem cả mục Spam) và bấm link để kích hoạt tài khoản — xu dùng thử được cộng ngay sau đó. Link hết hạn sau 1 giờ.`,
   },
   en: {
     title: "Welcome Back",
@@ -60,8 +62,21 @@ const T = {
     errLogin: "Wrong email or password",
     errSignup: "Could not create account — email may be taken",
     banned: "Your account has been locked. Please contact support if you need help.",
+    checkInbox: (email: string) =>
+      `Verification link sent to ${email}. Open your inbox (check Spam too) and click the link to activate your account — trial credits land right after. The link expires in 1 hour.`,
   },
 } as const;
+
+/**
+ * Lỗi "email chưa xác minh" từ better-auth. Bắt theo `code` là chính; kèm rà
+ * chuỗi vì thông báo có thể khác nhau giữa các bản, mà đoán nhầm thành "sai mật
+ * khẩu" thì khách gõ đúng vẫn tưởng mình sai.
+ */
+function isUnverifiedEmailError(err: { code?: string; message?: string }): boolean {
+  const code = (err.code ?? "").toUpperCase();
+  if (code.includes("EMAIL_NOT_VERIFIED") || code.includes("VERIFY")) return true;
+  return /verif/i.test(err.message ?? "");
+}
 
 export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boolean }) {
   const t = T[lang];
@@ -73,11 +88,14 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** lời nhắc tích cực (kiểm hộp thư) — khác `error` là báo hỏng */
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const res =
         mode === "login"
@@ -85,9 +103,27 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
             await signIn.email({ email, password, rememberMe: true })
           : await signUp.email({ email, password, name: name.trim() || email.split("@")[0] });
       if (res.error) {
+        /**
+         * Chưa xác minh email thì better-auth từ chối tạo phiên VÀ tự gửi lại
+         * link (sendOnSignIn). Hiện lời nhắc kiểm hộp thư thay vì câu "sai mật
+         * khẩu" — khách gõ đúng mật khẩu mà bị báo sai thì sẽ thử lại mãi.
+         */
+        if (isUnverifiedEmailError(res.error)) {
+          setNotice(t.checkInbox(email));
+          return;
+        }
         setError(
           res.error.message ?? (mode === "login" ? t.errLogin : t.errSignup),
         );
+        return;
+      }
+      /**
+       * Đăng ký xong CHƯA có phiên (phải xác minh email trước) — đẩy sang
+       * /videos/upload là bị đá ngược về đây mà không rõ lý do. Hiện lời nhắc,
+       * để khách mở hộp thư.
+       */
+      if (mode === "register") {
+        setNotice(t.checkInbox(email));
         return;
       }
       router.push("/videos/upload");
@@ -224,6 +260,12 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
                   {t.forgot}
                 </Link>
               </div>
+            )}
+
+            {notice && (
+              <p className="rounded-lg bg-primary-50 px-3 py-2.5 text-xs leading-relaxed text-primary-800 dark:bg-primary-950/40 dark:text-primary-200">
+                {notice}
+              </p>
             )}
 
             {error && (
