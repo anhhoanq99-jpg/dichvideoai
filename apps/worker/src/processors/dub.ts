@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
+import { cpus } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -59,6 +60,21 @@ async function mapPool<T, R>(
   const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
   await Promise.all(workers);
   return results;
+}
+
+/**
+ * Số tiến trình ffmpeg chạy song song ở bước ép clip khớp khe thời gian.
+ *
+ * Trước đây gõ cứng 6 với chú thích "máy 12 nhân" — đúng hồi worker chạy trên
+ * máy dev. Worker giờ ở VPS 3 NHÂN, mà `concurrency: 2` cho phép 2 job cùng lúc
+ * → tối đa 12 tiến trình ffmpeg tranh 3 nhân. Quá tải kiểu này không làm nhanh
+ * hơn, chỉ tốn thêm chi phí chuyển ngữ cảnh và spawn tiến trình.
+ *
+ * Chia đôi số nhân cho `concurrency: 2` để hai job cùng chạy vẫn không vượt số
+ * nhân thật; tối thiểu 2 để máy 1-2 nhân không tụt về tuần tự.
+ */
+function fitConcurrency(): number {
+  return Math.max(2, Math.floor(cpus().length / 2));
 }
 
 /** Số câu tổng hợp song song theo nhà cung cấp giọng (tránh vượt rate-limit). */
@@ -219,6 +235,16 @@ export async function dubProcessor(job: Job<JobPayload>) {
       return voiceOverride.get(v) ?? v;
     };
 
+    /**
+     * Đo thời gian TỪNG CHẶNG. Lồng tiếng là bước chậm nhất của cả pipeline
+     * (đo thật: trung bình 1,32× thời lượng video, cá biệt 5,8×) nhưng trước đây
+     * chỉ log tổng thời gian nên không biết mất ở đâu — TTS gọi mạng, ép clip
+     * bằng ffmpeg, hay trộn/mux. Có số liệu mới tối ưu đúng chỗ được.
+     */
+    const t0 = Date.now();
+    let tTts = 0;
+    let tFit = 0;
+
     // 1. TTS từng câu — chạy song song có giới hạn (5→55%)
     let ttsDone = 0;
     const synthResults = await mapPool(
@@ -241,15 +267,16 @@ export async function dubProcessor(job: Job<JobPayload>) {
         void job.updateProgress(5 + Math.round((ttsDone / segments.length) * 50));
       },
     );
+    tTts = Date.now() - t0;
     const clips = synthResults.map((r) => r.file);
     const usage = synthResults.flatMap((r) => r.usage);
     const costUsdMicros = await recordUsage(job.data.jobId, usage);
 
-    // 2. Ép mỗi clip khớp khe thời gian của câu — song song (máy 12 nhân) (55→70%)
+    // 2. Ép mỗi clip khớp khe thời gian của câu — song song theo số nhân THẬT (55→70%)
     let fitDone = 0;
     const fitted = await mapPool(
       segments,
-      6,
+      fitConcurrency(),
       async (seg, k) => {
         const rawMs = await audioDurationMs(clips[k]);
         const slot = slotMs(segments, k, videoDurMs);
@@ -277,6 +304,7 @@ export async function dubProcessor(job: Job<JobPayload>) {
         void job.updateProgress(55 + Math.round((fitDone / segments.length) * 15));
       },
     );
+    tFit = Date.now() - t0 - tTts;
 
     // 3. Ghép track thuyết minh: [lặng] câu [lặng] câu ... (70→75%)
     const parts: string[] = [];
@@ -366,8 +394,24 @@ export async function dubProcessor(job: Job<JobPayload>) {
       .set({ result: { r2Key: outKey, sizeBytes }, costUsdMicros })
       .where(eq(jobs.id, job.data.jobId));
 
+    const tTotal = Date.now() - t0;
     logger.info(
-      { jobId: job.data.jobId, outKey, segments: segments.length, voice, costUsdMicros },
+      {
+        jobId: job.data.jobId,
+        outKey,
+        segments: segments.length,
+        voice,
+        costUsdMicros,
+        // chặng nào ăn thời gian — nhìn số này để biết tối ưu chỗ nào cho đáng
+        giay: {
+          tong: Math.round(tTotal / 1000),
+          tts: Math.round(tTts / 1000),
+          epClip: Math.round(tFit / 1000),
+          tronVaMux: Math.round((tTotal - tTts - tFit) / 1000),
+        },
+        soNhan: cpus().length,
+        songSongEpClip: fitConcurrency(),
+      },
       "dub done",
     );
     return { r2Key: outKey, sizeBytes };
