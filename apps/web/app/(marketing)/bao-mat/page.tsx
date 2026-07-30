@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OUTPUT_RETENTION_DAYS } from "@dichvideo/shared";
 import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
@@ -34,7 +35,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: "4. Thời gian lưu trữ",
     body: [
-      "Video kết quả tự xóa sau 7 ngày. Video nguồn và phụ đề bị xóa khi bạn xóa video khỏi tài khoản.",
+      `Video kết quả tự xóa sau ${OUTPUT_RETENTION_DAYS} ngày. Video nguồn và phụ đề bị xóa khi bạn xóa video khỏi tài khoản.`,
       "Lịch sử giao dịch xu được lưu để phục vụ đối soát và theo quy định kế toán.",
     ],
   },

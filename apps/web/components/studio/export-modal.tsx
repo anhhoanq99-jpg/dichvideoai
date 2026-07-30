@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Clapperboard, Download, FileText, Sparkles, Wallet } from "lucide-react";
 import {
   FIRST_TOPUP_PROMO,
+  OUTPUT_RETENTION_DAYS,
   dubTierOf,
   estimateJobCredits,
   topupCredits,
@@ -39,7 +40,7 @@ const T = {
     dubbing: "Đang lồng tiếng lên bản đã render…",
     done: "Hoàn tất! Video đã sẵn sàng.",
     download: "Tải video về máy",
-    keep7days: "File lưu 7 ngày — cũng tải lại được ở trang video.",
+    keepDays: `File lưu ${OUTPUT_RETENTION_DAYS} ngày — cũng tải lại được ở trang video.`,
     exportFail: "Xuất video thất bại",
     dubFail: "Lồng tiếng thất bại — bản render phụ đề vẫn tải được ở trang video.",
     subsOnly: "Hoặc chỉ tải file phụ đề (miễn phí)",
@@ -73,7 +74,7 @@ const T = {
     dubbing: "Dubbing over the rendered video…",
     done: "Done! Your video is ready.",
     download: "Download video",
-    keep7days: "Files are kept for 7 days — also downloadable from the video page.",
+    keepDays: `Files are kept for ${OUTPUT_RETENTION_DAYS} days — also downloadable from the video page.`,
     exportFail: "Export failed",
     dubFail: "Dubbing failed — the subtitled render is still downloadable from the video page.",
     subsOnly: "Or just download subtitle files (free)",
@@ -433,7 +434,7 @@ export function ExportModal({
             <Download className="h-4 w-4" /> {t.download}
           </a>
           <p className="mt-2 text-xs text-neutral-400">
-            {t.keep7days}
+            {t.keepDays}
           </p>
         </div>
       )}

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Download } from "lucide-react";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { jobs, subtitleTracks } from "@dichvideo/db";
-import type { SubtitleSegment } from "@dichvideo/shared";
+import { OUTPUT_RETENTION_DAYS, type SubtitleSegment } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
@@ -19,7 +19,7 @@ const T = {
     minutes: "phút",
     probing: "Đang đọc thông tin video…",
     exported: "Video đã xuất",
-    autoDelete: "Tự xóa sau 7 ngày — hãy tải về máy.",
+    autoDelete: `Tự xóa sau ${OUTPUT_RETENTION_DAYS} ngày — hãy tải về máy.`,
     dub: "Lồng tiếng",
     subtitle: "Phụ đề",
     download: "Tải về",
@@ -30,7 +30,7 @@ const T = {
     minutes: "min",
     probing: "Reading video metadata…",
     exported: "Exported videos",
-    autoDelete: "Auto-deleted after 7 days — download them to your device.",
+    autoDelete: `Auto-deleted after ${OUTPUT_RETENTION_DAYS} days — download them to your device.`,
     dub: "Dubbed",
     subtitle: "Subtitled",
     download: "Download",

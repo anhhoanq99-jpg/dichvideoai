@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { Download, History as HistoryIcon } from "lucide-react";
 import { jobs, videos } from "@dichvideo/db";
+import { OUTPUT_RETENTION_DAYS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
@@ -31,7 +32,7 @@ const T = {
     refunded: "Đã hoàn xu",
     refundedShort: "(hoàn)",
     download: "Tải về",
-    footnote: "Hiển thị 100 job gần nhất. File kết quả tự xóa sau 7 ngày — hãy tải về máy.",
+    footnote: `Hiển thị 100 job gần nhất. File kết quả tự xóa sau ${OUTPUT_RETENTION_DAYS} ngày — hãy tải về máy.`,
   },
   en: {
     status: {
@@ -52,7 +53,7 @@ const T = {
     refunded: "Credits refunded",
     refundedShort: "(refunded)",
     download: "Download",
-    footnote: "Showing the 100 most recent jobs. Result files are deleted after 7 days — download them to your device.",
+    footnote: `Showing the 100 most recent jobs. Result files are deleted after ${OUTPUT_RETENTION_DAYS} days — download them to your device.`,
   },
 } as const;
 

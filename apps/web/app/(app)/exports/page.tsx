@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Clock, Download, FileVideo } from "lucide-react";
 import { jobs, videos } from "@dichvideo/db";
+import { OUTPUT_RETENTION_DAYS } from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getLang } from "@/lib/i18n";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 const T = {
   vi: {
     title: "Video đã xuất",
-    subtitle: "File kết quả tự xóa sau 7 ngày — hãy tải về máy sớm.",
+    subtitle: `File kết quả tự xóa sau ${OUTPUT_RETENTION_DAYS} ngày — hãy tải về máy sớm.`,
     empty: "Chưa có video nào được xuất — mở một video và bấm “Xuất File”.",
     download: "Tải về",
     openVideo: "Mở video gốc",
@@ -28,7 +29,7 @@ const T = {
   },
   en: {
     title: "Exported videos",
-    subtitle: "Result files are deleted after 7 days — download them soon.",
+    subtitle: `Result files are deleted after ${OUTPUT_RETENTION_DAYS} days — download them soon.`,
     empty: "Nothing exported yet — open a video and press “Export”.",
     download: "Download",
     openVideo: "Open source video",
@@ -86,9 +87,9 @@ export default async function ExportsPage() {
       finishedAt: jobs.finishedAt,
       videoId: jobs.videoId,
       videoName: videos.originalName,
-      // file tự xóa sau 7 ngày — tính số ngày còn lại ngay trong SQL
+      // file tự xóa sau OUTPUT_RETENTION_DAYS — tính số ngày còn lại ngay trong SQL
       daysLeft: sql<number | null>`case when ${jobs.finishedAt} is null then null
-        else (7 - floor(extract(epoch from (now() - ${jobs.finishedAt})) / 86400))::int end`,
+        else (${OUTPUT_RETENTION_DAYS} - floor(extract(epoch from (now() - ${jobs.finishedAt})) / 86400))::int end`,
     })
     .from(jobs)
     .innerJoin(videos, eq(jobs.videoId, videos.id))

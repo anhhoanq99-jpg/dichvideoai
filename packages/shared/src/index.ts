@@ -1,6 +1,7 @@
 export * from "./queue";
 export * from "./credits";
 export * from "./trial";
+export * from "./storage";
 export * from "./types";
 export * from "./env";
 export * from "./subtitle-io";

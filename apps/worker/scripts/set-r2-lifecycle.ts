@@ -2,11 +2,15 @@
  * Đặt Lifecycle Rule cho bucket R2 để Cloudflare TỰ dọn file rác server-side
  * (không cần cron chạy trên máy user — chạy kể cả khi máy tắt).
  *
- *   1. Xóa file kết quả trong `outputs/` sau 7 ngày (đúng lời hứa ở ToS / trang lịch sử).
- *   2. Hủy các multipart-upload dở dang sau 7 ngày (phần upload bị bỏ giữa chừng vẫn tính tiền).
+ *   1. Xóa file kết quả trong `outputs/` sau RETENTION_DAYS ngày (đúng lời hứa ở ToS / trang lịch sử).
+ *   2. Hủy các multipart-upload dở dang (phần upload bị bỏ giữa chừng vẫn tính tiền).
  *
  * Chạy 1 lần: cd apps/worker && npx tsx scripts/set-r2-lifecycle.ts
  * (Đọc .env ở root repo — cần R2_* đủ quyền. Chạy lại sẽ GHI ĐÈ toàn bộ rule cũ.)
+ *
+ * ĐỔI SỐ NGÀY: sửa RETENTION_DAYS bên dưới rồi chạy lại — nhưng phải sửa CẢ chuỗi
+ * hiển thị cho khách (grep "7 ngày" / "7 days"), nếu không web hứa một đằng, file
+ * bị xoá một nẻo.
  */
 import { config } from "dotenv";
 config();
@@ -17,19 +21,24 @@ import {
   PutBucketLifecycleConfigurationCommand,
   type LifecycleRule,
 } from "@aws-sdk/client-s3";
+import { OUTPUT_RETENTION_DAYS } from "@dichvideo/shared";
 import { getR2 } from "../src/lib/r2";
 
-const RETENTION_DAYS = 7;
+/**
+ * Lấy từ `@dichvideo/shared` để rule trên Cloudflare và chữ hiển thị cho khách
+ * không bao giờ lệch nhau — đổi số ở đó rồi chạy lại script này là xong.
+ */
+const RETENTION_DAYS = OUTPUT_RETENTION_DAYS;
 
 const RULES: LifecycleRule[] = [
   {
-    ID: "expire-outputs-7d",
+    ID: `expire-outputs-${RETENTION_DAYS}d`,
     Status: "Enabled",
     Filter: { Prefix: "outputs/" },
     Expiration: { Days: RETENTION_DAYS },
   },
   {
-    ID: "abort-stale-multipart-7d",
+    ID: `abort-stale-multipart-${RETENTION_DAYS}d`,
     Status: "Enabled",
     // Áp cho cả bucket: dọn phần upload dở (video nguồn upload lỗi giữa chừng)
     Filter: { Prefix: "" },

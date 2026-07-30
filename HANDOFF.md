@@ -125,7 +125,14 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
   giá premium ở khâu dịch/retranslate.
 - 🟡 Nhãn giọng "SubdubAI" lệch brand "SubVideo AI" — chờ user quyết có đổi không.
 - 🟡 Con số "1.500+" ở `hero-section.tsx` là tự đặt (thật: 7 user) — **user quyết GIỮ NGUYÊN, đừng sửa.**
-- 🟡 File R2 `outputs/` "xoá sau 7 ngày" nhưng lifecycle rule CHƯA bật (token object-scoped, làm ở dashboard).
+- 🔴 **R2 lifecycle CHƯA bật — web đang hứa xoá sau 5 ngày nhưng thực tế file nằm lại vĩnh viễn.**
+  Đã thử `apps/worker/scripts/set-r2-lifecycle.ts` → **Access Denied** (token `.env` object-scoped,
+  đúng như ghi ở mục 2). Phải làm TAY ở dashboard Cloudflare → R2 → bucket `dichvideo-prod` →
+  Settings → Object lifecycle rules → Add rule:
+  • Prefix `outputs/` → Delete objects sau **5 ngày**
+  • Abort incomplete multipart uploads sau **5 ngày** (phần upload dở vẫn tính tiền lưu trữ)
+  Số ngày lấy từ `OUTPUT_RETENTION_DAYS` trong `packages/shared/src/storage.ts` — đổi ở đó thì
+  phải sửa rule trên dashboard cho khớp, nếu không web hứa một đằng file xoá một nẻo.
 - 🟡 Nhân bản giọng riêng không chạy — key ElevenLabs free thiếu quyền `create_instant_voice_clone`.
 - 🟡 Chưa có thông tin pháp lý/công ty (NĐ 52/2013) — user chủ động bỏ qua.
 - 🟠 **Vercel Attack Challenge bật lên khi bị gọi dồn** — poll `/robots.txt` 20s/lần đã đủ khiến
