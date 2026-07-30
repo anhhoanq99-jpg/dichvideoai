@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { subtitleTracks, videos } from "@dichvideo/db";
-import { TARGET_LANG_IDS, TRANSLATION_STYLE_IDS } from "@dichvideo/shared";
+import {
+  TARGET_LANG_IDS,
+  TRANSLATION_STYLE_IDS,
+  estimateJobCredits,
+  translateTierOf,
+} from "@dichvideo/shared";
 import { db } from "@/lib/db";
 import {
   createPipelineJob,
   jsonError,
   parseJsonBody,
+  requireCredits,
   requireOwnVideo,
 } from "@/lib/api-helpers";
 import { callerId, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -32,7 +38,7 @@ export async function POST(
   const { session, video } = auth;
 
   const [original] = await db
-    .select({ id: subtitleTracks.id })
+    .select({ id: subtitleTracks.id, segments: subtitleTracks.segments })
     .from(subtitleTracks)
     .where(
       and(eq(subtitleTracks.videoId, video.id), eq(subtitleTracks.kind, "original")),
@@ -43,6 +49,21 @@ export async function POST(
 
   const body = await parseJsonBody(req, schema);
   if (body.response) return body.response;
+
+  /**
+   * Báo thiếu xu NGAY, giống route render/dub. Trước đây route này bỏ qua bước
+   * kiểm: khách hết xu vẫn tạo được job, để rồi worker trừ tiền thất bại và
+   * khách nhận về một job "thất bại" không rõ lý do thay vì câu "không đủ xu".
+   */
+  const lines = Array.isArray(original.segments) ? original.segments.length : 0;
+  const credits = await requireCredits(
+    session.user.id,
+    estimateJobCredits("translate", {
+      lines,
+      translateTier: translateTierOf(body.data.style),
+    }),
+  );
+  if (credits.response) return credits.response;
 
   await db
     .update(videos)

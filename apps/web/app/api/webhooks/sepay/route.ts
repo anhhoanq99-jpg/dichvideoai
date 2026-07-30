@@ -54,13 +54,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, skipped: "no user code" });
   }
   const userIdPrefix = codeMatch[1].toLowerCase();
-  const [userRow] = await db
+  const matches = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(sql`lower(left(${schema.user.id}, 8)) = ${userIdPrefix}`);
-  if (!userRow) {
+    .where(sql`lower(left(${schema.user.id}, 8)) = ${userIdPrefix}`)
+    .limit(2);
+  if (matches.length === 0) {
     return NextResponse.json({ success: true, skipped: "user not found" });
   }
+  /**
+   * Mã nạp chỉ lấy 8 ký tự đầu của userId nên VỀ LÝ THUYẾT hai tài khoản có thể
+   * trùng tiền tố. Trước đây code lấy luôn kết quả đầu tiên — tiền của khách này
+   * cộng vào tài khoản khách khác, âm thầm, không ai biết. Xác suất rất thấp
+   * nhưng hậu quả là mất tiền của khách nên thà DỪNG để xử tay còn hơn đoán.
+   */
+  if (matches.length > 1) {
+    return NextResponse.json(
+      { success: false, error: "Mã nạp trùng nhiều tài khoản — cần xử lý thủ công" },
+      { status: 409 },
+    );
+  }
+  const userRow = matches[0];
 
   // Lần nạp ĐẦU (chưa có lượt topup nào) đủ điều kiện → cộng thêm bonus mồi.
   // Trên webhook retry, lượt topup lần 1 đã ghi vào ledger nên lần 2 thấy "đã có"

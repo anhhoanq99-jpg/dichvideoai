@@ -136,7 +136,9 @@ export function AdminUsersClient({
       const res = await fetch(`/api/admin/users/${editing.id}/credits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ delta: sign * n }),
+        // mã cho MỖI lần bấm — server dùng nó chặn cộng trùng khi bấm đúp
+        // hoặc trình duyệt tự gửi lại lúc mạng chớp
+        body: JSON.stringify({ delta: sign * n, requestId: crypto.randomUUID() }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
