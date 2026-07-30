@@ -71,7 +71,14 @@ Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
   Code mới ưu tiên dùng các primitive này thay vì viết lại chuỗi class (ghép class riêng qua `cn()` — có tailwind-merge).
 
 ## Nguồn AI & fallback
-- **Dịch**: Gemini → tự fallback **Groq Llama 3.3 70B** khi Gemini lỗi bất kỳ (`apps/worker/src/lib/translate.ts`).
+- **Dịch**: **Gemini là CHÍNH** (đổi lại 30/07/2026) → tự hạ **Groq Llama 3.3 70B** khi hết sạch key.
+  Groq miễn phí nhưng dịch Trung/Nhật→Việt kém rõ: bỏ tên nhân vật, dùng đại từ hiện đại cho phim
+  cổ trang. Chi phí Gemini đã ổn từ khi tắt token thinking (~44đ/video 30 dòng, thu 150 xu).
+  Quay lại Groq: `TRANSLATE_PROVIDER=groq`.
+- **Phong cách `google` = máy dịch** (Google Cloud Translation), rẽ nhánh sớm trong `translateSegments`,
+  bỏ qua tóm tắt ngữ cảnh + trau chuốt. ⚠️ Máy dịch **KHÔNG rẻ hơn AI**: $20/1M ký tự ≈ 13đ/dòng,
+  đắt hơn Gemini ~9 lần. Nó chỉ rẻ nhờ **500.000 ký tự/tháng miễn phí** — worker chặn cứng trong
+  hạn mức đó (`hasFreeTranslateQuota`), vượt là tự hạ xuống dịch AI. Gỡ cái chặn đó = lỗ ngay.
 - **STT**: Groq Whisper (free). **OCR**: chỉ Gemini; chết + có audio → tự fallback STT (`extract.ts`).
 - Lỗi Gemini phân loại ở `gemini-limits.ts` (daily-quota / billing-depleted → UnrecoverableError, fail nhanh, không retry).
 

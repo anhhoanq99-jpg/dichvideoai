@@ -13,8 +13,25 @@ export const CREDIT_PRICING = {
   sttPerMin: 100,
   /** đọc chữ trên hình (Gemini video) — theo phút video */
   ocrPerMin: 300,
-  /** dịch AI — theo dòng phụ đề */
+  /** dịch AI (có ngữ cảnh, phong cách, văn nói) — theo dòng phụ đề */
   translatePerLine: 5,
+  /**
+   * Dịch MÁY (Google Cloud Translation) — theo dòng phụ đề.
+   *
+   * Google cho 500.000 ký tự/tháng MIỄN PHÍ, và worker CHẶN CỨNG trong hạn mức
+   * đó (`hasFreeTranslateQuota`) — vượt là tự hạ xuống dịch AI, không bao giờ
+   * phát sinh hoá đơn. Nên chi phí thực của bậc này chỉ có hai mức:
+   *   - trong hạn mức : 0đ
+   *   - vượt hạn mức  : bằng chi phí dịch AI (~1,5đ/dòng, đo từ dữ liệu thật)
+   *
+   * ⚠️ ĐỪNG tưởng máy dịch rẻ hơn AI. Google tính $20/1 TRIỆU KÝ TỰ ≈ 13đ/dòng,
+   * tức ĐẮT HƠN Gemini khoảng 9 lần — máy dịch tính theo ký tự còn LLM tính theo
+   * token, mà phụ đề thì ngắn. Hạn mức free là lý do duy nhất bậc này rẻ.
+   *
+   * Bán 3 xu/dòng: rẻ hơn dịch AI 40% cho khách, mà vẫn phủ được chi phí AI khi
+   * rơi về dự phòng (biên ~50%).
+   */
+  translateMachinePerLine: 3,
   translateMin: 20,
   /** render phụ đề + che chữ — theo phút video */
   renderPerMin: 50,
@@ -64,6 +81,23 @@ const DUB_RATE_PER_MIN: Record<DubTier, number> = {
  */
 export function dubRatePerMin(tier: DubTier): number {
   return DUB_RATE_PER_MIN[tier];
+}
+
+/**
+ * Bậc giá dịch: `ai` chạy model ngôn ngữ (tóm tắt ngữ cảnh + dịch + trau chuốt),
+ * `machine` chỉ gọi máy dịch. Tra bậc từ phong cách bằng `translateTierOf()`
+ * trong translate-styles.ts.
+ */
+export type TranslateTier = "ai" | "machine";
+
+const TRANSLATE_RATE_PER_LINE: Record<TranslateTier, number> = {
+  ai: CREDIT_PRICING.translatePerLine,
+  machine: CREDIT_PRICING.translateMachinePerLine,
+};
+
+/** Đơn giá dịch (xu/dòng) của một bậc — để giao diện hiện giá mà không gõ số cứng. */
+export function translateRatePerLine(tier: TranslateTier): number {
+  return TRANSLATE_RATE_PER_LINE[tier];
 }
 
 /**
@@ -140,7 +174,12 @@ export function topupPacks(): TopupPack[] {
 /** Ước tính credit cho một job — dùng chung cho worker (trừ tiền) và web (hiển thị). */
 export function estimateJobCredits(
   type: "import" | "probe" | "stt" | "ocr" | "translate" | "render" | "dub",
-  input: { durationSec?: number | null; lines?: number; dubTier?: DubTier },
+  input: {
+    durationSec?: number | null;
+    lines?: number;
+    dubTier?: DubTier;
+    translateTier?: TranslateTier;
+  },
 ): number {
   const minutes = Math.max(1, Math.ceil((input.durationSec ?? 0) / 60));
   switch (type) {
@@ -154,7 +193,7 @@ export function estimateJobCredits(
     case "translate":
       return Math.max(
         CREDIT_PRICING.translateMin,
-        (input.lines ?? 0) * CREDIT_PRICING.translatePerLine,
+        (input.lines ?? 0) * TRANSLATE_RATE_PER_LINE[input.translateTier ?? "ai"],
       );
     case "render":
       return Math.max(CREDIT_PRICING.renderMin, minutes * CREDIT_PRICING.renderPerMin);

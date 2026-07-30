@@ -10,6 +10,8 @@ import {
 import {
   dubTierOf,
   estimateJobCredits,
+  translateTierOf,
+  type TranslationStyleId,
   type JobPayload,
   type JobType,
 } from "@dichvideo/shared";
@@ -37,11 +39,22 @@ export async function chargeJobStart(db: Db, payload: JobPayload, type: JobType)
   if (await ledgerEntry(db, payload.jobId, "job_charge")) return; // retry attempt — đã trừ rồi
 
   const [video] = await db
-    .select({ durationSec: videos.durationSec })
+    .select({
+      durationSec: videos.durationSec,
+      translationStyle: videos.translationStyle,
+    })
     .from(videos)
     .where(eq(videos.id, payload.videoId));
 
   const lines = type === "translate" ? await countSegments(db, payload.videoId) : 0;
+
+  /**
+   * Phong cách lấy CÙNG THỨ TỰ ƯU TIÊN với processor dịch (params trước, rồi tới
+   * cột trên video) — lệch thứ tự là tính một giá mà chạy một kiểu khác.
+   */
+  const style = (typeof payload.params.style === "string"
+    ? payload.params.style
+    : (video?.translationStyle ?? "natural")) as TranslationStyleId;
 
   const credits = estimateJobCredits(type, {
     durationSec: video?.durationSec,
@@ -49,6 +62,7 @@ export async function chargeJobStart(db: Db, payload: JobPayload, type: JobType)
     ...(type === "dub"
       ? { dubTier: dubTierOf(String(payload.params.voice ?? "")) }
       : {}),
+    ...(type === "translate" ? { translateTier: translateTierOf(style) } : {}),
   });
   if (credits <= 0) return;
 

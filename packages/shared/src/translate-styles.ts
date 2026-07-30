@@ -1,3 +1,5 @@
+import type { TranslateTier } from "./credits";
+
 /** Phong cách dịch — dùng chung cho web (chọn) và worker (prompt). */
 export const TRANSLATION_STYLES = [
   {
@@ -53,6 +55,11 @@ export const TRANSLATION_STYLES = [
   { id: "formal", name: "Trang trọng — tin tức, tài liệu", hint: "Lịch sự, chuẩn mực" },
   { id: "literal", name: "Bám sát — dịch sát từng câu", hint: "Ưu tiên chính xác" },
   {
+    id: "google",
+    name: "Dịch nhanh — máy dịch (rẻ nhất)",
+    hint: "Sát nghĩa, giữ nguyên tên riêng, nhưng KHÔNG chỉnh thành văn nói",
+  },
+  {
     id: "custom",
     name: "Tự nhập prompt",
     hint: "Tự mô tả phong cách dịch bạn muốn",
@@ -60,6 +67,15 @@ export const TRANSLATION_STYLES = [
 ] as const;
 
 export type TranslationStyleId = (typeof TRANSLATION_STYLES)[number]["id"];
+
+/**
+ * Bậc giá dịch của một phong cách. `google` chạy máy dịch thuần (không gọi model
+ * ngôn ngữ, không có bước tóm tắt ngữ cảnh và trau chuốt) nên rẻ hơn hẳn — khai
+ * báo đúng một chỗ, cùng lối với `dubTierOf` bên dub-presets.
+ */
+export function translateTierOf(style: TranslationStyleId): TranslateTier {
+  return style === "google" ? "machine" : "ai";
+}
 
 export const TRANSLATION_STYLE_IDS = TRANSLATION_STYLES.map((s) => s.id) as [
   TranslationStyleId,

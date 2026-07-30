@@ -63,6 +63,9 @@ export const STYLE_INSTRUCTIONS: Record<TranslationStyleId, string> = {
     "diễn đạt gần gũi, sinh động, dễ hiểu với người xem phổ thông.",
   "hanh-dong":
     "Dịch theo phong cách HÀNH ĐỘNG / KỊCH TÍNH: câu ngắn, nhanh, mạnh, dồn dập. Lời thoại dứt khoát, khẩu lệnh gọn sắc, giữ nhịp căng thẳng của cảnh phim.",
+  // KHÔNG dùng tới: style "google" rẽ nhánh sang máy dịch trước khi dựng prompt
+  // (xem translateSegments). Giữ khoá ở đây cho khớp kiểu Record.
+  google: "",
   formal: "Dịch trang trọng, lịch sự, phù hợp nội dung tài liệu/tin tức.",
   literal: "Dịch sát nghĩa nhất có thể, ưu tiên độ chính xác hơn độ mượt.",
   custom: "", // thay bằng prompt người dùng nhập lúc chạy

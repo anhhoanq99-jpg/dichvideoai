@@ -10,8 +10,10 @@ import {
   firstTopupPack,
   topupBonusPercent,
   topupCredits,
+  translateRatePerLine,
 } from "./credits";
 import { dubTierOf } from "./dub-presets";
+import { translateTierOf } from "./translate-styles";
 
 /**
  * Luồng TIỀN — trước đây không có một test nào, dù đây là chỗ đã sai 3 lần:
@@ -135,6 +137,64 @@ test("sàn renderMin/dubMin hiện không bao giờ chạm — đơn giá 1 phú
 
 test("dịch tính theo số dòng", () => {
   assert.equal(estimateJobCredits("translate", { lines: 100 }), 100 * CREDIT_PRICING.translatePerLine);
+});
+
+// ---- Bậc giá dịch: AI vs máy dịch ----
+
+test("translateTierOf: chỉ phong cách google là máy dịch, còn lại là AI", () => {
+  assert.equal(translateTierOf("google"), "machine");
+  for (const s of ["natural", "co-trang", "review-phim", "literal", "custom"] as const) {
+    assert.equal(translateTierOf(s), "ai", `${s} phải tính giá AI`);
+  }
+});
+
+test("máy dịch RẺ HƠN dịch AI — nếu không thì bậc rẻ vô nghĩa", () => {
+  assert.ok(CREDIT_PRICING.translateMachinePerLine < CREDIT_PRICING.translatePerLine);
+  assert.ok(translateRatePerLine("machine") < translateRatePerLine("ai"));
+});
+
+test("dịch 100 dòng tính đúng theo từng bậc", () => {
+  assert.equal(
+    estimateJobCredits("translate", { lines: 100, translateTier: "machine" }),
+    100 * CREDIT_PRICING.translateMachinePerLine,
+  );
+  assert.equal(
+    estimateJobCredits("translate", { lines: 100, translateTier: "ai" }),
+    100 * CREDIT_PRICING.translatePerLine,
+  );
+});
+
+test("thiếu translateTier thì mặc định AI — KHÔNG được tính nhầm giá rẻ", () => {
+  assert.equal(
+    estimateJobCredits("translate", { lines: 100 }),
+    estimateJobCredits("translate", { lines: 100, translateTier: "ai" }),
+  );
+});
+
+/**
+ * Bậc máy dịch CHỈ chạy trong hạn mức 500.000 ký tự/tháng miễn phí của Google
+ * (worker chặn cứng bằng `hasFreeTranslateQuota`), vượt là tự hạ xuống dịch AI.
+ * Nên giá phải phủ được chi phí DỊCH AI — chứ không phải chi phí Google.
+ *
+ * Nếu ai đó gỡ cái chặn kia đi thì công thức này sai: máy dịch trả phí tốn
+ * ~13đ/dòng, đắt hơn Gemini ~9 lần. Ghi lại đây để đừng dẫm phải.
+ */
+test("giá máy dịch phủ được chi phí AI — vì hết hạn mức free sẽ rơi về AI", () => {
+  // đo từ dữ liệu thật: ~44đ cho video 30 dòng
+  const AI_COST_PER_LINE = 44 / 30;
+  assert.ok(
+    CREDIT_PRICING.translateMachinePerLine > AI_COST_PER_LINE,
+    `bán ${CREDIT_PRICING.translateMachinePerLine}đ/dòng nhưng dự phòng AI tốn ~${AI_COST_PER_LINE.toFixed(2)}đ/dòng`,
+  );
+});
+
+test("máy dịch trả phí ĐẮT HƠN AI — ghim lại để không ai tưởng nhầm là bậc rẻ", () => {
+  const googlePerLine = ((25 * 20) / 1_000_000) * VND_PER_USD; // ~13đ/dòng
+  const aiPerLine = 44 / 30; // ~1,5đ/dòng
+  assert.ok(
+    googlePerLine > aiPerLine * 5,
+    "nếu Google rẻ đi đáng kể thì xem lại thiết kế chặn hạn mức",
+  );
 });
 
 test("OCR đắt hơn STT, và nhãn quảng cáo khớp đúng tỉ lệ thật", () => {

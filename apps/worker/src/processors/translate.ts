@@ -48,6 +48,8 @@ export async function translateProcessor(job: Job<JobPayload>) {
       targetLang,
       customPrompt,
       glossary: video.glossary,
+      // chỉ bậc "Dịch nhanh" dùng tới; bỏ trống thì Google tự nhận diện
+      sourceLang: video.sourceLang,
     },
     (pct) => void job.updateProgress(Math.min(95, pct)),
   );

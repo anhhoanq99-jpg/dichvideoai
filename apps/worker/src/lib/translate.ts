@@ -13,6 +13,7 @@ import {
   withGeminiRetry,
 } from "./gemini-limits";
 import { geminiKeys } from "./gemini-keys";
+import { googleTranslateSegments, hasFreeTranslateQuota } from "./google-translate";
 import {
   POLISH_STYLES,
   STYLE_BRIEF_HINTS,
@@ -346,9 +347,36 @@ export async function translateSegments(
     customPrompt?: string | null;
     glossary?: string | null;
     model?: string;
+    /** mã ngôn ngữ nguồn — chỉ bậc "Dịch nhanh" dùng, bỏ trống thì Google tự nhận diện */
+    sourceLang?: string | null;
   },
   onProgress: (pct: number) => void,
 ): Promise<TranslateResult> {
+  /**
+   * Bậc "Dịch nhanh": máy dịch thuần, KHÔNG gọi model ngôn ngữ. Rẽ nhánh ngay từ
+   * đây để không tốn bước tóm tắt ngữ cảnh và trau chuốt — đó chính là phần khiến
+   * dịch AI đắt, mà bậc này bán rẻ hơn nên không được phép chạy.
+   */
+  if (input.style === "google") {
+    const chars = input.segments.reduce((sum, s) => sum + s.text.length, 0);
+    if (await hasFreeTranslateQuota(chars)) {
+      const { segments, usage } = await googleTranslateSegments({
+        segments: input.segments,
+        targetLang: input.targetLang ?? "vi",
+        sourceLang: input.sourceLang,
+        onProgress,
+      });
+      return { segments, usage };
+    }
+    // Hết hạn mức miễn phí → dịch AI (rẻ hơn máy dịch trả phí ~9 lần). Chạy tiếp
+    // xuống dưới với phong cách "natural" thay vì báo lỗi cho khách.
+    logger.warn(
+      { chars },
+      "dịch nhanh hết hạn mức free — chuyển sang dịch AI phong cách tự nhiên",
+    );
+    input = { ...input, style: "natural" };
+  }
+
   const keys = geminiKeys();
   const groqKey = process.env.GROQ_API_KEY;
   if (keys.length === 0 && !groqKey) {
@@ -360,22 +388,27 @@ export async function translateSegments(
     keys,
     keyIdx: 0,
     /**
-     * MẶC ĐỊNH Groq (miễn phí). Trước đây ưu tiên Gemini vì chất lượng, nhưng token
-     * "thinking" của model suy luận đốt tiền quá mức → chuyển Groq làm chính, Gemini
-     * thành dự phòng (dùng khi Groq hết hạn ngày). Không có key Groq thì chạy Gemini.
+     * MẶC ĐỊNH GEMINI (đổi 30/07/2026, trước là Groq).
      *
-     * ĐỔI SANG GEMINI: đặt `TRANSLATE_PROVIDER=gemini` trong .env rồi restart worker.
-     * Gemini dịch tiếng Trung/Nhật sang Việt tốt hơn Llama rõ rệt (giữ tên riêng,
-     * bám xưng hô theo thời đại). Token "thinking" đã tắt (`thinkingBudget: 0`) nên
-     * chi phí không còn như trước — xem lại bằng `scripts/check-cost-projection.ts`
-     * sau vài job để biết biên lãi thực tế trước khi giữ luôn.
+     * Groq Llama 3.3 70B miễn phí nhưng dịch Trung/Nhật sang Việt kém rõ rệt:
+     * bỏ mất tên nhân vật, dùng đại từ hiện đại cho phim cổ trang — khách so sánh
+     * và thấy thua cả Google Dịch miễn phí. Chất lượng dịch là giá trị cốt lõi của
+     * sản phẩm nên không đánh đổi được.
+     *
+     * Nỗi lo chi phí trước đây đến từ token "thinking" không được đếm; đã tắt hẳn
+     * (`thinkingConfig: { thinkingBudget: 0 }`). Đo từ dữ liệu thật: ~44đ cho video
+     * ngắn 30 dòng, trong khi thu 150 xu → biên ~71%.
+     *
+     * Groq vẫn là lưới an toàn: hết sạch key Gemini thì tự hạ xuống (xem
+     * `ctx.provider = "groq"` phía dưới). Muốn quay lại Groq làm chính thì đặt
+     * `TRANSLATE_PROVIDER=groq`.
      */
     provider:
-      process.env.TRANSLATE_PROVIDER === "gemini" && keys.length > 0
-        ? "gemini"
-        : groqKey
-          ? "groq"
-          : "gemini",
+      process.env.TRANSLATE_PROVIDER === "groq" && groqKey
+        ? "groq"
+        : keys.length > 0
+          ? "gemini"
+          : "groq",
     geminiModel:
       // gemini-3-flash-preview: ĐÃ ĐO bằng key thật — 3/3 lượt thành công.
       // KHÔNG dùng gemini-3.5-flash (luôn 503 "high demand" ở bậc miễn phí) và

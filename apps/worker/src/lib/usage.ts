@@ -7,6 +7,10 @@ export interface UsageRecord {
     | "azure-tts"
     | "eleven"
     | "gcloud"
+    // TÁCH RIÊNG khỏi "gcloud" (đang dùng cho TTS): hai thứ cùng tính theo ký tự
+    // nhưng khác đơn giá và khác hạn mức miễn phí. Gộp chung thì không đếm nổi
+    // đã tiêu bao nhiêu trong 500.000 ký tự dịch free mỗi tháng.
+    | "gcloud-translate"
     | "r2";
   metric: "tokens_in" | "tokens_out" | "audio_sec" | "chars" | "bytes";
   quantity: number;
@@ -38,6 +42,12 @@ export const PRICING = {
    * giờ thấy nguồn này tốn tiền, dù nó là giọng mặc định của mọi khách.
    */
   gcloudTtsPerChar: 30e6 / 1_000_000,
+  /**
+   * Google Cloud Translation (NMT): $20 / 1 TRIỆU ký tự, kèm 500.000 ký tự/tháng
+   * miễn phí. Ghi theo giá niêm yết như gcloudTtsPerChar — đây là chi phí biên
+   * của ký tự tiếp theo, thứ cần nhìn khi định giá.
+   */
+  gcloudTranslatePerChar: 20e6 / 1_000_000,
 } as const;
 
 export async function recordUsage(jobId: string, records: UsageRecord[]) {
