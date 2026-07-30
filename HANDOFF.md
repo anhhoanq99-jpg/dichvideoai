@@ -125,6 +125,13 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
   giá premium ở khâu dịch/retranslate.
 - 🟡 Nhãn giọng "SubdubAI" lệch brand "SubVideo AI" — chờ user quyết có đổi không.
 - 🟡 Con số "1.500+" ở `hero-section.tsx` là tự đặt (thật: 7 user) — **user quyết GIỮ NGUYÊN, đừng sửa.**
+- ⚠️ **MẤT DỮ LIỆU 30/07: lifecycle rule đầu tiên đặt SAI đã xoá file nguồn.** Rule tạo ban đầu
+  không có prefix nhưng bật `Delete objects after 5 days` → áp cho CẢ BUCKET, không riêng `outputs/`.
+  Cloudflare quét ngay trong ngày, xoá sạch `uploads/` cũ hơn 5 ngày: **69 video mất file nguồn**
+  (64 của tài khoản test `anhhoanq.99`, 5 của tài khoản khác) — không xuất lại được, R2 không có
+  versioning nên không khôi phục được. **Phụ đề vẫn còn** (nằm ở DB, không phải R2) nên khách vẫn
+  tải được SRT/VTT. Rule đã sửa lại thành 2 rule tách bạch. Bài học: hành động `Delete objects`
+  BẮT BUỘC phải có prefix `outputs/`; rule không prefix chỉ được giữ `Abort incomplete multipart`.
 - 🔴 **R2 lifecycle CHƯA bật — web đang hứa xoá sau 5 ngày nhưng thực tế file nằm lại vĩnh viễn.**
   Đã thử `apps/worker/scripts/set-r2-lifecycle.ts` → **Access Denied** (token `.env` object-scoped,
   đúng như ghi ở mục 2). Phải làm TAY ở dashboard Cloudflare → R2 → bucket `dichvideo-prod` →
