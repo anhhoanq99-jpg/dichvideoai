@@ -25,7 +25,7 @@ pnpm dev:web       # CHỈ web. Dùng cái này khi dev local — worker đã ch
 pnpm typecheck     # cả 4 package
 pnpm --filter web lint     # 0 lỗi; còn 1 warning cố hữu (TanStack Virtual ở segment-table) — vô hại
 pnpm --filter web build
-# test: cd apps/worker && npx tsx --test src/lib/*.test.ts ../../packages/shared/src/*.test.ts
+# test: cd apps/worker && npx tsx --test src/lib/*.test.ts ../../packages/shared/src/*.test.ts ../web/lib/*.test.ts
 ```
 Sau khi sửa code worker: `pm2 restart dichvideo-worker`.
 
