@@ -37,6 +37,11 @@ PRODUCTION, thu tiền thật.** Giai đoạn: **thương mại hóa** — vừa
 
 ## 2. Hạ tầng (ĐANG CHẠY THẬT)
 
+- ⚡ **VÙNG CHẠY = `sin1` (Singapore)** — đặt ở `apps/web/vercel.json`. TRƯỚC ĐÂY không có file này
+  nên Vercel dùng mặc định `iad1` (Washington DC) trong khi DB Neon ở `ap-southeast-1`: mỗi truy vấn
+  là một vòng Mỹ↔Singapore ~200ms. Đo thật từ VN: TTFB `/login` **669ms → 160ms** (nhanh ~4 lần).
+  ⚠️ `preferredRegion` của Next KHÔNG dùng được — trên Vercel nó chỉ ăn khi `runtime = 'edge'`,
+  mà app cần Node runtime (`pg`, `aws-sdk`). Kiểm vùng thật bằng `vercel inspect <url>` → xem `[sin1]`.
 - **Web**: https://subvideoai.com (Cloudflare Registrar, DNS Cloudflare CNAME → Vercel, DNS-only).
   Vercel project `dichvideoai-web`, root `apps/web`. `vercel.app` + `www` → 308 redirect về apex
   (`apps/web/proxy.ts` `CANONICAL_HOST`). Env `BETTER_AUTH_URL` + `NEXT_PUBLIC_SITE_URL` = domain mới.
