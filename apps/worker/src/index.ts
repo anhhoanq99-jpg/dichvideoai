@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 // so real environment (Docker/VPS) always wins.
 config();
 config({ path: "../../.env" });
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { and, eq, inArray } from "drizzle-orm";
 import { createDb, jobs, videos } from "@dichvideo/db";
@@ -17,6 +17,7 @@ import {
   type JobType,
 } from "@dichvideo/shared";
 import { chargeJobStart, refundJobOnFinalFailure } from "./lib/billing";
+import { reconcileOrphanJobs, reconcileStuckVideos } from "./lib/reconcile";
 import { logger } from "./logger";
 import { processors } from "./processors";
 
@@ -144,6 +145,35 @@ worker.on("error", (err) => {
   logger.error({ err: err.message }, "worker error");
 });
 
+/**
+ * DỌN JOB MỒ CÔI: chạy ngay khi worker lên, rồi lặp lại mỗi 6 giờ.
+ *
+ * Lúc khởi động là thời điểm quan trọng nhất — worker vừa restart thường là lúc
+ * job bị bỏ lại giữa đường. Lặp 6 giờ để bắt cả trường hợp worker sống nhưng
+ * Redis mất bản ghi; nhịp thưa để không đốt hạn mức lệnh Upstash (xem chú thích
+ * drainDelay bên trên) — mỗi lượt chỉ tốn lệnh khi DB THẬT SỰ có job đang chờ.
+ */
+const RECONCILE_EVERY_MS = 6 * 60 * 60 * 1000;
+const reconcileQueue = new Queue<JobPayload>(QUEUES.pipeline, { connection });
+
+async function runReconcile() {
+  try {
+    const r = await reconcileOrphanJobs(db, reconcileQueue);
+    if (r.requeued || r.failed) {
+      logger.warn(r, "đã dọn job mồ côi");
+    }
+    // chạy SAU khi dọn job: job vừa bị đánh failed ở trên có thể là job cuối
+    // của một video, lúc đó video mới đủ điều kiện hạ trạng thái
+    await reconcileStuckVideos(db);
+  } catch (err) {
+    logger.error({ err: String(err) }, "dọn job mồ côi thất bại");
+  }
+}
+
+void runReconcile();
+const reconcileTimer = setInterval(() => void runReconcile(), RECONCILE_EVERY_MS);
+reconcileTimer.unref();
+
 const health = createServer((_req, res) => {
   res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify({ ok: true, queue: QUEUES.pipeline }));
@@ -157,7 +187,9 @@ health.listen(env.WORKER_HEALTH_PORT, () => {
 
 async function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
+  clearInterval(reconcileTimer);
   await worker.close();
+  await reconcileQueue.close();
   await connection.quit();
   health.close();
   process.exit(0);
