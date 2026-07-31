@@ -64,7 +64,7 @@ tiền bạc, tối ưu tốc độ, chuẩn bị chạy quảng cáo rộng.
 
 | Commit | Nội dung |
 |---|---|
-| `5f308fd` ⏸ | **Xác minh email** (CHƯA PUSH — xem mục 4). `lib/auth.ts` `requireEmailVerification` + `emailVerification{sendOnSignUp,sendOnSignIn,autoSignInAfterVerification}` + `grantSignupCredits`, `lib/email.ts` `sendVerifyEmail`, `login-card.tsx` lời nhắc kiểm hộp thư |
+| `5f308fd` ⏸ | **Xác minh email** — code hoàn chỉnh nhưng **đã bị `ff12404` revert** (lỡ push khi SMTP còn hỏng). Lấy lại bằng `git revert --no-edit ff12404`. Gồm: `lib/auth.ts` `requireEmailVerification` + `emailVerification{sendOnSignUp,sendOnSignIn,autoSignInAfterVerification}` + `grantSignupCredits`, `lib/email.ts` `sendVerifyEmail`, `login-card.tsx` lời nhắc kiểm hộp thư |
 | `fcdaa75` | **Dòng bản quyền ở MỌI trang** — `components/copyright-line.tsx` dùng chung; `site-footer.tsx`, `(app)/layout.tsx`, 3 thẻ auth |
 | `0b66335` | **Chữ mẫu trong bảng Kiểu phụ đề** — `subtitle-sample.tsx` + `subtitle-text-style.ts` (công thức tô chữ dùng chung với khung xem trước, không thể lệch) |
 | `6ccd956` | Vá 3 lỗ hổng luồng tiền tìm được khi rà soát |
@@ -91,7 +91,10 @@ Verify: 107 cột · 5 enum · 24 index · 26 ràng buộc — **khớp**.
 
 ## 4. ĐANG LÀM DỞ — dừng ở đâu, bước tiếp theo
 
-### Xác minh email (commit `5f308fd`, **local, CHƯA push**)
+### Xác minh email — code đã viết xong nhưng **ĐANG BỊ REVERT trên main**
+
+Commit gốc `5f308fd`, đã bị `ff12404` revert (lỡ push nhầm khi SMTP còn hỏng, đảo lại ngay).
+**Lấy code về**: `git revert --no-edit ff12404` (revert của revert) — KHÔNG phải viết lại từ đầu.
 
 **Đã xong**: toàn bộ code + typecheck + lint + build + 114 test pass.
 
