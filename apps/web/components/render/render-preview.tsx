@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MAX_COVER_REGIONS,
-  opacityToHexAlpha,
   type CoverMode,
   type CoverRegion,
   type SubtitleSegment,
@@ -14,6 +13,7 @@ import { useDubPreview } from "@/hooks/use-dub-preview";
 import { useLogoGesture } from "@/hooks/use-logo-gesture";
 import { AccentedWords } from "./accented-words";
 import { PreviewControls } from "./preview-controls";
+import { subtitleBoxStyle, subtitleTextStyle } from "./subtitle-text-style";
 import {
   LOGO_CORNER,
   activeSegmentAt,
@@ -452,10 +452,6 @@ export function RenderPreview({
     else video.pause();
   }
 
-  // dùng chung với worker để preview khớp bản xuất — xem opacityToHexAlpha
-  const boxAlpha = opacityToHexAlpha(settings.boxOpacity);
-  const outline = settings.outlineColor;
-
   return (
     <div>
       {/* w-fit + video giới hạn chiều cao: video dọc 9:16 không chiếm cả màn hình,
@@ -592,43 +588,15 @@ export function RenderPreview({
             )}
             <span
               className="max-w-full px-1.5 py-0.5 text-center leading-tight"
-              style={{
-                fontFamily: `'${settings.font}', sans-serif`,
-                fontSize: Math.max(9, activeFontSize * previewScale),
-                fontWeight: settings.bold ? 700 : 400,
-                backgroundColor: settings.boxed
-                  ? `${settings.boxColor}${boxAlpha}`
-                  : "transparent",
-              }}
+              style={subtitleBoxStyle(
+                settings,
+                Math.max(9, activeFontSize * previewScale),
+              )}
             >
               {/* span trong mang màu + hiệu ứng — key theo câu để animation chạy lại mỗi câu */}
               <span
                 key={activeSegment?.i ?? -1}
-                style={{
-                  display: "inline-block",
-                  color: settings.primaryColor,
-                  textShadow: settings.boxed
-                    ? "none"
-                    : `-1px -1px 0 ${outline}, 1px -1px 0 ${outline}, -1px 1px 0 ${outline}, 1px 1px 0 ${outline}, 0 0 4px ${outline}`,
-                  ...(settings.effect === "fade"
-                    ? { animation: "sub-fade 0.18s ease-out both" }
-                    : {}),
-                  ...(settings.effect === "pop"
-                    ? { animation: "sub-pop 0.16s ease-out both" }
-                    : {}),
-                  ...(settings.effect === "karaoke"
-                    ? {
-                        color: "transparent",
-                        textShadow: "none",
-                        backgroundImage: `linear-gradient(90deg, ${settings.primaryColor} 50%, #C9C9C9 50%)`,
-                        backgroundSize: "200% 100%",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextStroke: settings.boxed ? undefined : `1px ${outline}`,
-                        animation: `sub-karaoke ${segDurMs}ms linear both`,
-                      }
-                    : {}),
-                }}
+                style={subtitleTextStyle(settings, segDurMs)}
               >
                 {settings.effect === "karaoke" ? (
                   previewText.replace(/\*/g, "")

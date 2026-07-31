@@ -10,6 +10,7 @@ import {
   styleFieldsFromPreset,
   type RenderSettings,
 } from "@/components/render/render-settings";
+import { SubtitleSample } from "@/components/render/subtitle-sample";
 import { SubtitleStyleFields } from "@/components/render/subtitle-style-fields";
 
 const T = {
@@ -17,6 +18,7 @@ const T = {
     styleTitle: "Kiểu phụ đề",
     stylePreset: "Mẫu có sẵn",
     aspect: "Khung hình",
+    sample: "Xem thử",
     styleHint:
       "Mọi thay đổi hiện ngay trên khung xem trước. Kéo phụ đề trên video để đổi vị trí; vị trí đè vùng che chỉnh trong nút “Làm mờ”.",
   },
@@ -24,6 +26,7 @@ const T = {
     styleTitle: "Subtitle style",
     stylePreset: "Presets",
     aspect: "Aspect ratio",
+    sample: "Preview",
     styleHint:
       "Every change shows instantly in the preview. Drag the subtitles on the video to reposition; overlay-on-cover position is set in the “Blur” button.",
   },
@@ -89,6 +92,15 @@ export function StyleModal({
               ))}
             </select>
           </label>
+        </div>
+
+        {/* chữ mẫu ngay dưới ô chọn mẫu: đổi cái gì cũng thấy ngay, khỏi phải
+            tua video tới đúng câu đang có thoại mới biết kiểu chữ ra sao */}
+        <div>
+          <span className={fieldLabelClass}>{t.sample}</span>
+          <div className="mt-1">
+            <SubtitleSample settings={settings} lang={lang} />
+          </div>
         </div>
 
         <SubtitleStyleFields
