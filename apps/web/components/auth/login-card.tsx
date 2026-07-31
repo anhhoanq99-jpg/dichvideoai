@@ -8,6 +8,7 @@ import { SIGNUP_TRIAL_CREDITS } from "@dichvideo/shared";
 import { BrandLogo } from "@/components/brand-logo";
 import { signIn, signUp } from "@/lib/auth-client";
 import { LangSwitcher } from "@/components/lang-switcher";
+import { CopyrightLine } from "@/components/copyright-line";
 import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +103,7 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
     "flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm focus-within:border-primary-500 dark:border-neutral-700 dark:bg-neutral-800";
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-neutral-50 px-4 py-8 dark:bg-neutral-950">
       <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-7 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center justify-between">
           <BrandLogo textClassName="hidden" />
@@ -260,6 +261,7 @@ export function LoginCard({ lang, banned = false }: { lang: Lang; banned?: boole
           {t.bonus}
         </p>
       </div>
+      <CopyrightLine lang={lang} />
     </main>
   );
 }

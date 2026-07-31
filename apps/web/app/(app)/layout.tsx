@@ -6,6 +6,7 @@ import { AppHeaderShell } from "@/components/app-header-shell";
 import { AppSidebar, MobileNav } from "@/components/app-sidebar";
 import { BackButton } from "@/components/back-button";
 import { BrandLogo } from "@/components/brand-logo";
+import { CopyrightLine } from "@/components/copyright-line";
 import { CreditBalanceChip } from "@/components/credit-balance-chip";
 import { LangSwitcher } from "@/components/lang-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -54,8 +55,12 @@ export default async function AppLayout({
         </AppHeaderShell>
         {/* overflow-x-hidden: phần tử nào lỡ rộng hơn màn hình cũng không làm
             trang bị đẩy ngang khi thao tác trên điện thoại */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
-          {children}
+        {/* Dòng bản quyền nằm TRONG vùng cuộn, không ghim đáy màn hình: studio
+            và bảng phụ đề đã chật, thêm một dải cố định nữa là mất chỗ làm việc.
+            Cuộn hết nội dung mới thấy — đúng chỗ của footer. */}
+        <main className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+          <div className="flex-1">{children}</div>
+          <CopyrightLine lang={lang} className="mt-6 shrink-0 text-center" />
         </main>
       </div>
     </div>

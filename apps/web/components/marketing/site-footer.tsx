@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Clapperboard, MessageCircle } from "lucide-react";
 import { SUPPORT_ZALO, SUPPORT_ZALO_URL } from "@dichvideo/shared";
 import { BRAND_TAGLINE } from "@/components/brand-logo";
+import { CopyrightLine } from "@/components/copyright-line";
 import type { Lang } from "@/lib/i18n";
 import { Reveal } from "./reveal";
 
@@ -95,9 +96,10 @@ export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
             {t.zalo} {SUPPORT_ZALO}
           </a>
         </nav>
-        <p className="text-xs text-neutral-500">
-          © {new Date().getFullYear()} {t.brand}. {t.copyright}
-        </p>
+        <CopyrightLine lang={lang} />
+        {/* miễn trừ trách nhiệm — KHÁC dòng bản quyền phía trên, giữ cả hai:
+            một cái là quyền của mình, một cái là trách nhiệm của khách */}
+        <p className="text-xs text-neutral-500">{t.copyright}</p>
       </div>
     </footer>
   );
